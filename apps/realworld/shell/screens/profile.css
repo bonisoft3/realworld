@@ -1,0 +1,186 @@
+@import "./shared/chrome.css";
+
+@import "./shared/system.css";
+
+
+/* profile — ir: #profile. One person's page: the header, a two-item rail and
+   their writing in the shared preview card. Two top-level regions, so `empty`
+   and `populated` are styled alike and each region says its own sentence. The
+   storybook renders this screen in a 360px frame on a wide viewport, so every
+   responsive rule below reads the container and never the device. */
+[data-screen="profile"] { container-type: inline-size; }
+
+[data-screen="profile"] .topline { display: flex; align-items: center;
+  flex-wrap: wrap; gap: var(--sp-sm) var(--sp-md);
+  justify-content: space-between; margin: 0 calc(var(--sp-lg) * -1)
+  var(--sp-lg); padding: 0 var(--sp-lg) var(--sp-md);
+  border-bottom: 1px solid var(--border); }
+[data-screen="profile"] .back { color: var(--secondary);
+  text-decoration: none; white-space: nowrap; }
+[data-screen="profile"] .back:hover { color: var(--primary); }
+/* The search box rides every reading screen, and on a screen whose only other
+   controls are pills it is also the input event that clears a refusal. */
+[data-screen="profile"] .search { display: flex; gap: var(--sp-sm);
+  flex-wrap: wrap; flex: 1 1 260px; justify-content: flex-end; margin: 0; }
+[data-screen="profile"] .search input { flex: 1 1 140px; min-width: 0;
+  max-width: 320px; border-radius: var(--r-full); padding: 8px 16px; }
+[data-screen="profile"] .search button { border-radius: var(--r-full); }
+[data-screen="profile"] .search .invalid { flex-basis: 100%;
+  text-align: right; }
+
+/* The person. A portrait, the name in serif over the handle in sans, the about
+   line in serif — the duality doing the work the wireframe draws. */
+[data-screen="profile"] .person-row { display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "portrait ident" "bio bio" "arms arms";
+  align-items: center; column-gap: var(--sp-md); row-gap: var(--sp-md); }
+[data-screen="profile"] .portrait { grid-area: portrait; width: 72px;
+  height: 72px; object-fit: cover; border-radius: var(--r-full);
+  background: var(--surface-muted);
+  border: 1px solid var(--border); }
+[data-screen="profile"] .ident { grid-area: ident; min-width: 0; }
+[data-screen="profile"] .role-display-md.person-name { font-size: 1.625rem; }
+[data-screen="profile"] .person-name { margin: 0; color: var(--primary);
+  overflow-wrap: anywhere; }
+/* display_name is nullable and the markup carries no conditional: a person who
+   set no name reads as their handle alone. */
+[data-screen="profile"] .person-name:empty { display: none; }
+[data-screen="profile"] .person-handle { margin: 3px 0 0;
+  color: var(--secondary); overflow-wrap: anywhere; }
+/* The about line is something a person wrote, so it is serif and it is at
+   --primary; chrome colour would demote it to a caption. */
+[data-screen="profile"] .person-bio { grid-area: bio; margin: 0;
+  max-width: 58ch; color: var(--primary); overflow-wrap: anywhere; }
+[data-screen="profile"] .person-bio:empty { display: none; }
+
+/* The follow control: three arms behind two probes. Both probes are hidden
+   boxes whose :empty state is the only session fact this screen has. */
+[data-screen="profile"] .follow-arms { grid-area: arms; position: relative;
+  display: flex; align-items: center; }
+[data-screen="profile"] .mine-probe,
+[data-screen="profile"] .follows-probe { display: none; }
+[data-screen="profile"] .own-arm { display: inline-block; }
+[data-screen="profile"] .follow-arm,
+[data-screen="profile"] .following-arm { display: inline-flex;
+  flex-wrap: wrap; }
+/* Not my page and I do not follow them → the accent Follow; not my page and I
+   do → the outline Following, a reversal and never danger. */
+[data-screen="profile"] .follows-probe:empty ~ .following-arm { display: none; }
+[data-screen="profile"] .follows-probe:not(:empty) ~ .follow-arm { display: none; }
+/* My own page → neither, and Settings instead. */
+[data-screen="profile"] .mine-probe:empty ~ .own-arm { display: none; }
+[data-screen="profile"] .mine-probe:not(:empty) ~ .follow-arm,
+[data-screen="profile"] .mine-probe:not(:empty) ~ .following-arm { display: none; }
+/* It navigates, it does not commit, so it is secondary with a hairline and the
+   page keeps its one accent unspent. */
+[data-screen="profile"] .own-arm { color: var(--secondary);
+  text-decoration: underline; text-underline-offset: 3px;
+  text-decoration-color: var(--border); }
+[data-screen="profile"] .own-arm:hover { color: var(--primary);
+  text-decoration-color: var(--secondary); }
+[data-screen="profile"] .follow-arms .invalid,
+[data-screen="profile"] .follow-arms .store-error { flex-basis: 100%; }
+
+/* The rail. Two destinations for the same person, the current one carrying the
+   rule it sits on; it is screen-level markup and stays in every frame, because
+   the platform has no conditional that could remove it. */
+[data-screen="profile"] .tabs { display: flex; gap: var(--sp-lg);
+  margin: var(--sp-lg) calc(var(--sp-lg) * -1) var(--sp-md);
+  padding: 0 var(--sp-lg); border-bottom: 1px solid var(--border); }
+[data-screen="profile"] .tab { display: inline-block; padding-bottom: 9px;
+  margin-bottom: -1px; color: var(--secondary); text-decoration: none;
+  border-bottom: 2px solid transparent; }
+[data-screen="profile"] .tab:hover { color: var(--primary); }
+[data-screen="profile"] .role-meta-sm.tab { font-weight: 600; }
+[data-screen="profile"] .tab.current { color: var(--primary);
+  border-bottom-color: var(--primary); }
+
+/* The ceiling rides the twentieth card, never the last one, so a person with
+   three pieces is never told twenty exist (ir decision-paging-keyset). */
+[data-screen="profile"] .ceiling { display: none; position: relative; z-index: 2;
+  margin: var(--sp-sm) 0 0; padding-top: var(--sp-sm);
+  border-top: 1px solid var(--border); color: var(--secondary); }
+[data-screen="profile"] .list > *:nth-child(20) .ceiling { display: block; }
+
+/* Each region's own sentence. Neither is centred: they replace content that
+   was left-aligned, and a centred line would read as a different page. */
+[data-screen="profile"] .empty { margin: 0; text-align: left; }
+[data-screen="profile"] .person .empty { color: var(--primary);
+  padding: var(--sp-md) 0 0; }
+[data-screen="profile"] .list .empty { color: var(--secondary);
+  padding: var(--sp-md) 0 var(--sp-xl); }
+
+@container (max-width: 460px) {
+  [data-screen="profile"] .search { justify-content: flex-start; }
+  [data-screen="profile"] .search .invalid { text-align: left; }
+  [data-screen="profile"] .portrait { width: 56px; height: 56px; }
+  [data-screen="profile"] .role-display-md.person-name { font-size: 1.375rem; }
+  [data-screen="profile"] .person-row { column-gap: var(--sp-sm);
+    row-gap: var(--sp-sm); }
+  [data-screen="profile"] .tabs { gap: var(--sp-md); }
+  [data-screen="profile"] .preview-head { flex-wrap: wrap; }
+  [data-screen="profile"] .preview-foot { flex-direction: column;
+    align-items: flex-start; }
+  [data-screen="profile"] .arms { align-items: flex-start; }
+}
+
+/* States — data-state is shell-owned; the screen only styles it. `empty` and
+   `populated` are styled alike by design. */
+[data-screen="profile"] .skeleton,
+[data-screen="profile"] .skeleton-cards,
+[data-screen="profile"] .offline { display: none; }
+/* A skeleton covers region-bound content only: the back-link and the search
+   box are static markup outside every region and are drawn as themselves. The
+   rail is held invisible rather than drawn, because naming a person's two
+   tabs before the person resolves is a guess. */
+[data-screen="profile"][data-state="loading"] .skeleton { display: grid;
+  gap: var(--sp-md); }
+[data-screen="profile"][data-state="loading"] .skeleton-cards { display: flex;
+  flex-direction: column; gap: var(--sp-sm); }
+[data-screen="profile"][data-state="loading"] .person,
+[data-screen="profile"][data-state="loading"] .list { display: none; }
+[data-screen="profile"][data-state="loading"] .tabs { visibility: hidden; }
+/* Held down until the probes sweep their templates, or an unset arm flashes. */
+[data-screen="profile"][data-state="loading"] .arms,
+[data-screen="profile"][data-state="loading"] .follow-arms { visibility: hidden; }
+[data-screen="profile"] .skel-head { display: flex; align-items: center;
+  gap: var(--sp-md); }
+[data-screen="profile"] .skel-portrait { width: 72px; height: 72px; flex: none;
+  border-radius: var(--r-full); background: var(--surface-muted); }
+[data-screen="profile"] .skel-name { height: 17px; width: 44%;
+  border-radius: var(--r-sm); background: var(--surface-muted); }
+[data-screen="profile"] .skel-bio { height: 12px; width: 82%;
+  border-radius: var(--r-sm); background: var(--surface-muted); }
+[data-screen="profile"] .skel-button { height: 40px; width: 176px;
+  border-radius: var(--r-sm); background: var(--surface-muted); }
+[data-screen="profile"] .skel-card { height: 104px;
+  border-radius: var(--r-md); background: var(--surface-muted); }
+[data-screen="profile"] .skel-card.tall { height: 118px; }
+/* Every screen with a server-computed read carries the offline sentence; this
+   screen's writing list is one (an embedded filter plus a limit). It must not
+   read as a person who has published nothing. */
+[data-screen="profile"][data-state="network-error"] .offline { display: block; }
+
+/* Storyboard hooks, every one of them scoped to `[data-storybook]`. `following`
+   and `own-profile` are frames the interpreter never sets; `populated`,
+   `populated-dark` and `empty` are frames it sets on every running screen, so a
+   hook naming one of those and not the storybook poses the live arms too — and
+   on one's own page that hides "Edit your profile", which is the only way from
+   here into settings. The storybook answers every probe with three rows, so the
+   probe rules alone would draw own-profile in all six frames; each hook names
+   the one arm its frame is about. Each carries `.follow-arms` so it ties the
+   probe rules on specificity and wins on order — a hook one class short is a
+   frame that silently keeps the probe's answer. */
+[data-storybook][data-screen="profile"][data-state="populated"] .follow-arms .own-arm,
+[data-storybook][data-screen="profile"][data-state="populated-dark"] .follow-arms .own-arm,
+[data-storybook][data-screen="profile"][data-state="following"] .follow-arms .own-arm,
+[data-storybook][data-screen="profile"][data-state="empty"] .follow-arms .own-arm { display: none; }
+[data-storybook][data-screen="profile"][data-state="populated"] .follow-arms .follow-arm,
+[data-storybook][data-screen="profile"][data-state="populated-dark"] .follow-arms .follow-arm { display: inline-flex; }
+[data-storybook][data-screen="profile"][data-state="populated"] .follow-arms .following-arm,
+[data-storybook][data-screen="profile"][data-state="populated-dark"] .follow-arms .following-arm { display: none; }
+[data-storybook][data-screen="profile"][data-state="following"] .follow-arms .follow-arm { display: none; }
+[data-storybook][data-screen="profile"][data-state="following"] .follow-arms .following-arm { display: inline-flex; }
+[data-storybook][data-screen="profile"][data-state="own-profile"] .follow-arms .follow-arm,
+[data-storybook][data-screen="profile"][data-state="own-profile"] .follow-arms .following-arm { display: none; }
+[data-storybook][data-screen="profile"][data-state="own-profile"] .follow-arms .own-arm { display: inline-block; }

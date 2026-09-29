@@ -1,0 +1,404 @@
+/* The design system, declared once for the whole app.
+
+   This was twelve copies of the same block, and they had drifted: three
+   different preview cards, inputs padded 9px on one screen and 10px on the
+   next, a page title at two sizes. decision-preview-one-component says the
+   preview is one component only if its source is literally shared — so the
+   source is now literally shared, and "byte-identical" is a property of the
+   file system rather than a promise a reviewer has to re-check.
+
+   Screens import this and then declare their own layout, and nothing else.
+   Every value here comes through a token in design.css (check-screens guards
+   the fork). */
+
+/* Every box measures the way its author wrote it. The terminal ships no
+   stylesheet and the emitted design.css carries tokens only, so without this
+   a padded card is wider than the column that holds it — which is where the
+   11px of horizontal overflow on a 400px screen came from
+   (check-visual's no-horizontal-overflow). */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Type roles — the five DESIGN.md typography entries, and the ONLY place this
+   stylesheet names a family or a size (ir test-dual-appearance). The duality is
+   the identity: serif for what a person wrote, sans for what the app says about
+   it. Shared system block: byte-identical on every screen that carries it. */
+.role-display-lg { font-family: ui-serif, Georgia, "Times New Roman", serif;
+  font-size: 2.5rem; font-weight: 600; line-height: 1.15; }
+.role-display-md { font-family: ui-serif, Georgia, "Times New Roman", serif;
+  font-size: 1.375rem; font-weight: 600; line-height: 1.25; }
+.role-prose { font-family: ui-serif, Georgia, "Times New Roman", serif;
+  font-size: 1.0625rem; line-height: 1.7; }
+.role-body-md { font-family: system-ui, sans-serif; font-size: 1rem;
+  line-height: 1.5; }
+.role-meta-sm { font-family: system-ui, sans-serif; font-size: .8125rem;
+  line-height: 1.4; }
+/* Role variants: the family stays the role's, one step of size or weight moves.
+   Every selector still starts at a role class, so the lint's "family and size
+   through the roles only" clause holds. */
+.role-body-md.page-title { font-size: 1.3125rem; font-weight: 650;
+  letter-spacing: -.01em; }
+.role-body-md.beginning-line { font-size: 1.0625rem; }
+.role-body-md.beginning-out { font-weight: 600; }
+.role-body-md.outline, .role-meta-sm.pill, .role-meta-sm.mark,
+.role-meta-sm.older { font-weight: 600; }
+.role-meta-sm.chip { font-weight: 600; }
+
+/* Ground and controls. Colour, radius and spacing come from tokens only —
+   a literal hex here would fork the dark twin (ir test-dual-appearance). */
+.screen { margin: 0 auto; max-width: 720px; color: var(--primary);
+  background: var(--neutral); padding: var(--sp-lg) var(--sp-lg) var(--sp-xl); }
+input { color: var(--primary); background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 9px 12px; }
+input::placeholder { color: var(--secondary); }
+input:focus-visible { outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+button { cursor: pointer; background: var(--accent); color: var(--neutral);
+  border: 1px solid transparent; border-radius: var(--r-sm); padding: 9px 18px;
+  transition: filter var(--motion-fast) var(--motion-ease); }
+button:hover { filter: brightness(.94); }
+button:focus-visible { outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+/* Navigation never wears the accent — it is spent on creation and commitment
+   only (DESIGN.md), and this screen commits nothing. */
+button.outline { background: var(--surface); color: var(--secondary);
+  border-color: var(--border); }
+button.outline:hover { color: var(--primary); border-color: var(--secondary);
+  filter: none; }
+/* Hidden until the screen says otherwise. The reveal is per-screen
+   ([data-state="network-error"]); the base belongs here, because a note that
+   says the app cannot be reached must not be the resting state of a screen
+   that plainly reached it. */
+.offline { display: none; color: var(--secondary); margin: 0 0 var(--sp-md); }
+
+/* Refusal, one treatment for every form: danger words under the control that
+   was refused, and a danger ring on the control itself. .invalid is the shell's
+   validation reveal, .store-error the store's 4xx. */
+.invalid, .store-error { display: none; color: var(--danger);
+  margin: 6px 0 0; }
+.invalid:not([hidden]), .store-error:not([hidden]) { display: block; }
+form:has(> .invalid:not([hidden])) :is(input:not([type="hidden"]), textarea, select),
+form:has(> .store-error:not([hidden])) :is(input:not([type="hidden"]), textarea, select) {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 16%, transparent); }
+[data-state="form-submit"] form[data-submitting] button[type="submit"] { opacity: .55; }
+/* ...but not the optimistic toggles. Dimming a submit while its write is in
+   flight is right for a form the reader is waiting on, and wrong for a control
+   that has ALREADY changed in front of them: the arm swaps at 34ms off the
+   local row, and then this rule held it at 55% until the write settled around
+   300ms — which is exactly the "it fills but feels slow" it looked like, and it
+   was the dimming, not the fill. The genuinely-slow case is still covered, by
+   the delayed pulse below. */
+[data-state="form-submit"] form[data-submitting] :is(.pill, .mark)[type="submit"] { opacity: 1; }
+
+/* The preview — one component wherever a list of writing appears, with its
+   numbers pinned in ir decision-preview-one-component: a surface well at
+   rounded.md with a border hairline, an r6.5 avatar, a display-md serif title,
+   a prose description at --primary, chips and a 42x13 pill at rounded.full,
+   spacing.sm insets and spacing.sm between cards. Card width is the single
+   permitted variant. */
+.list { display: flex; flex-direction: column; gap: var(--sp-sm); }
+.preview { position: relative; display: flex; flex-direction: column;
+  gap: 5px; background: var(--surface); color: var(--primary);
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: var(--sp-sm) var(--sp-md);
+  transition: border-color var(--motion-fast) var(--motion-ease),
+              box-shadow var(--motion-fast) var(--motion-ease); }
+.preview:hover { border-color: var(--secondary);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--primary) 8%, transparent); }
+/* The title and description open the piece — the largest, safest target on the
+   card and the part that is only text. The overlay stops there rather than
+   spanning the well: the byline, the chips and the pill are their own
+   destinations, and an overlay across them leaves every one of them sitting on
+   top of a link that claims the same pixels (check-visual's
+   no-interactive-overlap, which reads that as a covered control). */
+.preview-open { position: relative; display: flex; flex-direction: column;
+  gap: 5px; }
+/* The thumbnail rides beside the title block, so a card with a cover and one
+   without are the same component at the same height — the image is the
+   variant, not the layout. A region rather than a bare <img> for the reason
+   the hero is one: an unset URL binds to a transparent pixel. */
+/* Two columns, not a reversed row: the title and the description are separate
+   elements and have to stay stacked against each other while the image sits
+   beside both. */
+.preview:has(.thumb-img) .preview-open { display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "title thumb" "desc thumb";
+  align-content: start; column-gap: var(--sp-md); row-gap: 5px; }
+.preview:has(.thumb-img) .preview-title { grid-area: title; }
+.preview:has(.thumb-img) .preview-desc { grid-area: desc; }
+.preview:has(.thumb-img) .thumb { grid-area: thumb; align-self: start; }
+.thumb { flex: none; }
+.thumb-img { display: block; width: 104px; height: 74px; object-fit: cover;
+  border-radius: var(--r-sm); background: var(--surface-muted); }
+.card-open { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.preview .byline, .preview .chips, .preview .arms {
+  position: relative; z-index: 2; }
+/* slug is GENERATED: an unconfirmed row has none, and "#/article/" is a hash
+   matchRoute rejects, after which currentRoute() throws and takes the app down
+   until reload. */
+.preview[data-pending="true"] .card-open { display: none; }
+.preview-head { display: flex; align-items: center; gap: var(--sp-sm);
+  justify-content: space-between; }
+.byline { display: inline-flex; align-items: center; gap: 7px; min-width: 0;
+  min-height: 24px;
+  color: var(--secondary); text-decoration: underline;
+  text-underline-offset: 2px; text-decoration-color: var(--border); }
+.byline:hover { color: var(--primary); text-decoration-color: var(--secondary); }
+.avatar { position: relative; width: 22px; height: 22px; flex: none;
+  object-fit: cover; border-radius: var(--r-full);
+  background: var(--surface-muted)
+    url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><g fill='%23909598' opacity='.75'><circle cx='12' cy='9.5' r='4'/><path d='M12 15c-4.4 0-7 2.4-7 5.5V22h14v-1.5c0-3.1-2.6-5.5-7-5.5z'/></g></svg>")
+    center / 100% no-repeat; }
+/* image_url is nullable and the picture is a link the person supplies, so a
+   blank or dead one is ordinary. The silhouette is the placeholder for both
+   no-picture paths: the element's background shows through a blank image, and
+   the pseudo-element — which paints on a replaced element only when the image
+   fails — turns the UA's broken glyph into the same figure. The one grey
+   works over the muted surface in either appearance. */
+.avatar::after { content: ""; position: absolute; inset: 0;
+  border-radius: inherit; background: var(--surface-muted)
+    url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><g fill='%23909598' opacity='.75'><circle cx='12' cy='9.5' r='4'/><path d='M12 15c-4.4 0-7 2.4-7 5.5V22h14v-1.5c0-3.1-2.6-5.5-7-5.5z'/></g></svg>")
+    center / 100% no-repeat; }
+/* display_name is nullable and the markup carries no conditional: an empty
+   name collapses and the separator rides on the name that is there. */
+.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name:empty { display: none; }
+.name:not(:empty)::after { content: " · "; }
+.handle { white-space: nowrap; }
+.date { flex: none; color: var(--secondary); }
+/* The reading cost, beside the date: both are facts about the piece rather
+   than about its writer. The column is the body's own word count, so the
+   number cannot drift from the text it measures (decision-reading-time). */
+.read { flex: none; color: var(--secondary); white-space: nowrap; }
+.read::before { content: "\00b7\00a0"; }
+.read::after { content: "\00a0min read"; }
+/* An unconfirmed row has no server-computed count yet; showing "min read"
+   against nothing would read as a broken card. */
+.read:empty { display: none; }
+.preview-title { color: var(--primary); overflow-wrap: anywhere; }
+.preview-desc { color: var(--primary); display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.preview-desc:empty { display: none; }
+.preview-foot { display: flex; align-items: flex-end; gap: var(--sp-sm);
+  justify-content: space-between; margin-top: 3px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0;
+  list-style: none; min-width: 0; }
+.chips:empty { display: none; }
+/* 24px is the floor a finger needs (check-visual's touch-target-size, and the
+   WCAG target-size minimum). A chip's ink is smaller than that, so the box is
+   grown to the floor rather than the type — the row still reads as chrome. */
+.chip { display: inline-flex; align-items: center; min-height: 24px;
+  color: var(--secondary); background: var(--surface-muted);
+  border-radius: var(--r-full); padding: 2px 10px; text-decoration: none; }
+.chip:hover { color: var(--primary); }
+/* The favorite toggle. Both arms are SIBLINGS of the probe, never children:
+   a nested arm would bind against the favorite row and render a zero on
+   exactly the pieces the reader has favorited (ir decision-probe-empty). The
+   count rides inside each arm, so the control is one pressable thing in both
+   states and the set state reads as a fill. */
+.arms { display: flex; flex: none; align-items: flex-start;
+  justify-content: flex-end; flex-wrap: wrap; gap: var(--sp-sm); }
+.fav-probe { display: none; }
+.fav-probe:empty ~ .when-set { display: none; }
+.fav-probe:not(:empty) ~ .when-unset { display: none; }
+/* The save toggle, built the same way and read the same way. Its probe is its
+   own, so the two toggles on a card never speak for each other. */
+.save-probe { display: none; }
+.save-probe:empty ~ .when-saved { display: none; }
+.save-probe:not(:empty) ~ .when-unsaved { display: none; }
+.pill { min-width: 68px; padding: 2px 10px; border-radius: var(--r-full);
+  background: var(--surface); color: var(--secondary);
+  border-color: var(--border); }
+.pill:hover { color: var(--primary); border-color: var(--secondary);
+  filter: none; }
+.pill.set { background: var(--accent); color: var(--neutral);
+  border-color: var(--accent); }
+.pill.set:hover { color: var(--neutral); border-color: var(--accent);
+  filter: brightness(.94); }
+/* Same geometry as the pill so the two controls read as one family, and
+   deliberately not the same colour: accent is spent on creation and
+   commitment (DESIGN.md), and a save is a note to yourself. Set state is a
+   quiet fill plus a changed word — a fill, as the identity requires, without
+   a second card on the page wearing the signal the heart is for. */
+.mark { min-width: 68px; padding: 2px 10px; border-radius: var(--r-full);
+  background: var(--surface); color: var(--secondary);
+  border-color: var(--border); }
+.mark:hover { color: var(--primary); border-color: var(--secondary);
+  filter: none; }
+.mark.set { background: var(--surface-muted); color: var(--primary);
+  border-color: var(--secondary); }
+.mark.set:hover { filter: none; }
+
+/* The toggles say which of three things is true, because three different
+   things are, and the reader can tell them apart without being told.
+   Measured on a press: the local row lands at ~99ms carrying
+   data-pending="true", and the server confirms it at ~301ms by clearing that
+   attribute. The count is a different tier again — article_stats is a pipeline
+   sink, seconds behind, and shared by everyone (decision-favorite-private-
+   derived). Pretending those are one state is what made a fast toggle feel
+   slow: nothing on screen changed until the slowest of them arrived.
+   0.  the press itself      — :active, no data involved, so it is instant
+   1.  mine, unconfirmed     — the row exists in this tab only: it breathes
+   2.  mine, confirmed       — breathing stops; the transition is the settle
+   3.  everyone's count      — arrives when the pipeline says so, and is the
+                               one number here that was never mine to animate */
+.pill, .mark {
+  transition: background-color var(--motion-fast) var(--motion-ease),
+              color var(--motion-fast) var(--motion-ease),
+              border-color var(--motion-fast) var(--motion-ease),
+              transform var(--motion-fast) var(--motion-ease); }
+/* Tier 0. The one piece of feedback that owes nothing to the network, so it is
+   the one that can be immediate. */
+.pill:active, .mark:active { transform: scale(.94); }
+
+/* Tier 1. A row the store has not yet had confirmed wears data-pending, and
+   the probe's row is the arm's own: `:has` reads the probe beside it rather
+   than any pending row on the card. Breathing, not spinning — the write has
+   already visibly happened and this says only that it is not yet everyone's. */
+/* Held back on purpose. The fill itself is immediate — the optimistic row is
+   in the collection at 6ms and painted at 34ms — and the confirmation normally
+   lands between 180 and 300ms. An animation that starts at once therefore
+   spends its whole life dimming a control that is already done, which measured
+   as opacity 1.00 at 34ms falling to 0.69 by 184ms: the fastest thing on the
+   screen made to look like the slowest. The delay outlasts a healthy write, so
+   a normal press never pulses at all and this is only ever seen when the write
+   is genuinely in trouble — which is the only time it says anything. The floor
+   is shallow for the same reason: a control that is working should not look
+   disabled. */
+@keyframes arm-unconfirmed {
+  from { opacity: 1 }
+  50%  { opacity: .74 }
+  to   { opacity: 1 }
+}
+.fav-probe:has(> [data-pending]) ~ .when-set .pill,
+.fav-probe:has(> [data-pending]) ~ .when-unset .pill,
+.save-probe:has(> [data-pending]) ~ .when-saved .mark,
+.save-probe:has(> [data-pending]) ~ .when-unsaved .mark {
+  animation: arm-unconfirmed 900ms var(--motion-ease) 400ms infinite; }
+/* Tier 2 needs no rule: the selector stops matching and the animation stops
+   with it. Deliberately NOT a settle animation — `:has(> :not([data-pending]))`
+   also matches on first paint for every piece already favourited, so a settle
+   would pop every heart on the page on load, which is the opposite of the
+   signal. */
+
+/* Motion is a nicety here and a problem for anyone who asked for less of it:
+   a control that breathes forever is exactly what the preference exists to
+   stop. The token collapse in design.css handles durations, not iteration. */
+@media (prefers-reduced-motion: reduce) {
+  .fav-probe:has(> [data-pending]) ~ .when-set .pill,
+  .fav-probe:has(> [data-pending]) ~ .when-unset .pill,
+  .save-probe:has(> [data-pending]) ~ .when-saved .mark,
+  .save-probe:has(> [data-pending]) ~ .when-unsaved .mark {
+    animation: none; opacity: .7; }
+}
+
+/* Primitives every screen carries and none of them owns. They lived in the
+   twelve copies and so were invisible until the copies became one file: a
+   back-link, the frame a loading screen draws, the sentence a region appends
+   when it has no rows, and the note shown when the app cannot reach its
+   cluster. */
+.back { display: inline-flex; align-items: center; min-height: 24px;
+  color: var(--secondary); text-decoration: none; }
+.back .under { border-bottom: 1px solid var(--border); padding-bottom: 2px; }
+.back:hover { color: var(--primary); }
+/* A region's own sentence. The interpreter appends this paragraph, so it
+   carries no role class and reads at the inherited sans body size. */
+.empty { color: var(--secondary); text-align: center; padding: var(--sp-xl) 0; }
+/* The skeleton is revealed by the screen that owns its shape; the base state
+   is hidden, so a screen that forgets to reveal one shows content, not bones. */
+.skeleton { display: none; }
+.skel-bar { display: block; background: var(--surface-muted);
+  border-radius: var(--r-sm); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* end shared system block */
+
+/* A phone gives the title the whole width and puts the cover above it: beside
+   the title, a 104px thumb leaves about 216px for a serif headline, which is
+   where the mid-word breaks come from. The head row wraps rather than
+   truncating the writer's name to three letters. */
+@container (max-width: 560px) {
+  .preview:has(.thumb-img) .preview-open { grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "thumb" "title" "desc"; row-gap: var(--sp-sm); }
+  .thumb-img { width: 100%; height: auto; aspect-ratio: 16 / 9; }
+  .preview-head { flex-wrap: wrap; row-gap: 2px; }
+  .byline { max-width: 100%; }
+}
+
+/* Search on a phone, for the nine screens that carry it. It is a destination —
+   /search/:q is its own screen — so on a narrow surface it keeps one slim row
+   and gives its label back to a mark rather than spending the top of the page
+   on a button. Written once here because nine copies of a control's treatment
+   is how the copies start to differ. */
+@container (max-width: 560px) {
+  .search { flex-wrap: nowrap; gap: 6px; }
+  .search input { flex: 1 1 auto; min-width: 0; padding: 8px 12px; }
+  .search button { flex: none; font-size: 0; padding: 8px 12px; }
+  .search button::before { content: "\1f50d"; font-size: .9375rem; }
+}
+
+/* The language picker: a row of its own at the top of every screen, pinned to
+   the inline end. The strip above it is the terminal's — shell.js builds that
+   <nav>
+   from each route's nav.label and appends the identity to it, and it takes no
+   app element — so an app-wide setting takes the nearest surface this app does
+   own. A native <details> disclosure: no handler, and no id to collide with,
+   which matters because the terminal keeps a departed screen mounted and
+   hidden and a duplicate id would hand getElementById the wrong one.
+   The trigger names the language the reader is in — the summary carries all
+   fifteen endonyms and [data-locale] on the screen root (interpreter/screen.js,
+   applyLocale) shows exactly one. */
+.lang-picker { position: relative; inline-size: fit-content;
+  margin-inline-start: auto; margin-block-end: var(--sp-sm); }
+.lang-summary { display: inline-flex; align-items: center; gap: 6px;
+  min-block-size: 24px; cursor: pointer; color: var(--secondary);
+  list-style: none; padding: 2px 10px; border: 1px solid var(--border);
+  border-radius: var(--r-full); }
+.lang-summary::-webkit-details-marker { display: none; }
+/* The globe is a mark, not text: its own line box keeps an emoji's taller
+   metrics from setting the height of the pill around it. */
+.lang-globe { font-size: .9375rem; line-height: 1; }
+.lang-summary::after { content: "\25be"; display: inline-block;
+  transition: transform var(--motion-fast) var(--motion-ease); }
+.lang-picker[open] .lang-summary::after { transform: rotate(180deg); }
+.lang-summary:hover { color: var(--primary); border-color: var(--secondary); }
+.lang-current i { display: none; font-style: normal; unicode-bidi: isolate; }
+.screen[data-locale="id"] .lang-current i[data-t="id"],
+.screen[data-locale="de"] .lang-current i[data-t="de"],
+.screen[data-locale="en"] .lang-current i[data-t="en"],
+.screen[data-locale="es"] .lang-current i[data-t="es"],
+.screen[data-locale="fr"] .lang-current i[data-t="fr"],
+.screen[data-locale="sw"] .lang-current i[data-t="sw"],
+.screen[data-locale="pt"] .lang-current i[data-t="pt"],
+.screen[data-locale="tr"] .lang-current i[data-t="tr"],
+.screen[data-locale="ru"] .lang-current i[data-t="ru"],
+.screen[data-locale="ur"] .lang-current i[data-t="ur"],
+.screen[data-locale="ar"] .lang-current i[data-t="ar"],
+.screen[data-locale="hi"] .lang-current i[data-t="hi"],
+.screen[data-locale="bn"] .lang-current i[data-t="bn"],
+.screen[data-locale="zh"] .lang-current i[data-t="zh"],
+.screen[data-locale="ja"] .lang-current i[data-t="ja"] { display: inline; }
+/* One column, floating: fifteen options are a list to read down, and a menu
+   that opened in the flow pushed the page's first screenful away. */
+.lang-menu { position: absolute; z-index: var(--layer-5);
+  inset-block-start: calc(100% + var(--size-1)); inset-inline-end: 0;
+  display: flex; flex-direction: column; min-inline-size: 13rem;
+  max-block-size: min(60vh, 360px); overflow-y: auto; padding: var(--sp-sm);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--shadow-2); }
+.lang-item { display: flex; align-items: center; min-block-size: 32px;
+  padding: var(--size-1) var(--sp-sm); color: var(--secondary);
+  border-radius: var(--r-sm); text-decoration: none; }
+.lang-item:hover, .lang-item:focus-visible { color: var(--primary);
+  background: var(--surface-muted); }
+/* dir rides the NAME, isolated, so an Arabic or Urdu endonym runs in its own
+   direction inside a row built exactly like the other thirteen. */
+.lang-name { unicode-bidi: isolate; }
+/* The page the reader is already on: the interpreter stamps aria-current on
+   the row naming the screen's locale, which is enough to lift it out of the
+   alphabet and tick it without a heading in fifteen catalogues. */
+.lang-item[aria-current="page"] { order: -1; margin-block-end: var(--sp-sm);
+  color: var(--primary); background: var(--surface-muted); }
+.lang-item[aria-current="page"]::after { content: "\2713"; margin-inline-start: auto; }

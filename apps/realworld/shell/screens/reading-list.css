@@ -1,0 +1,69 @@
+@import "./shared/chrome.css";
+
+@import "./shared/system.css";
+
+
+/* reading-list — ir: #reading-list. One column of the same cards every other
+   list draws; the screen owns its masthead and its ceiling line and nothing
+   else, because the preview is shared source (shell/shared/system.css) rather
+   than a copy each screen keeps. Every rule is scoped to this screen: screen
+   stylesheets are injected once and never removed, so an unscoped rule here
+   would restyle every screen the session has already visited. */
+[data-screen="reading-list"] { container-type: inline-size; }
+
+[data-screen="reading-list"] .masthead { margin: 0 0 var(--sp-lg);
+  padding-bottom: var(--sp-md); border-bottom: 1px solid var(--border); }
+[data-screen="reading-list"] .page-title { margin: 6px 0 0;
+  color: var(--primary); }
+/* The one line of copy on the screen, and it is load-bearing: a list of what
+   somebody has set aside reads as public unless it says otherwise, and what a
+   person saves is exactly the thing they would not publish. */
+[data-screen="reading-list"] .lede { margin: 4px 0 0; color: var(--secondary); }
+
+/* The bookmark row is structure, not a card: it contributes order and holds
+   the one-row region that draws the piece. */
+[data-screen="reading-list"] .saved { display: block; }
+
+/* The cap is a fact about this list, revealed by the list reaching it — no
+   count is read and no region is added (the tag screen's rule, verbatim in
+   shape). */
+[data-screen="reading-list"] .ceiling { display: none; position: relative;
+  z-index: 2; margin: var(--sp-md) 0 0; color: var(--secondary);
+  text-align: center; }
+[data-screen="reading-list"] .list:has(> *:nth-child(20)) ~ .ceiling {
+  display: block; }
+
+/* States — data-state is shell-owned; the screen only styles it. */
+[data-screen="reading-list"] .skeleton,
+[data-screen="reading-list"] .offline { display: none; }
+/* The masthead is static markup outside every region, so the loading frame
+   draws it as itself and the bones cover the list alone. */
+[data-screen="reading-list"][data-state="loading"] .skeleton { display: grid;
+  gap: var(--sp-sm); }
+[data-screen="reading-list"][data-state="loading"] .list { display: none; }
+/* Held down until both probes have swept their templates, or an unset arm
+   flashes before the first refresh answers (decision-probe-empty). */
+[data-screen="reading-list"][data-state="loading"] .arms { visibility: hidden; }
+[data-screen="reading-list"] .skel-card { height: 104px;
+  background: var(--surface-muted); border-radius: var(--r-md); }
+
+/* An unreachable cluster must not read as a reader who has saved nothing —
+   the two look identical and mean opposite things. */
+[data-screen="reading-list"][data-state="network-error"] .offline {
+  display: block; border-top: 1px solid var(--danger);
+  margin: var(--sp-lg) 0 0; padding-top: var(--sp-md); }
+[data-screen="reading-list"][data-state="network-error"] .list { display: none; }
+
+/* The fixture tier gives every list rows, which makes every probe non-empty;
+   without these the populated frame would draw a card already saved and
+   already favorited, which is not what its figure draws. Storybook ancestry,
+   so the correction can never reach the app. */
+.storybook .frame [data-screen="reading-list"][data-state] .when-set { display: none; }
+.storybook .frame [data-screen="reading-list"][data-state] .when-unset {
+  display: inline-flex; }
+/* The exception on this screen and no other: every row here IS saved, by
+   construction — a bookmark row is what put it in the list. The frame that
+   showed "Save" would be drawing a state this route cannot hold. */
+.storybook .frame [data-screen="reading-list"][data-state] .when-unsaved { display: none; }
+.storybook .frame [data-screen="reading-list"][data-state] .when-saved {
+  display: inline-flex; }

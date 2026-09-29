@@ -1,0 +1,41 @@
+# favorite-count (ir favorite-count): the reader's own private answer to
+# "did the total include me", emitted for the reader whose favourite changed.
+#
+# The public total mixes this reader's row with everyone else's, and the
+# difference is not recoverable from the reader's own row: whether the count
+# included them is a property of the READ that produced it, not of the data
+# now. Every attempt to infer it from the row failed at some number of changes,
+# because a bounded row cannot carry unbounded history.
+#
+# So it is stated here, from the same read that produced the count. RLS keeps
+# the row private to its reader — a count discloses nobody — and only the
+# reader who acted is written, so this costs one row per event and never fans
+# out across an article's other favouriters.
+let rows = if this.type() == "array" { throw("favorite-count: harness discarded the CDC event (result_map: root = this); #rpkPipeline must preserve it as root.rows") } else { this.rows }
+let event_row = if this.exists("data") && this.data.type() == "string" && this.data.length() > 0 { this.data.parse_json() } else { null }
+
+# The table conduit stamped, not the shape of the row: `bookmark` and
+# `favorite` are column-identical (ir decision-absolute-recount).
+let from_favorite = $event_row.type() == "object" && $event_row.__table == "favorite" && $event_row.exists("article_id")
+
+let id = $event_row.article_id
+let uid = $event_row.user_id
+let live = $rows.filter(r -> r.article_id == $id && r.deleted_at == null)
+
+# `total_at_read` and `mine_counted` come from ONE read, so the pair is
+# internally consistent whatever else has happened since. `as_of_txid` names
+# the version of the reader's row this pair describes, which is what lets the
+# terminal tell a pair that still speaks for its row from one that has been
+# overtaken.
+root = if $from_favorite {
+  [{
+    "id":            $uid + ":" + $id,
+    "user_id":       $uid,
+    "article_id":    $id,
+    "mine_counted":  if $live.filter(r -> r.user_id == $uid).length() > 0 { 1 } else { 0 },
+    "total_at_read": $live.length(),
+    "as_of_txid":    $event_row.txid.or(0).int64().string(),
+  }]
+} else {
+  deleted()
+}

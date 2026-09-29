@@ -1,0 +1,79 @@
+# generated from bayt.cue — do not edit
+services:
+  apps_realworld-launch:
+    build:
+      additional_contexts:
+        apps_realworld-caddy: service:apps_realworld-caddy
+        apps_realworld-database: service:apps_realworld-database
+        apps_realworld-crud: service:apps_realworld-crud
+        apps_realworld-electric: service:apps_realworld-electric
+        apps_realworld-redis: service:apps_realworld-redis
+        apps_realworld-mesh-events: service:apps_realworld-mesh-events
+        apps_realworld-conduit: service:apps_realworld-conduit
+        apps_realworld-transform: service:apps_realworld-transform
+        apps_realworld-auth: service:apps_realworld-auth
+      context: ..
+      dockerfile: .bayt/Dockerfile.launch
+      target: launch
+      args:
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+    depends_on:
+      apps_realworld-caddy:
+        condition: service_healthy
+        restart: true
+      apps_realworld-database:
+        condition: service_healthy
+        restart: true
+      apps_realworld-crud:
+        condition: service_healthy
+        restart: true
+      apps_realworld-electric:
+        condition: service_healthy
+        restart: true
+      apps_realworld-redis:
+        condition: service_healthy
+        restart: true
+      apps_realworld-mesh-events:
+        condition: service_healthy
+        restart: true
+      apps_realworld-conduit:
+        condition: service_healthy
+        restart: true
+      apps_realworld-transform:
+        condition: service_started
+      apps_realworld-auth:
+        condition: service_started
+    healthcheck:
+      test:
+      - CMD
+      - echo
+      - realworld is healthy
+      interval: 5s
+      timeout: 2s
+      retries: 3
+    image: bayt-apps_realworld-launch:${BAYT_IMAGE_TAG:-latest}
+    networks:
+      default:
+        aliases:
+        - launch
+  apps_realworld-launch_bayt:
+    build:
+      additional_contexts:
+        apps_realworld-caddy_bayt: service:apps_realworld-caddy_bayt
+        apps_realworld-database_bayt: service:apps_realworld-database_bayt
+        apps_realworld-crud_bayt: service:apps_realworld-crud_bayt
+        apps_realworld-electric_bayt: service:apps_realworld-electric_bayt
+        apps_realworld-redis_bayt: service:apps_realworld-redis_bayt
+        apps_realworld-mesh-events_bayt: service:apps_realworld-mesh-events_bayt
+        apps_realworld-conduit_bayt: service:apps_realworld-conduit_bayt
+        apps_realworld-transform_bayt: service:apps_realworld-transform_bayt
+        apps_realworld-auth_bayt: service:apps_realworld-auth_bayt
+      context: ..
+      dockerfile: .bayt/Dockerfile.launch
+      target: launch_bayt
+      args:
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+    image: bayt-apps_realworld-launch_bayt:latest
+    scale: 0

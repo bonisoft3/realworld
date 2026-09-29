@@ -1,0 +1,85 @@
+@import "./shared/chrome.css";
+
+@import "./shared/system.css";
+
+
+/* search — ir: #search. The community list narrowed to the typed words. The
+   heading and the empty sentence take the screen-level {param.x} pass, which
+   interpolates plainly; the region filter takes interpolateFilter, which
+   re-encodes — so a query with a space or a quote in it reaches plfts intact
+   while still reading as itself above the box. */
+[data-screen="search"] { container-type: inline-size; }
+[data-screen="search"] .masthead { margin: 0 calc(var(--sp-lg) * -1)
+  var(--sp-md); padding: 0 var(--sp-lg) var(--sp-md);
+  border-bottom: 1px solid var(--border); }
+[data-screen="search"] .back { display: inline-block;
+  color: var(--secondary); text-decoration: none; }
+[data-screen="search"] .back:hover { color: var(--primary); }
+[data-screen="search"] .page-title { margin: 6px 0 0; color: var(--primary);
+  overflow-wrap: anywhere; }
+[data-screen="search"] .search { display: flex; gap: var(--sp-sm);
+  flex-wrap: wrap; margin: 0 0 var(--sp-md); }
+[data-screen="search"] .search input { flex: 1; min-width: 0;
+  border-radius: var(--r-full); padding: 8px 16px; }
+[data-screen="search"] .search button { border-radius: var(--r-full); }
+[data-screen="search"] .search .invalid { flex-basis: 100%; }
+/* The ceiling rides the twentieth card — :nth-child(20), never :last-child, so
+   a query that found three pieces is never told twenty exist. */
+[data-screen="search"] .ceiling { display: none; position: relative;
+  z-index: 2; margin: var(--sp-sm) 0 0; padding-top: var(--sp-sm);
+  border-top: 1px solid var(--border); color: var(--secondary); }
+[data-screen="search"] .list > *:nth-child(20) .ceiling { display: block; }
+@container (max-width: 460px) {
+  [data-screen="search"] .preview-head { flex-wrap: wrap; }
+  [data-screen="search"] .preview-foot { flex-direction: column;
+    align-items: flex-start; }
+  [data-screen="search"] .arms { align-items: flex-start; }
+}
+
+/* States — data-state is shell-owned; the screen only styles it. */
+[data-screen="search"] .skeleton,
+[data-screen="search"] .nothing,
+[data-screen="search"] .offline { display: none; }
+/* A skeleton covers region-bound content only: the back-link, the echoed query
+   and the search box are screen-level static markup and are drawn as
+   themselves while the read is in flight. */
+[data-screen="search"][data-state="loading"] .skeleton { display: flex;
+  flex-direction: column; gap: var(--sp-sm); }
+[data-screen="search"][data-state="loading"] .list { display: none; }
+[data-screen="search"] .skel-card { height: 96px;
+  background: var(--surface-muted); border-radius: var(--r-md); }
+[data-screen="search"] .skel-card.tall { height: 110px; }
+/* Until the first refresh sweeps the <template> a probe reads non-empty, so
+   the unset arm would flash (ir decision-probe-empty). */
+[data-screen="search"][data-state="loading"] .arms { visibility: hidden; }
+/* empty — one top-level region, so the screen state is the whole answer: the
+   words that found nothing, a narrower gesture, and one way out. All sans; the
+   app is talking, nobody wrote these words as a piece. The two text tiers must
+   stay distinguishable or the refusal flattens into one grey block. The accent
+   is permitted here: an empty state with no committing control may spend it on
+   its call to action. */
+[data-screen="search"][data-state="empty"] .list { display: none; }
+[data-screen="search"][data-state="empty"] .nothing { display: block;
+  text-align: center; margin: calc(var(--sp-xl) * 2) auto 0;
+  max-width: 34ch; }
+[data-screen="search"] .role-body-md.nothing-line { font-size: 1.0625rem;
+  font-weight: 600; }
+[data-screen="search"] .nothing-line { margin: 0; color: var(--primary);
+  overflow-wrap: anywhere; }
+[data-screen="search"] .nothing-sub { margin: 6px 0 var(--sp-lg);
+  color: var(--secondary); }
+[data-screen="search"] .role-body-md.nothing-out { font-weight: 600; }
+[data-screen="search"] .nothing-out { display: inline-block;
+  color: var(--accent); text-decoration: none; }
+[data-screen="search"] .nothing-out:hover { text-decoration: underline;
+  text-underline-offset: 3px; }
+/* network-error — the treatment home draws, on the screen whose invariant
+   argues for it (ir test-search-empty): a query that found nothing and a read
+   that never landed must not look the same. The danger hairline is what
+   separates them; the box and the heading survive because they live outside
+   the region. */
+[data-screen="search"] .offline { border-top: 1px solid var(--danger);
+  color: var(--secondary); margin: var(--sp-lg) 0 0; padding-top: var(--sp-md);
+  max-width: 46ch; }
+[data-screen="search"][data-state="network-error"] .offline { display: block; }
+[data-screen="search"][data-state="network-error"] .list { display: none; }

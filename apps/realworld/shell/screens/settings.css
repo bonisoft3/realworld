@@ -1,0 +1,126 @@
+@import "./shared/chrome.css";
+
+@import "./shared/system.css";
+
+
+
+/* settings — ir: #settings. A quiet sheet: one byline strip over the same
+   app_user row the form below writes, three fields, one Save. */
+[data-screen="settings"] { container-type: inline-size; max-width: 560px;
+  /* the gutter the byline's first line leaves for the public-page link */
+  --link-gutter: 7.5rem; }
+
+/* me is RLS-scoped to exactly one row; the guard keeps the storybook's three
+   fixture rows from drawing the sheet three times. */
+[data-screen="settings"] .sheet > * ~ * { display: none; }
+
+[data-screen="settings"] .me { position: relative; }
+[data-screen="settings"] .you { padding-top: var(--sp-md); }
+
+/* The strip is a byline, drawn as one: avatar, name in serif, handle in sans.
+   It is the first thing to change on save because it reads the same row. */
+[data-screen="settings"] .strip { display: grid;
+  grid-template-columns: auto minmax(0, 1fr); column-gap: var(--sp-md);
+  align-items: center; padding-bottom: var(--sp-md);
+  border-bottom: 1px solid var(--border); }
+/* An unset picture must read as a circle, not as a hole: the fill and the
+   hairline are what carry it when src resolves to nothing. */
+[data-screen="settings"] .avatar { grid-row: 1 / span 2; width: 42px;
+  height: 42px; border-radius: var(--r-full); object-fit: cover;
+  background: var(--surface-muted); border: 1px solid var(--border); }
+/* The link is absolute over the strip's first line, so whatever occupies that
+   line leaves it a gutter rather than running under it. Both rows carry it,
+   not just the name: a person who has set no display name collapses .name to
+   zero height, and the handle rises into the first line in its place. */
+[data-screen="settings"] .name,
+[data-screen="settings"] .handle { grid-column: 2;
+  padding-right: var(--link-gutter); overflow-wrap: anywhere; }
+[data-screen="settings"] .name { margin: 0; color: var(--primary); }
+[data-screen="settings"] .handle { margin: 2px 0 0; color: var(--secondary); }
+
+/* 24px is the finger floor; the link's ink is one small line, so the box grows
+   to meet it (check-visual's touch-target-size). */
+[data-screen="settings"] .public-link { display: inline-flex; align-items: center;
+  min-height: 24px; position: absolute; top: var(--sp-md);
+  right: 0; color: var(--secondary); text-decoration: none;
+  white-space: nowrap; }
+[data-screen="settings"] .public-link .under {
+  border-bottom: 1px solid var(--border); padding-bottom: 2px; }
+[data-screen="settings"] .public-link:hover { color: var(--primary); }
+
+[data-screen="settings"] .profile-form { display: flex; flex-direction: column;
+  gap: var(--sp-md); margin-top: var(--sp-md); }
+/* A form over an existing row cannot lean on placeholders — a filled control
+   hides them — so every field carries a label. */
+[data-screen="settings"] .field { display: block; }
+[data-screen="settings"] .field input,
+[data-screen="settings"] .about { width: 100%; }
+[data-screen="settings"] .field-label { display: block; margin: 0 0 6px;
+  color: var(--secondary); }
+[data-screen="settings"] .about { min-height: 85px; resize: vertical; }
+[data-screen="settings"] .field-help { margin: calc(var(--sp-md) * -1 + 6px) 0 0;
+  color: var(--secondary); }
+
+[data-screen="settings"] .save-row { display: flex; align-items: center;
+  gap: var(--sp-md); }
+[data-screen="settings"] .save-row button { min-width: 91px; }
+
+[data-screen="settings"] .signout-note,
+[data-screen="settings"] .saved-note { margin: var(--sp-lg) 0 0;
+  color: var(--secondary); }
+
+/* States — data-state is shell-owned; the screen only styles it. */
+[data-screen="settings"] .saved,
+[data-screen="settings"] .saved-note { display: none; }
+[data-screen="settings"][data-state="loading"] .skeleton { display: block; }
+[data-screen="settings"][data-state="loading"] .sheet { display: none; }
+[data-screen="settings"][data-state="network-error"] .offline { display: block; }
+/* success — the six hundred milliseconds after a save. The ring points at the
+   strip, which already carries the new name; a ring and never a fill, because
+   a filled banner would be the second loud object on a quiet sheet. */
+[data-screen="settings"][data-state="success"] .name { outline: 1px solid var(--accent);
+  outline-offset: 4px; border-radius: var(--r-sm); }
+[data-screen="settings"][data-state="success"] .saved { display: block;
+  margin: 0; color: var(--accent); }
+[data-screen="settings"][data-state="success"] .saved-note { display: block; }
+[data-screen="settings"][data-state="success"] .signout-note { display: none; }
+
+/* loading — eight fills in surface-muted at the geometry of the sheet, so
+   nothing moves when the row lands. The avatar's is a circle rather than a
+   rounded box or the strip reflows into a byline. */
+[data-screen="settings"] .skeleton .field-label { display: block;
+  margin: var(--sp-md) 0 6px; color: var(--secondary); }
+[data-screen="settings"] .skel-strip { position: relative; display: grid;
+  grid-template-columns: auto minmax(0, 1fr); column-gap: var(--sp-md);
+  align-items: center; padding: var(--sp-md) 0; row-gap: 6px;
+  border-bottom: 1px solid var(--border); }
+[data-screen="settings"] .skel-avatar { grid-row: 1 / span 2; width: 42px;
+  height: 42px; border-radius: var(--r-full); background: var(--surface-muted); }
+[data-screen="settings"] .skel-name { grid-column: 2; width: 94px; height: 15px; }
+[data-screen="settings"] .skel-handle { grid-column: 2; width: 143px; height: 10px; }
+[data-screen="settings"] .skel-link { position: absolute; top: var(--sp-md);
+  right: 0; width: 98px; height: 11px; }
+[data-screen="settings"] .skel-input { height: 36px; }
+[data-screen="settings"] .skel-area { height: 85px; }
+[data-screen="settings"] .skel-short { height: 33px; }
+[data-screen="settings"] .skel-button { width: 91px; height: 36px;
+  margin-top: var(--sp-lg); }
+
+/* Below this the gutter stops paying: the link takes its own line above the
+   strip rather than squeezing the identity line to nothing. The threshold is
+   the gutter plus a readable remainder, not a device width — under it the
+   handle wraps to three lines against a nowrap link. */
+@container (max-width: 420px) {
+  [data-screen="settings"] .public-link,
+  [data-screen="settings"] .skel-link { position: static; display: block;
+    margin-bottom: var(--sp-sm); white-space: normal; }
+  [data-screen="settings"] .name,
+  [data-screen="settings"] .handle { padding-right: 0; }
+  [data-screen="settings"] .you { padding-top: 0; }
+  [data-screen="settings"] .skel-strip { padding-top: 0; }
+}
+
+/* The shared byline joins name to handle with a middot. Here they are stacked
+   blocks, so the separator has nothing to its right and the card reads
+   "Marguerite Oyelaran ·". */
+[data-screen="settings"] .name:not(:empty)::after { content: none; }

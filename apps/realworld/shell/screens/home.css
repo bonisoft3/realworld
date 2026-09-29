@@ -1,0 +1,145 @@
+@import "./shared/chrome.css";
+
+@import "./shared/system.css";
+
+
+/* home — ir: #home */
+[data-screen="home"] { container-type: inline-size; max-width: 1120px;
+  margin: 0 auto; padding: var(--sp-lg) var(--sp-lg) 64px;
+  background: var(--neutral); color: var(--primary); }
+/* The masthead is the identity's one serif-chrome exemption, and it is home's
+   alone — the nav glosses this route "Community" so the word Conduit appears
+   once on a screen (ir decision-design-identity). */
+[data-screen="home"] .masthead { border-bottom: 1px solid var(--border);
+  padding-bottom: var(--sp-md); }
+[data-screen="home"] .masthead h1 { margin: 0; color: var(--primary); }
+[data-screen="home"] .tagline { margin: 5px 0 0; color: var(--secondary); }
+
+[data-screen="home"] .search { display: flex; flex-wrap: wrap;
+  gap: var(--sp-sm); margin: var(--sp-md) 0 var(--sp-lg); }
+[data-screen="home"] .search input { flex: 1 1 200px; min-width: 0; }
+[data-screen="home"] .search .invalid { flex-basis: 100%; margin-top: 0; }
+
+[data-screen="home"] .columns { display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px; gap: var(--sp-xl);
+  align-items: start; }
+/* minmax(0, 1fr), not the implicit `auto` track: an auto track is sized by its
+   content, so a card whose min-content is wider than the column grows the
+   track past the screen instead of wrapping inside it — 11px of horizontal
+   overflow on a 400px phone (check-visual's no-horizontal-overflow). */
+[data-screen="home"] .list { display: grid; grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-sm); }
+
+/* The lead. A community list where the newest piece looks exactly like the
+   twentieth is a list with no front page: Medium and Substack both give the
+   most recent piece more type and more room, because the first card is what
+   decides whether a reader scrolls at all. Only the first card changes, and it
+   changes by size alone — same fragment, same fields, same controls, so
+   accept-preview-complete still holds and there is no second component to
+   keep in step. */
+/* Above the stacking width only. A lead is more room given to one card, and a
+   phone has none to give: at 2rem inside a 216px column the title breaks
+   mid-word, which is worse than no lead at all. */
+@container (min-width: 561px) {
+  [data-screen="home"] .list > :first-child { padding: var(--sp-md) var(--sp-lg); }
+  [data-screen="home"] .list > :first-child .preview-title { font-size: 2rem;
+    line-height: 1.12; letter-spacing: -.015em; }
+  [data-screen="home"] .list > :first-child .preview-desc { font-size: 1.1875rem;
+    line-height: 1.55; }
+  [data-screen="home"] .list > :first-child .avatar { width: 28px; height: 28px; }
+}
+/* A lead with nothing under it is not a lead — it is one card wearing an
+   emphasis it has not earned. */
+[data-screen="home"] .list > :first-child:last-child { padding: var(--sp-sm) var(--sp-md); }
+[data-screen="home"] .list > :first-child:last-child .preview-title {
+  font-size: 1.375rem; line-height: 1.25; letter-spacing: normal; }
+[data-screen="home"] .list > :first-child:last-child .preview-desc {
+  font-size: 1.0625rem; line-height: 1.7; }
+[data-screen="home"] .list > :first-child:last-child .avatar { width: 22px; height: 22px; }
+[data-screen="home"] .rail-label { display: block; color: var(--secondary);
+  letter-spacing: .08em; text-transform: uppercase;
+  margin-bottom: var(--sp-sm); }
+[data-screen="home"] .tags { display: flex; flex-direction: column; gap: 5px; }
+[data-screen="home"] .tag-chip { display: flex; gap: var(--sp-sm);
+  justify-content: space-between; background: var(--surface-muted);
+  color: var(--secondary); border-radius: var(--r-full); padding: 4px 12px;
+  text-decoration: none; }
+[data-screen="home"] .tag-chip:hover { color: var(--primary); }
+[data-screen="home"] .tag-name { overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+/* Each region carries its own sentence, because two top-level regions mean
+   the screen state cannot say which list is empty (ir decision-feed-route). */
+[data-screen="home"] .tags .empty { text-align: left; padding: 0; }
+
+/* The keyset link rides the twentieth card, not the last one: a three-article
+   community must not be offered a page that is not there. It is suppressed
+   while the row is unconfirmed, because created_at is the server's. */
+[data-screen="home"] .older { position: relative; z-index: 2; display: none;
+  justify-self: start; margin-top: 2px; color: var(--secondary);
+  text-underline-offset: 2px; }
+[data-screen="home"] .older:hover { color: var(--primary); }
+[data-screen="home"] .list > :nth-child(20) .older { display: inline-block; }
+[data-screen="home"] .list > [data-pending="true"] .older { display: none; }
+
+/* The storybook renders this screen in a 360px frame on a wide viewport, so
+   the rail must be sized by the frame and not by the device. */
+@container (max-width: 860px) {
+  [data-screen="home"] { padding: var(--sp-md) var(--sp-md) 48px; }
+  [data-screen="home"] .columns { grid-template-columns: minmax(0, 1fr) minmax(104px, 32%);
+    gap: var(--sp-md); }
+}
+/* Below this the rail stops being a column and becomes a footer. A third of a
+   phone's width spent on tag chips leaves the previews — the reason the screen
+   exists — too narrow to hold a byline and a date on one line, which is where
+   the truncated handles come from. The tags keep their place in the source, so
+   the reading order is unchanged. */
+@container (max-width: 560px) {
+  [data-screen="home"] .columns { grid-template-columns: minmax(0, 1fr); }
+  [data-screen="home"] .rail { border-top: 1px solid var(--border);
+    padding-top: var(--sp-md); }
+  [data-screen="home"] .tags { flex-direction: row; flex-wrap: wrap; }
+  [data-screen="home"] .tag-chip { flex: none; }
+  /* Search is a destination, not a surface: /search/:q is its own screen, and
+     the writing is what this page is for. On a phone it keeps one slim row and
+     gives its label back to a mark, and the tagline goes — a reader who is
+     signed in has already bought the pitch. Together that is about ninety
+     pixels of the first screenful returned to the first piece. */
+  [data-screen="home"] .tagline { display: none; }
+  [data-screen="home"] .masthead { padding-bottom: var(--sp-sm); }
+  /* Only the spacing is home's; the control itself is the shared layer's. */
+  [data-screen="home"] .search { margin: var(--sp-sm) 0 var(--sp-md); }
+}
+
+/* States — data-state is shell-owned; the screen only styles it. empty and
+   populated are styled alike by design. */
+[data-screen="home"] .skeleton,
+[data-screen="home"] .skeleton-rail,
+[data-screen="home"] .offline { display: none; }
+/* A skeleton covers region-bound content only: the masthead and the search
+   box are static markup outside every region and are drawn as themselves. */
+[data-screen="home"][data-state="loading"] .skeleton { display: grid;
+  gap: var(--sp-sm); }
+[data-screen="home"][data-state="loading"] .skeleton-rail { display: grid;
+  gap: 5px; }
+[data-screen="home"][data-state="loading"] .list,
+[data-screen="home"][data-state="loading"] .tags { display: none; }
+/* Held down until the probe sweeps its template, or the unset arm flashes. */
+[data-screen="home"][data-state="loading"] .arms { visibility: hidden; }
+[data-screen="home"] .skel-card { height: 104px;
+  background: var(--surface-muted); border-radius: var(--r-md); }
+[data-screen="home"] .skel-card.tall { height: 118px; }
+[data-screen="home"] .skel-chip { height: 23px;
+  background: var(--surface-muted); border-radius: var(--r-full); }
+/* network-error must not read as a community that has published nothing. */
+[data-screen="home"] .offline { border-top: 1px solid var(--danger);
+  color: var(--secondary); margin: var(--sp-lg) 0 0; padding-top: var(--sp-md);
+  max-width: 46ch; }
+[data-screen="home"][data-state="network-error"] .offline { display: block; }
+[data-screen="home"][data-state="network-error"] .columns { display: none; }
+/* favorited is a storyboard frame the interpreter never sets: at runtime the
+   fill comes from the probe alone. The storybook gives every probe rows, so
+   the contrast between a set and an unset pill is only reviewable here. */
+[data-screen="home"][data-state="favorited"] .list > :not(:nth-child(2)) .when-set {
+  display: none; }
+[data-screen="home"][data-state="favorited"] .list > :not(:nth-child(2)) .when-unset {
+  display: inline-flex; }

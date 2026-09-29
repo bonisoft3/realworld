@@ -1,0 +1,275 @@
+{
+  "app_user": [
+    {
+      "id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
+      "handle": "seed_handle_1",
+      "display_name": "Sample display_name 1",
+      "bio": "seed_bio_1",
+      "image_url": "seed_image_url_1",
+      "created_at": "2026-09-23T23:00:00Z"
+    },
+    {
+      "id": "06ab999a-d3bd-4a38-9679-c0e3bfde8293",
+      "handle": "seed_handle_2",
+      "display_name": "Sample display_name 2",
+      "bio": "seed_bio_2",
+      "image_url": "seed_image_url_2",
+      "created_at": "2026-09-23T22:00:00Z"
+    },
+    {
+      "id": "d5a8b298-ca62-4e5c-a197-2684f895bf7f",
+      "handle": "seed_handle_3",
+      "display_name": "Sample display_name 3",
+      "bio": "seed_bio_3",
+      "image_url": "seed_image_url_3",
+      "created_at": "2026-09-23T21:00:00Z"
+    }
+  ],
+  "me": [
+    {
+      "id": "10bf1771-ee9a-4f10-8270-6754b2b9d1e7",
+      "handle": "seed_handle_1"
+    },
+    {
+      "id": "410ab57c-9f50-4522-bff5-01f1a7fba067",
+      "handle": "seed_handle_2"
+    },
+    {
+      "id": "d495d533-8586-4f4c-9416-5131f8745b11",
+      "handle": "seed_handle_3"
+    }
+  ],
+  "article": [
+    {
+      "id": "098fbc2e-a802-4459-ad75-ee51e5a1a256",
+      "author_id": "d5a8b298-ca62-4e5c-a197-2684f895bf7f",
+      "title": "Sample title 1",
+      "description": "seed_description_1",
+      "body": "seed_body_1",
+      "tags": "seed_tags_1",
+      "cover_url": "seed_cover_url_1",
+      "cover_credit": "seed_cover_credit_1",
+      "slug": "seed_slug_1",
+      "created_at": "2026-09-23T23:00:00Z",
+      "updated_at": "2026-09-23T23:00:00Z",
+      "search": "seed_search_1",
+      "reading_minutes": 10
+    },
+    {
+      "id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "author_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
+      "title": "Sample title 2",
+      "description": "seed_description_2",
+      "body": "seed_body_2",
+      "tags": "seed_tags_2",
+      "cover_url": "seed_cover_url_2",
+      "cover_credit": "seed_cover_credit_2",
+      "slug": "seed_slug_2",
+      "created_at": "2026-09-23T22:00:00Z",
+      "updated_at": "2026-09-23T22:00:00Z",
+      "search": "seed_search_2",
+      "reading_minutes": 20
+    },
+    {
+      "id": "67d7f91a-26c7-4bac-8166-e90e5fee59bc",
+      "author_id": "d5a8b298-ca62-4e5c-a197-2684f895bf7f",
+      "title": "Sample title 3",
+      "description": "seed_description_3",
+      "body": "seed_body_3",
+      "tags": "seed_tags_3",
+      "cover_url": "seed_cover_url_3",
+      "cover_credit": "seed_cover_credit_3",
+      "slug": "seed_slug_3",
+      "created_at": "2026-09-23T21:00:00Z",
+      "updated_at": "2026-09-23T21:00:00Z",
+      "search": "seed_search_3",
+      "reading_minutes": 30
+    }
+  ],
+  "article_tag": [
+    {
+      "id": "e25a9e91-7fb5-4d19-ac07-a3be7c9e27ce",
+      "article_id": "67d7f91a-26c7-4bac-8166-e90e5fee59bc",
+      "tag": "seed_tag_1"
+    },
+    {
+      "id": "0196409a-ba56-4255-bd09-282b69a51539",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "tag": "seed_tag_2"
+    },
+    {
+      "id": "f46a2015-42de-4eb2-be0e-5c8de2c320b3",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "tag": "seed_tag_3"
+    }
+  ],
+  "comment": [
+    {
+      "id": "a545c793-c259-4fb1-899f-24bc62f1804c",
+      "article_id": "67d7f91a-26c7-4bac-8166-e90e5fee59bc",
+      "author_id": "d5a8b298-ca62-4e5c-a197-2684f895bf7f",
+      "body": "seed_body_1",
+      "created_at": "2026-09-23T23:00:00Z"
+    },
+    {
+      "id": "5f0604f1-86ca-4d88-b5e4-ed9a46cdf719",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "author_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
+      "body": "seed_body_2",
+      "created_at": "2026-09-23T22:00:00Z"
+    },
+    {
+      "id": "c6c7317b-82ac-490c-b4de-07c6a9274c53",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "author_id": "d5a8b298-ca62-4e5c-a197-2684f895bf7f",
+      "body": "seed_body_3",
+      "created_at": "2026-09-23T21:00:00Z"
+    }
+  ],
+  "favorite": [
+    {
+      "id": "3b2390c0-3a31-4611-ac38-356543b9cc4a",
+      "user_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
+      "article_id": "67d7f91a-26c7-4bac-8166-e90e5fee59bc",
+      "created_at": "2026-09-23T23:00:00Z",
+      "deleted_at": "2026-09-23T23:00:00Z"
+    },
+    {
+      "id": "584b8eb9-b0f0-48ff-9651-621dfdbb3bb2",
+      "user_id": "06ab999a-d3bd-4a38-9679-c0e3bfde8293",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "created_at": "2026-09-23T22:00:00Z",
+      "deleted_at": "2026-09-23T22:00:00Z"
+    },
+    {
+      "id": "dd937e6f-3574-4768-a562-24d31ec1d992",
+      "user_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "created_at": "2026-09-23T21:00:00Z",
+      "deleted_at": "2026-09-23T21:00:00Z"
+    }
+  ],
+  "bookmark": [
+    {
+      "id": "8efdeb9f-798d-4dbd-9465-b25f54679f6f",
+      "user_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
+      "article_id": "67d7f91a-26c7-4bac-8166-e90e5fee59bc",
+      "created_at": "2026-09-23T23:00:00Z"
+    },
+    {
+      "id": "85e924eb-f026-482a-849f-d90016fba731",
+      "user_id": "06ab999a-d3bd-4a38-9679-c0e3bfde8293",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "created_at": "2026-09-23T22:00:00Z"
+    },
+    {
+      "id": "a479c5f6-3571-46dd-9c56-8411fbffb2c0",
+      "user_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "created_at": "2026-09-23T21:00:00Z"
+    }
+  ],
+  "follow": [
+    {
+      "id": "c4e4fefd-4327-4033-8716-5511c77f699f",
+      "follower_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
+      "followed_id": "d5a8b298-ca62-4e5c-a197-2684f895bf7f",
+      "created_at": "2026-09-23T23:00:00Z"
+    },
+    {
+      "id": "97545c72-361c-480a-aa48-cdeef9247f15",
+      "follower_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
+      "followed_id": "d5a8b298-ca62-4e5c-a197-2684f895bf7f",
+      "created_at": "2026-09-23T22:00:00Z"
+    },
+    {
+      "id": "1326ed19-8322-4b47-8075-c67c25aba520",
+      "follower_id": "d5a8b298-ca62-4e5c-a197-2684f895bf7f",
+      "followed_id": "d5a8b298-ca62-4e5c-a197-2684f895bf7f",
+      "created_at": "2026-09-23T21:00:00Z"
+    }
+  ],
+  "favorite_count": [
+    {
+      "id": "favorite_count_0001",
+      "user_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
+      "article_id": "67d7f91a-26c7-4bac-8166-e90e5fee59bc",
+      "mine_counted": 0,
+      "total_at_read": 10,
+      "as_of_txid": 10
+    },
+    {
+      "id": "favorite_count_0002",
+      "user_id": "06ab999a-d3bd-4a38-9679-c0e3bfde8293",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "mine_counted": 1,
+      "total_at_read": 20,
+      "as_of_txid": 20
+    },
+    {
+      "id": "favorite_count_0003",
+      "user_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "mine_counted": 0,
+      "total_at_read": 30,
+      "as_of_txid": 30
+    }
+  ],
+  "article_stats": [
+    {
+      "id": "article_stats_1",
+      "article_id": "67d7f91a-26c7-4bac-8166-e90e5fee59bc",
+      "favorite_count": 10,
+      "counted_txid": 10
+    },
+    {
+      "id": "article_stats_2",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "favorite_count": 20,
+      "counted_txid": 20
+    },
+    {
+      "id": "article_stats_3",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "favorite_count": 30,
+      "counted_txid": 30
+    }
+  ],
+  "tag_count": [
+    {
+      "id": "tag_count_0001",
+      "article_count": 10
+    },
+    {
+      "id": "tag_count_0002",
+      "article_count": 20
+    },
+    {
+      "id": "tag_count_0003",
+      "article_count": 30
+    }
+  ],
+  "favorite_index": [
+    {
+      "id": "favorite_index_0001",
+      "user_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
+      "article_id": "67d7f91a-26c7-4bac-8166-e90e5fee59bc",
+      "active": "yes",
+      "favorited_at": "2026-09-23T23:00:00Z"
+    },
+    {
+      "id": "favorite_index_0002",
+      "user_id": "06ab999a-d3bd-4a38-9679-c0e3bfde8293",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "active": "no",
+      "favorited_at": "2026-09-23T22:00:00Z"
+    },
+    {
+      "id": "favorite_index_0003",
+      "user_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
+      "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
+      "active": "yes",
+      "favorited_at": "2026-09-23T21:00:00Z"
+    }
+  ]
+}

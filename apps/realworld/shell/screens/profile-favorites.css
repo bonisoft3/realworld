@@ -1,0 +1,151 @@
+@import "./shared/chrome.css";
+
+@import "./shared/system.css";
+
+
+/* profile-favorites — ir: #profile-favorites. The same header as profile, the
+   same rail, the same cards; the only difference between the two routes is
+   which list sits under the rail and which rail item is current. Two top-level
+   regions (the person, the list), so empty and populated are styled alike and
+   each region speaks its own sentence (ir decision-feed-route). */
+[data-screen="profile-favorites"] { container-type: inline-size; }
+[data-screen="profile-favorites"] .masthead { margin: 0 0 var(--sp-md); }
+[data-screen="profile-favorites"] .back { display: inline-block;
+  color: var(--secondary); text-decoration: none; }
+[data-screen="profile-favorites"] .back:hover { color: var(--primary); }
+[data-screen="profile-favorites"] .search { display: flex; gap: var(--sp-sm);
+  flex-wrap: wrap; margin: 0 0 var(--sp-lg); }
+[data-screen="profile-favorites"] .search input { flex: 1; min-width: 0;
+  border-radius: var(--r-full); padding: 8px 16px; }
+[data-screen="profile-favorites"] .search button { border-radius: var(--r-full); }
+[data-screen="profile-favorites"] .search .invalid { flex-basis: 100%; }
+
+/* The person. Display name and about line are serif — they are what this
+   person wrote about themselves; the handle is chrome and stays sans. */
+[data-screen="profile-favorites"] .person-card { display: flex;
+  flex-direction: column; align-items: flex-start; gap: var(--sp-sm); }
+[data-screen="profile-favorites"] .person-head { display: flex;
+  align-items: center; gap: var(--sp-md); min-width: 0; }
+[data-screen="profile-favorites"] .portrait { width: 64px; height: 64px;
+  flex: none; object-fit: cover; border-radius: var(--r-full);
+  background: var(--surface-muted);
+  border: 1px solid var(--border); }
+[data-screen="profile-favorites"] .person-id { display: flex;
+  flex-direction: column; gap: 2px; min-width: 0; }
+[data-screen="profile-favorites"] .person-name { color: var(--primary);
+  overflow-wrap: anywhere; }
+/* display_name is nullable and the markup carries no conditional: a person who
+   set no name reads as their handle alone. */
+[data-screen="profile-favorites"] .person-name:empty { display: none; }
+[data-screen="profile-favorites"] .person-handle { color: var(--secondary); }
+[data-screen="profile-favorites"] .about { margin: 0; color: var(--primary);
+  max-width: 58ch; }
+[data-screen="profile-favorites"] .about:empty { display: none; }
+
+/* The follow control, and the "is this me" swap above it. Both probes hold
+   both arms in the markup and CSS chooses (ir decision-probe-empty). In the
+   storybook every list region is given rows, so the set arms win in every
+   non-empty frame; the reader arm is only seen there in the empty frame, where
+   every region is given none. That is the platform's, not this screen's. */
+[data-screen="profile-favorites"] .me-probe,
+[data-screen="profile-favorites"] .follow-probe { display: none; }
+[data-screen="profile-favorites"] .me-probe:not(:empty) ~ .reader-arm { display: none; }
+[data-screen="profile-favorites"] .me-probe:empty ~ .own-arm { display: none; }
+[data-screen="profile-favorites"] .follow-probe:empty ~ .when-followed { display: none; }
+[data-screen="profile-favorites"] .follow-probe:not(:empty) ~ .when-unfollowed { display: none; }
+/* Accent is spent on creation and commitment: following somebody is a
+   commitment, unfollowing is a reversal and wears the outline (DESIGN.md). */
+[data-screen="profile-favorites"] .reader-arm { display: inline-flex; }
+[data-screen="profile-favorites"] .role-body-md.follow { font-weight: 600; }
+[data-screen="profile-favorites"] .follow { min-width: 168px; }
+/* A link into settings navigates and commits nothing, so it is secondary with
+   a hairline underline and never the accent. */
+[data-screen="profile-favorites"] .own-arm { color: var(--secondary);
+  text-decoration: underline; text-underline-offset: 3px;
+  text-decoration-color: var(--border); }
+[data-screen="profile-favorites"] .own-arm:hover { color: var(--primary);
+  text-decoration-color: var(--secondary); }
+
+/* The rail: two routes, the current one carrying the ink underline that sits
+   on the hairline rule. Full-bleed, so the rule crosses the whole screen. */
+[data-screen="profile-favorites"] .rail { display: flex; gap: var(--sp-lg);
+  align-items: flex-end; margin: var(--sp-lg) calc(var(--sp-lg) * -1)
+  var(--sp-md); padding: 0 var(--sp-lg);
+  border-bottom: 1px solid var(--border); }
+[data-screen="profile-favorites"] .rail-item { color: var(--secondary);
+  text-decoration: none; padding-bottom: 7px;
+  box-shadow: inset 0 -2px 0 transparent;
+  transition: color var(--motion-fast) var(--motion-ease); }
+[data-screen="profile-favorites"] a.rail-item:hover { color: var(--primary); }
+[data-screen="profile-favorites"] .rail-item.current { color: var(--primary);
+  font-weight: 600; box-shadow: inset 0 -2px 0 var(--primary); }
+
+/* Each favorited row is the index row's slot; the card inside it is the live
+   article. The ceiling line rides the item template, so a person with three
+   favorites is never told twenty exist (ir decision-paging-keyset). */
+[data-screen="profile-favorites"] .favorited { display: flex;
+  flex-direction: column; gap: 3px; }
+[data-screen="profile-favorites"] .ceiling { display: none; margin: 5px 0 0;
+  color: var(--secondary); }
+[data-screen="profile-favorites"] .list > *:nth-child(20) .ceiling { display: block; }
+/* The list region's own sentence, because the screen state cannot say which of
+   the two top-level regions is the empty one. The interpreter appends this
+   paragraph, so it carries no role class. */
+[data-screen="profile-favorites"] .list .empty { margin: 0; padding: 56px
+  var(--sp-md); color: var(--secondary); text-align: center; }
+[data-screen="profile-favorites"] .person .empty { margin: 0;
+  padding: var(--sp-md) 0; color: var(--primary); }
+@container (max-width: 460px) {
+  [data-screen="profile-favorites"] .portrait { width: 52px; height: 52px; }
+  [data-screen="profile-favorites"] .follow { min-width: 0; width: 100%; }
+  [data-screen="profile-favorites"] .when-unfollowed,
+  [data-screen="profile-favorites"] .when-followed { align-self: stretch; }
+  [data-screen="profile-favorites"] .preview-head { flex-wrap: wrap; }
+  [data-screen="profile-favorites"] .preview-foot { flex-direction: column;
+    align-items: flex-start; }
+  [data-screen="profile-favorites"] .arms { align-items: flex-start; }
+}
+
+/* States — data-state is shell-owned; the screen only styles it. empty and
+   populated are styled alike by design. */
+[data-screen="profile-favorites"] .skeleton,
+[data-screen="profile-favorites"] .skeleton-list,
+[data-screen="profile-favorites"] .offline { display: none; }
+/* A skeleton covers region-bound content only: the back-link, the search box
+   and the rail are screen-level static markup and are drawn as themselves. */
+[data-screen="profile-favorites"][data-state="loading"] .skeleton { display: flex;
+  flex-direction: column; gap: var(--sp-sm); }
+[data-screen="profile-favorites"][data-state="loading"] .skeleton-list {
+  display: flex; flex-direction: column; gap: var(--sp-sm); }
+[data-screen="profile-favorites"][data-state="loading"] .person,
+[data-screen="profile-favorites"][data-state="loading"] .list { display: none; }
+/* Until the first refresh sweeps the <template> a probe reads non-empty, so
+   an unset arm would flash (ir decision-probe-empty). */
+[data-screen="profile-favorites"][data-state="loading"] .arms,
+[data-screen="profile-favorites"][data-state="loading"] .reader-arm,
+[data-screen="profile-favorites"][data-state="loading"] .own-arm {
+  visibility: hidden; }
+[data-screen="profile-favorites"] .skel-head { display: flex;
+  align-items: center; gap: var(--sp-md); }
+[data-screen="profile-favorites"] .skel-portrait { width: 64px; height: 64px;
+  flex: none; border-radius: var(--r-full); background: var(--surface-muted); }
+[data-screen="profile-favorites"] .skel-id { display: flex;
+  flex-direction: column; gap: 7px; }
+[data-screen="profile-favorites"] .skel-line { height: 11px; width: 100%;
+  max-width: 34ch; background: var(--surface-muted);
+  border-radius: var(--r-sm); }
+[data-screen="profile-favorites"] .skel-line.name { width: 168px; }
+[data-screen="profile-favorites"] .skel-line.handle { width: 104px;
+  height: 8px; }
+[data-screen="profile-favorites"] .skel-line.bio { height: 8px; }
+[data-screen="profile-favorites"] .skel-line.bio.short { max-width: 22ch; }
+[data-screen="profile-favorites"] .skel-button { width: 168px; height: 38px;
+  background: var(--surface-muted); border-radius: var(--r-sm); }
+[data-screen="profile-favorites"] .skel-card { height: 96px;
+  background: var(--surface-muted); border-radius: var(--r-md); }
+/* Every screen with a server-computed read carries the offline sentence; both
+   of this screen's list reads are embedded-filter reads. */
+[data-screen="profile-favorites"] .offline { border-top: 1px solid var(--danger);
+  margin: 0 0 var(--sp-md); padding-top: var(--sp-md); max-width: 46ch; }
+[data-screen="profile-favorites"][data-state="network-error"] .offline {
+  display: block; }

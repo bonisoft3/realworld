@@ -1,0 +1,1528 @@
+{
+  "access": {
+    "app_user": {
+      "scope": "public"
+    },
+    "me": {
+      "owner": "id",
+      "scope": "private"
+    },
+    "article": {
+      "scope": "public"
+    },
+    "article_tag": {
+      "scope": "public"
+    },
+    "comment": {
+      "scope": "public"
+    },
+    "favorite": {
+      "owner": "user_id",
+      "scope": "private"
+    },
+    "bookmark": {
+      "owner": "user_id",
+      "scope": "private"
+    },
+    "follow": {
+      "owner": "follower_id",
+      "scope": "private"
+    },
+    "favorite_count": {
+      "owner": "user_id",
+      "scope": "private"
+    },
+    "article_stats": {
+      "scope": "public"
+    },
+    "tag_count": {
+      "scope": "public"
+    },
+    "favorite_index": {
+      "scope": "public"
+    }
+  },
+  "app": "realworld",
+  "auth": {
+    "required": true,
+    "service": "/auth",
+    "mode": "passkey",
+    "self": {
+      "route": "profile",
+      "name": {
+        "table": "app_user",
+        "column": "display_name"
+      }
+    }
+  },
+  "floors": {
+    "touch": 24
+  },
+  "i18n": {
+    "default": "en",
+    "locales": {
+      "en": {
+        "path": "en"
+      },
+      "zh": {
+        "path": "zh"
+      },
+      "hi": {
+        "path": "hi"
+      },
+      "es": {
+        "path": "es"
+      },
+      "fr": {
+        "path": "fr"
+      },
+      "ar": {
+        "path": "ar"
+      },
+      "bn": {
+        "path": "bn"
+      },
+      "pt": {
+        "path": "pt"
+      },
+      "ru": {
+        "path": "ru"
+      },
+      "ur": {
+        "path": "ur"
+      },
+      "id": {
+        "path": "id"
+      },
+      "de": {
+        "path": "de"
+      },
+      "ja": {
+        "path": "ja"
+      },
+      "sw": {
+        "path": "sw"
+      },
+      "tr": {
+        "path": "tr"
+      }
+    }
+  },
+  "keys": {
+    "article_stats": "article_id"
+  },
+  "native": true,
+  "server": true,
+  "routes": [
+    {
+      "path": "/",
+      "screen": "home",
+      "nav": {
+        "key": "nav_home",
+        "label": "Community",
+        "labels": {
+          "en": "Community",
+          "zh": "社区",
+          "hi": "समुदाय",
+          "es": "Comunidad",
+          "fr": "Communauté",
+          "ar": "المجتمع",
+          "bn": "কমিউনিটি",
+          "pt": "Comunidade",
+          "ru": "Сообщество",
+          "ur": "کمیونٹی",
+          "id": "Komunitas",
+          "de": "Community",
+          "ja": "コミュニティ",
+          "sw": "Jamii",
+          "tr": "Topluluk"
+        }
+      },
+      "files": {
+        "html": "shell/screens/home.html",
+        "css": "shell/screens/home.css",
+        "handlers": [],
+        "adapters": [],
+        "shared": [
+          "shell/shared/chrome.css",
+          "shell/shared/system.css"
+        ]
+      },
+      "ssr": "ssr",
+      "states": [
+        "loading",
+        "empty",
+        "populated",
+        "favorited",
+        "validation-error",
+        "network-error",
+        "populated-dark"
+      ]
+    },
+    {
+      "path": "/feed",
+      "screen": "feed",
+      "nav": {
+        "key": "nav_feed",
+        "label": "Your Feed",
+        "labels": {
+          "en": "Your Feed",
+          "zh": "我的关注",
+          "hi": "आपका फ़ीड",
+          "es": "Tu Feed",
+          "fr": "Votre fil",
+          "ar": "موجزك",
+          "bn": "আপনার ফিড",
+          "pt": "Seu Feed",
+          "ru": "Ваша лента",
+          "ur": "آپ کا فیڈ",
+          "id": "Feed Anda",
+          "de": "Dein Feed",
+          "ja": "フィード",
+          "sw": "Mtiririko wako",
+          "tr": "Akışın"
+        }
+      },
+      "files": {
+        "html": "shell/screens/feed.html",
+        "css": "shell/screens/feed.css",
+        "handlers": [],
+        "adapters": [],
+        "shared": [
+          "shell/shared/chrome.css",
+          "shell/shared/system.css"
+        ]
+      },
+      "ssr": "spa",
+      "states": [
+        "loading",
+        "empty",
+        "populated",
+        "populated-dark"
+      ]
+    },
+    {
+      "path": "/reading-list",
+      "screen": "reading-list",
+      "nav": {
+        "key": "nav_reading_list",
+        "label": "Saved",
+        "labels": {
+          "en": "Saved",
+          "zh": "已保存",
+          "hi": "सेव किए गए",
+          "es": "Guardados",
+          "fr": "Enregistrés",
+          "ar": "المحفوظات",
+          "bn": "সংরক্ষিত",
+          "pt": "Salvos",
+          "ru": "Сохранённое",
+          "ur": "محفوظ شدہ",
+          "id": "Tersimpan",
+          "de": "Gemerkt",
+          "ja": "保存済み",
+          "sw": "Zilizohifadhiwa",
+          "tr": "Kaydedilenler"
+        }
+      },
+      "files": {
+        "html": "shell/screens/reading-list.html",
+        "css": "shell/screens/reading-list.css",
+        "handlers": [],
+        "adapters": [],
+        "shared": [
+          "shell/shared/chrome.css",
+          "shell/shared/system.css"
+        ]
+      },
+      "ssr": "spa",
+      "states": [
+        "loading",
+        "empty",
+        "populated",
+        "populated-dark"
+      ]
+    },
+    {
+      "keep": 0,
+      "path": "/editor",
+      "screen": "editor",
+      "nav": {
+        "key": "nav_editor",
+        "label": "New Article",
+        "labels": {
+          "en": "New Article",
+          "zh": "新建文章",
+          "hi": "नया लेख",
+          "es": "Nuevo artículo",
+          "fr": "Nouvel article",
+          "ar": "مقال جديد",
+          "bn": "নতুন লেখা",
+          "pt": "Novo Artigo",
+          "ru": "Новая статья",
+          "ur": "نئی تحریر",
+          "id": "Artikel Baru",
+          "de": "Neuer Artikel",
+          "ja": "新規記事",
+          "sw": "Makala Mpya",
+          "tr": "Yeni Yazı"
+        }
+      },
+      "files": {
+        "html": "shell/screens/editor.html",
+        "css": "shell/screens/editor.css",
+        "handlers": [],
+        "adapters": [],
+        "shared": [
+          "shell/shared/chrome.css",
+          "shell/shared/system.css"
+        ]
+      },
+      "ssr": "spa",
+      "states": [
+        "loading",
+        "populated",
+        "validation-error",
+        "success",
+        "populated-dark"
+      ]
+    },
+    {
+      "path": "/settings",
+      "screen": "settings",
+      "nav": {
+        "label": "Settings",
+        "strip": false
+      },
+      "files": {
+        "html": "shell/screens/settings.html",
+        "css": "shell/screens/settings.css",
+        "handlers": [],
+        "adapters": [],
+        "shared": [
+          "shell/shared/chrome.css",
+          "shell/shared/system.css"
+        ]
+      },
+      "ssr": "spa",
+      "states": [
+        "loading",
+        "populated",
+        "success",
+        "populated-dark"
+      ]
+    },
+    {
+      "keep": 3,
+      "path": "/older/:when",
+      "screen": "older",
+      "nav": {
+        "label": "Older writing"
+      },
+      "files": {
+        "html": "shell/screens/older.html",
+        "css": "shell/screens/older.css",
+        "handlers": [],
+        "adapters": [],
+        "shared": [
+          "shell/shared/chrome.css",
+          "shell/shared/system.css"
+        ]
+      },
+      "ssr": "ssr",
+      "states": [
+        "loading",
+        "populated",
+        "empty",
+        "populated-dark"
+      ]
+    },
+    {
+      "keep": 3,
+      "path": "/feed/older/:when",
+      "screen": "feed-older",
+      "nav": {
+        "label": "Older in your feed"
+      },
+      "files": {
+        "html": "shell/screens/feed-older.html",
+        "css": "shell/screens/feed-older.css",
+        "handlers": [],
+        "adapters": [],
+        "shared": [
+          "shell/shared/chrome.css",
+          "shell/shared/system.css"
+        ]
+      },
+      "ssr": "spa",
+      "states": [
+        "loading",
+        "populated",
+        "empty",
+        "populated-dark"
+      ]
+    },
+    {
+      "path": "/article/:slug",
+      "screen": "article",
+      "nav": {
+        "label": "Article"
+      },
+      "files": {
+        "html": "shell/screens/article.html",
+        "css": "shell/screens/article.css",
+        "handlers": [],
+        "adapters": [],
+        "renderers": [
+          "shell/renderers/markdown.js"
+        ],
+        "shared": [
+          "shell/shared/chrome.css",
+          "shell/shared/system.css"
+        ]
+      },
+      "ssr": "ssr",
+      "states": [
+        "loading",
+        "populated",
+        "validation-error",
+        "owner",
+        "delete-armed",
+        "no-comments",
+        "gone",
+        "populated-dark"
+      ]
+    },
+    {
+      "keep": 0,
+      "path": "/editor/:id",
+      "screen": "edit-article",
+      "nav": {
+        "label": "Edit Article"
+      },
+      "files": {
+        "html": "shell/screens/edit-article.html",
+        "css": "shell/screens/edit-article.css",
+        "handlers": [],
+        "adapters": [],
+        "shared": [
+          "shell/shared/chrome.css",
+          "shell/shared/system.css"
+        ]
+      },
+      "ssr": "spa",
+      "states": [
+        "loading",
+        "populated",
+        "validation-error",
+        "success",
+        "empty",
+        "populated-dark"
+      ]
+    },
+    {
+      "keep": 2,
+      "path": "/profile/:handle",
+      "screen": "profile",
+      "nav": {
+        "label": "Profile"
+      },
+      "files": {
+        "html": "shell/screens/profile.html",
+        "css": "shell/screens/profile.css",
+        "handlers": [],
+        "adapters": [],
+        "shared": [
+          "shell/shared/chrome.css",
+          "shell/shared/system.css"
+        ]
+      },
+      "ssr": "ssr",
+      "states": [
+        "loading",
+        "populated",
+        "following",
+        "own-profile",
+        "empty",
+        "populated-dark"
+      ]
+    },
+    {
+      "path": "/profile/:handle/favorites",
+      "screen": "profile-favorites",
+      "nav": {
+        "label": "Favorited"
+      },
+      "files": {
+        "html": "shell/screens/profile-favorites.html",
+        "css": "shell/screens/profile-favorites.css",
+        "handlers": [],
+        "adapters": [],
+        "shared": [
+          "shell/shared/chrome.css",
+          "shell/shared/system.css"
+        ]
+      },
+      "ssr": "ssr",
+      "states": [
+        "loading",
+        "populated",
+        "empty",
+        "populated-dark"
+      ]
+    },
+    {
+      "keep": 3,
+      "path": "/tag/:name",
+      "screen": "tag",
+      "nav": {
+        "label": "Tag"
+      },
+      "files": {
+        "html": "shell/screens/tag.html",
+        "css": "shell/screens/tag.css",
+        "handlers": [],
+        "adapters": [],
+        "shared": [
+          "shell/shared/chrome.css",
+          "shell/shared/system.css"
+        ]
+      },
+      "ssr": "ssr",
+      "states": [
+        "loading",
+        "populated",
+        "empty",
+        "populated-dark"
+      ]
+    },
+    {
+      "path": "/search/:q",
+      "screen": "search",
+      "nav": {
+        "label": "Search"
+      },
+      "files": {
+        "html": "shell/screens/search.html",
+        "css": "shell/screens/search.css",
+        "handlers": [],
+        "adapters": [],
+        "shared": [
+          "shell/shared/chrome.css",
+          "shell/shared/system.css"
+        ]
+      },
+      "ssr": "ssr",
+      "states": [
+        "loading",
+        "populated",
+        "empty",
+        "populated-dark",
+        "network-error"
+      ]
+    }
+  ],
+  "tables": [
+    "app_user",
+    "article",
+    "article_stats",
+    "article_tag",
+    "bookmark",
+    "comment",
+    "favorite",
+    "favorite_count",
+    "favorite_index",
+    "follow",
+    "me",
+    "tag_count"
+  ],
+  "schema": {
+    "app_user": {
+      "durability": "server",
+      "fields": [
+        {
+          "name": "id",
+          "pk": true,
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "bounds": {
+            "sizeMin": 1
+          },
+          "name": "handle",
+          "type": "string",
+          "required": true,
+          "unique": true
+        },
+        {
+          "bounds": {
+            "sizeMax": 60
+          },
+          "name": "display_name",
+          "type": "string",
+          "required": false
+        },
+        {
+          "bounds": {
+            "sizeMax": 300
+          },
+          "name": "bio",
+          "type": "string",
+          "required": false
+        },
+        {
+          "bounds": {
+            "sizeMax": 2048
+          },
+          "name": "image_url",
+          "type": "string",
+          "required": false
+        },
+        {
+          "default": "now()",
+          "name": "created_at",
+          "type": "timestamp",
+          "required": true
+        }
+      ]
+    },
+    "me": {
+      "durability": "live",
+      "fields": [
+        {
+          "name": "id",
+          "pk": true,
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "bounds": {
+            "sizeMin": 1
+          },
+          "name": "handle",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    "article": {
+      "durability": "server",
+      "fields": [
+        {
+          "default": "gen_random_uuid()",
+          "name": "id",
+          "pk": true,
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "default": "auth_uid()",
+          "name": "author_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "bounds": {
+            "sizeMin": 1,
+            "sizeMax": 200
+          },
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "bounds": {
+            "sizeMax": 300
+          },
+          "name": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "bounds": {
+            "sizeMin": 1
+          },
+          "name": "body",
+          "type": "string",
+          "required": true
+        },
+        {
+          "bounds": {
+            "sizeMax": 200
+          },
+          "name": "tags",
+          "type": "string",
+          "required": false
+        },
+        {
+          "bounds": {
+            "sizeMax": 2048
+          },
+          "name": "cover_url",
+          "type": "string",
+          "required": false
+        },
+        {
+          "bounds": {
+            "sizeMax": 120
+          },
+          "name": "cover_credit",
+          "type": "string",
+          "required": false
+        },
+        {
+          "bounds": {
+            "sizeMin": 1
+          },
+          "name": "slug",
+          "type": "string",
+          "required": true,
+          "unique": true
+        },
+        {
+          "default": "now()",
+          "name": "created_at",
+          "type": "timestamp",
+          "required": true
+        },
+        {
+          "default": "now()",
+          "name": "updated_at",
+          "type": "timestamp",
+          "required": true
+        },
+        {
+          "name": "search",
+          "type": "tsvector",
+          "required": true
+        },
+        {
+          "name": "reading_minutes",
+          "type": "int32",
+          "required": true
+        }
+      ]
+    },
+    "article_tag": {
+      "durability": "server",
+      "fields": [
+        {
+          "default": "gen_random_uuid()",
+          "name": "id",
+          "pk": true,
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "article_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "bounds": {
+            "sizeMin": 1,
+            "sizeMax": 40
+          },
+          "name": "tag",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "uniques": [
+        {
+          "name": "uq_article_tag_pair",
+          "cols": [
+            "article_id",
+            "tag"
+          ]
+        }
+      ]
+    },
+    "comment": {
+      "durability": "server",
+      "fields": [
+        {
+          "default": "gen_random_uuid()",
+          "name": "id",
+          "pk": true,
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "article_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "default": "auth_uid()",
+          "name": "author_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "bounds": {
+            "sizeMin": 1,
+            "sizeMax": 2000
+          },
+          "name": "body",
+          "type": "string",
+          "required": true
+        },
+        {
+          "default": "now()",
+          "name": "created_at",
+          "type": "timestamp",
+          "required": true
+        }
+      ]
+    },
+    "favorite": {
+      "durability": "server",
+      "fields": [
+        {
+          "default": "gen_random_uuid()",
+          "name": "id",
+          "pk": true,
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "default": "auth_uid()",
+          "name": "user_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "article_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "default": "now()",
+          "name": "created_at",
+          "type": "timestamp",
+          "required": true
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp",
+          "required": false
+        }
+      ],
+      "uniques": [
+        {
+          "name": "uq_favorite_pair",
+          "cols": [
+            "user_id",
+            "article_id"
+          ]
+        }
+      ]
+    },
+    "bookmark": {
+      "durability": "server",
+      "fields": [
+        {
+          "default": "gen_random_uuid()",
+          "name": "id",
+          "pk": true,
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "default": "auth_uid()",
+          "name": "user_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "article_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "default": "now()",
+          "name": "created_at",
+          "type": "timestamp",
+          "required": true
+        }
+      ],
+      "uniques": [
+        {
+          "name": "uq_bookmark_pair",
+          "cols": [
+            "user_id",
+            "article_id"
+          ]
+        }
+      ]
+    },
+    "follow": {
+      "durability": "server",
+      "fields": [
+        {
+          "default": "gen_random_uuid()",
+          "name": "id",
+          "pk": true,
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "default": "auth_uid()",
+          "name": "follower_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "followed_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "default": "now()",
+          "name": "created_at",
+          "type": "timestamp",
+          "required": true
+        }
+      ],
+      "uniques": [
+        {
+          "name": "uq_follow_pair",
+          "cols": [
+            "follower_id",
+            "followed_id"
+          ]
+        }
+      ]
+    },
+    "favorite_count": {
+      "durability": "live",
+      "fields": [
+        {
+          "name": "id",
+          "pk": true,
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "article_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "bounds": {
+            "intMin": 0,
+            "intMax": 1
+          },
+          "name": "mine_counted",
+          "type": "int32",
+          "required": true
+        },
+        {
+          "bounds": {
+            "intMin": 0
+          },
+          "name": "total_at_read",
+          "type": "int32",
+          "required": true
+        },
+        {
+          "name": "as_of_txid",
+          "type": "int64",
+          "required": false
+        }
+      ],
+      "uniques": [
+        {
+          "name": "uq_favorite_count_pair",
+          "cols": [
+            "user_id",
+            "article_id"
+          ]
+        }
+      ]
+    },
+    "article_stats": {
+      "durability": "live",
+      "fields": [
+        {
+          "name": "article_id",
+          "pk": true,
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "bounds": {
+            "intMin": 0
+          },
+          "name": "favorite_count",
+          "type": "int32",
+          "required": true
+        },
+        {
+          "bounds": {
+            "intMin": 0
+          },
+          "name": "counted_txid",
+          "type": "int64",
+          "required": true
+        }
+      ]
+    },
+    "tag_count": {
+      "durability": "live",
+      "fields": [
+        {
+          "bounds": {
+            "sizeMin": 1
+          },
+          "name": "id",
+          "pk": true,
+          "type": "string",
+          "required": true
+        },
+        {
+          "bounds": {
+            "intMin": 0
+          },
+          "name": "article_count",
+          "type": "int32",
+          "required": true
+        }
+      ]
+    },
+    "favorite_index": {
+      "durability": "live",
+      "fields": [
+        {
+          "bounds": {
+            "sizeMin": 1
+          },
+          "name": "id",
+          "pk": true,
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "article_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "required": true
+        },
+        {
+          "name": "favorited_at",
+          "type": "timestamp",
+          "required": true
+        }
+      ]
+    }
+  },
+  "types": {
+    "types": {
+      "string": {
+        "sql": "portable_string",
+        "base": [
+          "text",
+          "varchar",
+          "bpchar",
+          "tsvector"
+        ],
+        "json": "string",
+        "refuse": "\\x00",
+        "order": "text",
+        "beyond": [
+          "scalar-values"
+        ]
+      },
+      "bool": {
+        "sql": "portable_bool",
+        "base": [
+          "bool",
+          "boolean"
+        ],
+        "json": "boolean",
+        "order": "boolean",
+        "beyond": []
+      },
+      "int32": {
+        "sql": "portable_int32",
+        "base": [
+          "int2",
+          "int4",
+          "integer",
+          "smallint"
+        ],
+        "json": "number",
+        "min": -2147483648,
+        "max": 2147483647,
+        "order": "number",
+        "beyond": []
+      },
+      "int64": {
+        "sql": "portable_int64",
+        "base": [
+          "int8",
+          "bigint"
+        ],
+        "json": "string",
+        "pattern": "^(0|-?[1-9][0-9]*)$",
+        "order": "integer",
+        "beyond": [
+          "int64-range"
+        ]
+      },
+      "double": {
+        "sql": "portable_double",
+        "base": [
+          "float4",
+          "float8",
+          "double precision",
+          "real"
+        ],
+        "json": "number",
+        "order": "number",
+        "beyond": []
+      },
+      "bytes": {
+        "sql": "portable_bytes",
+        "base": [
+          "bytea"
+        ],
+        "json": "string",
+        "pattern": "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+        "order": "none",
+        "beyond": []
+      },
+      "uuid": {
+        "sql": "portable_uuid",
+        "base": [
+          "uuid"
+        ],
+        "json": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        "order": "text",
+        "beyond": []
+      },
+      "timestamp": {
+        "sql": "portable_timestamp",
+        "base": [
+          "timestamptz",
+          "timestamp with time zone"
+        ],
+        "json": "string",
+        "pattern": "^(000[1-9]|00[1-9][0-9]|0[1-9][0-9]{2}|[1-9][0-9]{3})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{6}Z$",
+        "order": "text",
+        "beyond": [
+          "calendar"
+        ]
+      },
+      "duration": {
+        "sql": "portable_duration",
+        "base": [
+          "interval"
+        ],
+        "json": "string",
+        "pattern": "^PT(0|[1-9][0-9]*)(\\.[0-9]{0,5}[1-9])?S$",
+        "order": "duration",
+        "beyond": [
+          "duration-range"
+        ]
+      },
+      "decimal": {
+        "base": [
+          "numeric",
+          "decimal"
+        ],
+        "json": "string",
+        "pattern": "^(0|-?[1-9][0-9]*|-?(0|[1-9][0-9]*)\\.[0-9]*[1-9])$",
+        "order": "decimal",
+        "beyond": [
+          "decimal-profile"
+        ]
+      },
+      "date": {
+        "sql": "portable_date",
+        "base": [
+          "date"
+        ],
+        "json": "string",
+        "pattern": "^(000[1-9]|00[1-9][0-9]|0[1-9][0-9]{2}|[1-9][0-9]{3})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
+        "order": "text",
+        "beyond": [
+          "calendar"
+        ]
+      },
+      "time": {
+        "sql": "portable_time",
+        "base": [
+          "time",
+          "time without time zone"
+        ],
+        "json": "string",
+        "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{6}$",
+        "order": "text",
+        "beyond": []
+      },
+      "timezone": {
+        "sql": "portable_timezone",
+        "base": [],
+        "json": "string",
+        "pattern": "^[A-Za-z0-9+_/-]+$",
+        "order": "none",
+        "beyond": [
+          "tzdb"
+        ]
+      },
+      "json": {
+        "sql": "portable_json",
+        "base": [
+          "json",
+          "jsonb"
+        ],
+        "json": "value",
+        "order": "none",
+        "beyond": [
+          "scalar-values",
+          "finite-numbers"
+        ]
+      },
+      "geojson": {
+        "sql": "portable_geojson",
+        "base": [
+          "geometry",
+          "geography"
+        ],
+        "json": "value",
+        "order": "none",
+        "beyond": [
+          "scalar-values",
+          "finite-numbers",
+          "ring-closure"
+        ]
+      }
+    },
+    "aliases": {
+      "text": "string",
+      "int": "int32",
+      "bigint": "int64",
+      "timestamptz": "timestamp",
+      "tsvector": "string"
+    }
+  },
+  "carriers": {
+    "types": {
+      "string": {
+        "sql": "portable_string",
+        "base": [
+          "text",
+          "varchar",
+          "bpchar",
+          "tsvector"
+        ],
+        "json": "string",
+        "refuse": "\\x00",
+        "order": "text",
+        "beyond": [
+          "scalar-values"
+        ]
+      },
+      "bool": {
+        "sql": "portable_bool",
+        "base": [
+          "bool",
+          "boolean"
+        ],
+        "json": "boolean",
+        "order": "boolean",
+        "beyond": []
+      },
+      "int32": {
+        "sql": "portable_int32",
+        "base": [
+          "int2",
+          "int4",
+          "integer",
+          "smallint"
+        ],
+        "json": "number",
+        "min": -2147483648,
+        "max": 2147483647,
+        "order": "number",
+        "beyond": []
+      },
+      "int64": {
+        "sql": "portable_int64",
+        "base": [
+          "int8",
+          "bigint"
+        ],
+        "json": "string",
+        "pattern": "^(0|-?[1-9][0-9]*)$",
+        "order": "integer",
+        "beyond": [
+          "int64-range"
+        ]
+      },
+      "double": {
+        "sql": "portable_double",
+        "base": [
+          "float4",
+          "float8",
+          "double precision",
+          "real"
+        ],
+        "json": "number",
+        "order": "number",
+        "beyond": []
+      },
+      "bytes": {
+        "sql": "portable_bytes",
+        "base": [
+          "bytea"
+        ],
+        "json": "string",
+        "pattern": "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+        "order": "none",
+        "beyond": []
+      },
+      "uuid": {
+        "sql": "portable_uuid",
+        "base": [
+          "uuid"
+        ],
+        "json": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        "order": "text",
+        "beyond": []
+      },
+      "timestamp": {
+        "sql": "portable_timestamp",
+        "base": [
+          "timestamptz",
+          "timestamp with time zone"
+        ],
+        "json": "string",
+        "pattern": "^(000[1-9]|00[1-9][0-9]|0[1-9][0-9]{2}|[1-9][0-9]{3})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{6}Z$",
+        "order": "text",
+        "beyond": [
+          "calendar"
+        ]
+      },
+      "duration": {
+        "sql": "portable_duration",
+        "base": [
+          "interval"
+        ],
+        "json": "string",
+        "pattern": "^PT(0|[1-9][0-9]*)(\\.[0-9]{0,5}[1-9])?S$",
+        "order": "duration",
+        "beyond": [
+          "duration-range"
+        ]
+      },
+      "decimal": {
+        "base": [
+          "numeric",
+          "decimal"
+        ],
+        "json": "string",
+        "pattern": "^(0|-?[1-9][0-9]*|-?(0|[1-9][0-9]*)\\.[0-9]*[1-9])$",
+        "order": "decimal",
+        "beyond": [
+          "decimal-profile"
+        ]
+      },
+      "date": {
+        "sql": "portable_date",
+        "base": [
+          "date"
+        ],
+        "json": "string",
+        "pattern": "^(000[1-9]|00[1-9][0-9]|0[1-9][0-9]{2}|[1-9][0-9]{3})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
+        "order": "text",
+        "beyond": [
+          "calendar"
+        ]
+      },
+      "time": {
+        "sql": "portable_time",
+        "base": [
+          "time",
+          "time without time zone"
+        ],
+        "json": "string",
+        "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{6}$",
+        "order": "text",
+        "beyond": []
+      },
+      "timezone": {
+        "sql": "portable_timezone",
+        "base": [],
+        "json": "string",
+        "pattern": "^[A-Za-z0-9+_/-]+$",
+        "order": "none",
+        "beyond": [
+          "tzdb"
+        ]
+      },
+      "json": {
+        "sql": "portable_json",
+        "base": [
+          "json",
+          "jsonb"
+        ],
+        "json": "value",
+        "order": "none",
+        "beyond": [
+          "scalar-values",
+          "finite-numbers"
+        ]
+      },
+      "geojson": {
+        "sql": "portable_geojson",
+        "base": [
+          "geometry",
+          "geography"
+        ],
+        "json": "value",
+        "order": "none",
+        "beyond": [
+          "scalar-values",
+          "finite-numbers",
+          "ring-closure"
+        ]
+      }
+    },
+    "aliases": {
+      "text": "string",
+      "int": "int32",
+      "bigint": "int64",
+      "timestamptz": "timestamp",
+      "tsvector": "string"
+    }
+  },
+  "migrations": [
+    "services/database/migrations/000_extensions.sql",
+    "services/database/migrations/001_roles.sql",
+    "services/database/migrations/002_grants.sql",
+    "services/database/migrations/004_types.sql",
+    "services/database/migrations/005_create_tables.sql",
+    "services/database/migrations/006_policies.sql",
+    "services/database/migrations/007_txid.sql",
+    "services/database/migrations/008_publication.sql",
+    "services/database/migrations/009_validations.sql",
+    "services/database/migrations/011_owner_writes.sql",
+    "services/database/migrations/012_me_readonly.sql",
+    "services/database/migrations/013_article_tag_sync.sql",
+    "services/database/migrations/014_me_provision.sql",
+    "services/database/migrations/015_default_privileges.sql"
+  ],
+  "pipelines": [
+    {
+      "fold": "pipelines/favorite-recount.js",
+      "key": "article_id",
+      "name": "favorite-recount",
+      "from": "favorite",
+      "projects": "favorite_count",
+      "to": "article_stats",
+      "aggregate": "select=article_id,txid,deleted_at",
+      "watermark": "counted_txid",
+      "dedupe": [
+        "user_id",
+        "article_id"
+      ],
+      "retracted": "deleted_at",
+      "pair": {
+        "table": "favorite_count",
+        "counted": "mine_counted",
+        "total": "total_at_read",
+        "asOf": "as_of_txid"
+      }
+    },
+    {
+      "key": "id",
+      "name": "favorite-count",
+      "from": "favorite",
+      "shim": "pipelines/favorite-count.browser.js",
+      "to": "favorite_count",
+      "aggregate": "select=user_id,article_id,txid,deleted_at"
+    },
+    {
+      "key": "id",
+      "name": "favorite-index",
+      "from": "favorite",
+      "shim": "pipelines/favorite-index.browser.js",
+      "to": "favorite_index",
+      "aggregate": "select=user_id,article_id,created_at,deleted_at"
+    },
+    {
+      "key": "tag",
+      "name": "tag-recount",
+      "from": "article_tag",
+      "shim": "pipelines/tag-recount.browser.js",
+      "to": "tag_count",
+      "aggregate": "select=article_id,tag"
+    }
+  ],
+  "uniques": {
+    "article_tag": [
+      [
+        "article_id",
+        "tag"
+      ]
+    ],
+    "favorite": [
+      [
+        "user_id",
+        "article_id"
+      ]
+    ],
+    "bookmark": [
+      [
+        "user_id",
+        "article_id"
+      ]
+    ],
+    "follow": [
+      [
+        "follower_id",
+        "followed_id"
+      ]
+    ],
+    "favorite_count": [
+      [
+        "user_id",
+        "article_id"
+      ]
+    ]
+  },
+  "validations": {
+    "favorite": {
+      "own-article": {
+        "src": "shell/validations/own-article.js",
+        "edges": [
+          {
+            "table": "article",
+            "key": "id",
+            "from": "article_id"
+          }
+        ]
+      }
+    }
+  }
+}

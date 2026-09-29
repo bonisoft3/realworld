@@ -1,0 +1,11 @@
+say:
+  launch:
+    rulemap:
+      server:
+        cmds:
+          - do: "./gradlew run"
+  test:
+    rulemap:
+      native:
+        cmds:
+          - do: "./gradlew test"

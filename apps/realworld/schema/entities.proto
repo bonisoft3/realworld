@@ -1,0 +1,100 @@
+syntax = "proto3";
+package pronto.entities;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+
+message AppUser {
+  optional string id = 1 [json_name = "id"];
+  optional string handle = 2 [json_name = "handle"];
+  optional string display_name = 3 [json_name = "display_name"];
+  optional string bio = 4 [json_name = "bio"];
+  optional string image_url = 5 [json_name = "image_url"];
+  google.protobuf.Timestamp created_at = 6 [json_name = "created_at"];
+}
+
+message Article {
+  optional string id = 1 [json_name = "id"];
+  optional string author_id = 2 [json_name = "author_id"];
+  optional string title = 3 [json_name = "title"];
+  optional string description = 4 [json_name = "description"];
+  optional string body = 5 [json_name = "body"];
+  optional string tags = 6 [json_name = "tags"];
+  optional string cover_url = 7 [json_name = "cover_url"];
+  optional string cover_credit = 8 [json_name = "cover_credit"];
+  optional string slug = 9 [json_name = "slug"];
+  google.protobuf.Timestamp created_at = 10 [json_name = "created_at"];
+  google.protobuf.Timestamp updated_at = 11 [json_name = "updated_at"];
+  optional string search = 12 [json_name = "search"];
+  optional int32 reading_minutes = 13 [json_name = "reading_minutes"];
+}
+
+message ArticleStats {
+  optional string article_id = 1 [json_name = "article_id"];
+  optional int32 favorite_count = 2 [json_name = "favorite_count"];
+  optional int64 counted_txid = 3 [json_name = "counted_txid"];
+}
+
+message ArticleTag {
+  optional string id = 1 [json_name = "id"];
+  optional string article_id = 2 [json_name = "article_id"];
+  optional string tag = 3 [json_name = "tag"];
+}
+
+message Bookmark {
+  optional string id = 1 [json_name = "id"];
+  optional string user_id = 2 [json_name = "user_id"];
+  optional string article_id = 3 [json_name = "article_id"];
+  google.protobuf.Timestamp created_at = 4 [json_name = "created_at"];
+}
+
+message Comment {
+  optional string id = 1 [json_name = "id"];
+  optional string article_id = 2 [json_name = "article_id"];
+  optional string author_id = 3 [json_name = "author_id"];
+  optional string body = 4 [json_name = "body"];
+  google.protobuf.Timestamp created_at = 5 [json_name = "created_at"];
+}
+
+message Favorite {
+  optional string id = 1 [json_name = "id"];
+  optional string user_id = 2 [json_name = "user_id"];
+  optional string article_id = 3 [json_name = "article_id"];
+  google.protobuf.Timestamp created_at = 4 [json_name = "created_at"];
+  google.protobuf.Timestamp deleted_at = 5 [json_name = "deleted_at"];
+}
+
+message FavoriteCount {
+  optional string id = 1 [json_name = "id"];
+  optional string user_id = 2 [json_name = "user_id"];
+  optional string article_id = 3 [json_name = "article_id"];
+  optional int32 mine_counted = 4 [json_name = "mine_counted"];
+  optional int32 total_at_read = 5 [json_name = "total_at_read"];
+  optional int64 as_of_txid = 6 [json_name = "as_of_txid"];
+}
+
+message FavoriteIndex {
+  optional string id = 1 [json_name = "id"];
+  optional string user_id = 2 [json_name = "user_id"];
+  optional string article_id = 3 [json_name = "article_id"];
+  optional bool active = 4 [json_name = "active"];
+  google.protobuf.Timestamp favorited_at = 5 [json_name = "favorited_at"];
+}
+
+message Follow {
+  optional string id = 1 [json_name = "id"];
+  optional string follower_id = 2 [json_name = "follower_id"];
+  optional string followed_id = 3 [json_name = "followed_id"];
+  google.protobuf.Timestamp created_at = 4 [json_name = "created_at"];
+}
+
+message Me {
+  optional string id = 1 [json_name = "id"];
+  optional string handle = 2 [json_name = "handle"];
+}
+
+message TagCount {
+  optional string id = 1 [json_name = "id"];
+  optional int32 article_count = 2 [json_name = "article_count"];
+}

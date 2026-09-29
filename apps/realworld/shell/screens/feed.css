@@ -1,0 +1,72 @@
+@import "./shared/chrome.css";
+
+/* Shared system block — byte-identical in every screen that carries it
+   (decision-preview-one-component makes the preview one component only if
+   its source is literally shared). Copy it whole; never fork a value.
+   Tokens come from design.css and are consumed, never redeclared. */
+
+@import "./shared/system.css";
+
+
+/* feed — ir: #feed */
+[data-screen="feed"] { max-width: 720px; container-type: inline-size; }
+/* The rule under the masthead runs the full width of the frame, so the head
+   bleeds back out through the screen's own inset. */
+[data-screen="feed"] .head { display: flex; flex-direction: column; gap: 2px;
+  margin: 0 calc(var(--sp-lg) * -1) var(--sp-md);
+  padding: 0 var(--sp-lg) var(--sp-md);
+  border-bottom: 1px solid var(--border); }
+[data-screen="feed"] .back { color: var(--secondary); text-decoration: none;
+  font-weight: 600; }
+[data-screen="feed"] .back:hover { color: var(--primary); }
+[data-screen="feed"] .search { display: flex; flex-wrap: wrap;
+  gap: var(--sp-sm); margin-bottom: var(--sp-md); }
+[data-screen="feed"] .search input { flex: 1; min-width: 0; }
+[data-screen="feed"] .search .invalid { flex-basis: 100%; margin-top: 0; }
+[data-screen="feed"] .offline { color: var(--secondary);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 10px 12px; margin-bottom: var(--sp-md); }
+/* The paging link is this screen's own continuation — feed-older, never the
+   community list — and rides the twentieth card so a short feed is never
+   offered a page that is not there. */
+[data-screen="feed"] .older { display: none; color: var(--secondary);
+  font-weight: 600; text-decoration: underline; text-underline-offset: 2px;
+  margin-top: 4px; }
+[data-screen="feed"] .older:hover { color: var(--primary); }
+[data-screen="feed"] .list > *:nth-child(20) .older { display: block; }
+@container (max-width: 420px) {
+  [data-screen="feed"] .preview-foot { flex-wrap: wrap; }
+  [data-screen="feed"] .arms { margin-left: auto; }
+}
+
+/* States — data-state is shell-owned; the screen only styles it. */
+[data-screen="feed"] .skeleton,
+[data-screen="feed"] .quiet,
+[data-screen="feed"] .offline { display: none; }
+/* loading — three card wells and nothing else. The back-link, the heading
+   and the search box are screen-level static markup and are drawn as
+   themselves; the pill arms stay hidden until the first refresh has swept
+   the probe templates, or the unset arm flashes. */
+[data-screen="feed"][data-state="loading"] .skeleton { display: grid;
+  gap: var(--sp-sm); }
+[data-screen="feed"][data-state="loading"] .list { display: none; }
+[data-screen="feed"][data-state="loading"] .arms { visibility: hidden; }
+[data-screen="feed"] .skel-card { height: 100px; border-radius: var(--r-md);
+  background: var(--surface-muted); }
+/* empty — feed has one top-level region, so the screen state is the list's
+   state and carries the whole message: the sentence, the way out of it, and
+   one accent link. The accent is spent here as this frame's only call to
+   action; the back-link stays secondary. */
+[data-screen="feed"][data-state="empty"] .quiet { display: grid;
+  justify-items: center; text-align: center; gap: var(--sp-sm);
+  padding: var(--sp-xl) var(--sp-md) 0; }
+[data-screen="feed"][data-state="empty"] .list { display: none; }
+[data-screen="feed"] .quiet .said { color: var(--secondary);
+  max-width: 42ch; }
+[data-screen="feed"] .quiet .go { color: var(--accent); font-weight: 600;
+  text-decoration: none; margin-top: var(--sp-sm); }
+[data-screen="feed"] .quiet .go:hover { text-decoration: underline;
+  text-underline-offset: 3px; }
+/* Every screen with a server-computed read carries the offline sentence;
+   feed draws no network-error frame of its own but reuses the treatment. */
+[data-screen="feed"][data-state="network-error"] .offline { display: block; }

@@ -1,0 +1,283 @@
+# generated from bayt.cue — do not edit
+services:
+  apps_realworld-caddy:
+    build:
+      additional_contexts:
+        root: ../../..
+      context: ..
+      dockerfile: .bayt/Dockerfile.caddy
+      target: caddy
+      args:
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+    develop:
+      watch:
+      - action: sync+restart
+        path: ../docker/Caddyfile
+        target: /etc/caddy/Caddyfile
+      - action: sync+restart
+        path: ../shell/index.html
+        target: /srv/shell/index.html
+      - action: sync+restart
+        path: ../shell/shell.css
+        target: /srv/shell/shell.css
+      - action: sync+restart
+        path: ../shell/boot.js
+        target: /srv/shell/boot.js
+      - action: sync+restart
+        path: ../offline-first-sw.js
+        target: /srv/offline-first-sw.js
+      - action: sync+restart
+        path: ../shell/shell.yaml
+        target: /srv/shell/shell.yaml
+      - action: sync+restart
+        path: ../shell/shell.json
+        target: /srv/shell/shell.json
+      - action: sync+restart
+        path: ../shell/design.css
+        target: /srv/shell/design.css
+      - action: sync+restart
+        path: ../shell/screens/home.html
+        target: /srv/shell/screens/home.html
+      - action: sync+restart
+        path: ../shell/screens/home.css
+        target: /srv/shell/screens/home.css
+      - action: sync+restart
+        path: ../shell/screens/feed.html
+        target: /srv/shell/screens/feed.html
+      - action: sync+restart
+        path: ../shell/screens/feed.css
+        target: /srv/shell/screens/feed.css
+      - action: sync+restart
+        path: ../shell/screens/reading-list.html
+        target: /srv/shell/screens/reading-list.html
+      - action: sync+restart
+        path: ../shell/screens/reading-list.css
+        target: /srv/shell/screens/reading-list.css
+      - action: sync+restart
+        path: ../shell/screens/editor.html
+        target: /srv/shell/screens/editor.html
+      - action: sync+restart
+        path: ../shell/screens/editor.css
+        target: /srv/shell/screens/editor.css
+      - action: sync+restart
+        path: ../shell/screens/settings.html
+        target: /srv/shell/screens/settings.html
+      - action: sync+restart
+        path: ../shell/screens/settings.css
+        target: /srv/shell/screens/settings.css
+      - action: sync+restart
+        path: ../shell/screens/older.html
+        target: /srv/shell/screens/older.html
+      - action: sync+restart
+        path: ../shell/screens/older.css
+        target: /srv/shell/screens/older.css
+      - action: sync+restart
+        path: ../shell/screens/feed-older.html
+        target: /srv/shell/screens/feed-older.html
+      - action: sync+restart
+        path: ../shell/screens/feed-older.css
+        target: /srv/shell/screens/feed-older.css
+      - action: sync+restart
+        path: ../shell/screens/article.html
+        target: /srv/shell/screens/article.html
+      - action: sync+restart
+        path: ../shell/screens/article.css
+        target: /srv/shell/screens/article.css
+      - action: sync+restart
+        path: ../shell/screens/edit-article.html
+        target: /srv/shell/screens/edit-article.html
+      - action: sync+restart
+        path: ../shell/screens/edit-article.css
+        target: /srv/shell/screens/edit-article.css
+      - action: sync+restart
+        path: ../shell/screens/profile.html
+        target: /srv/shell/screens/profile.html
+      - action: sync+restart
+        path: ../shell/screens/profile.css
+        target: /srv/shell/screens/profile.css
+      - action: sync+restart
+        path: ../shell/screens/profile-favorites.html
+        target: /srv/shell/screens/profile-favorites.html
+      - action: sync+restart
+        path: ../shell/screens/profile-favorites.css
+        target: /srv/shell/screens/profile-favorites.css
+      - action: sync+restart
+        path: ../shell/screens/tag.html
+        target: /srv/shell/screens/tag.html
+      - action: sync+restart
+        path: ../shell/screens/tag.css
+        target: /srv/shell/screens/tag.css
+      - action: sync+restart
+        path: ../shell/screens/search.html
+        target: /srv/shell/screens/search.html
+      - action: sync+restart
+        path: ../shell/screens/search.css
+        target: /srv/shell/screens/search.css
+      - action: sync+restart
+        path: ../shell/renderers/markdown.js
+        target: /srv/shell/renderers/markdown.js
+      - action: sync+restart
+        path: ../shell/shared/chrome.css
+        target: /srv/shell/shared/chrome.css
+      - action: sync+restart
+        path: ../shell/shared/system.css
+        target: /srv/shell/shared/system.css
+      - action: sync+restart
+        path: ../pipelines/favorite-recount.js
+        target: /srv/pipelines/favorite-recount.js
+      - action: sync+restart
+        path: ../shell/validations/own-article.js
+        target: /srv/shell/validations/own-article.js
+      - action: sync+restart
+        path: ../messages/en.json
+        target: /srv/messages/en.json
+      - action: sync+restart
+        path: ../messages/zh.json
+        target: /srv/messages/zh.json
+      - action: sync+restart
+        path: ../messages/hi.json
+        target: /srv/messages/hi.json
+      - action: sync+restart
+        path: ../messages/es.json
+        target: /srv/messages/es.json
+      - action: sync+restart
+        path: ../messages/fr.json
+        target: /srv/messages/fr.json
+      - action: sync+restart
+        path: ../messages/ar.json
+        target: /srv/messages/ar.json
+      - action: sync+restart
+        path: ../messages/bn.json
+        target: /srv/messages/bn.json
+      - action: sync+restart
+        path: ../messages/pt.json
+        target: /srv/messages/pt.json
+      - action: sync+restart
+        path: ../messages/ru.json
+        target: /srv/messages/ru.json
+      - action: sync+restart
+        path: ../messages/ur.json
+        target: /srv/messages/ur.json
+      - action: sync+restart
+        path: ../messages/id.json
+        target: /srv/messages/id.json
+      - action: sync+restart
+        path: ../messages/de.json
+        target: /srv/messages/de.json
+      - action: sync+restart
+        path: ../messages/ja.json
+        target: /srv/messages/ja.json
+      - action: sync+restart
+        path: ../messages/sw.json
+        target: /srv/messages/sw.json
+      - action: sync+restart
+        path: ../messages/tr.json
+        target: /srv/messages/tr.json
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/shell.js
+        target: /omnishell/interpreter/shell.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/chrome.js
+        target: /omnishell/interpreter/chrome.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/screen.js
+        target: /omnishell/interpreter/screen.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/fragment.js
+        target: /omnishell/interpreter/fragment.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/data-sync.js
+        target: /omnishell/interpreter/data-sync.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/validate.js
+        target: /omnishell/interpreter/validate.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/render.js
+        target: /omnishell/interpreter/render.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/hatch.js
+        target: /omnishell/interpreter/hatch.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/hatch-worker.js
+        target: /omnishell/interpreter/hatch-worker.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/storybook.js
+        target: /omnishell/interpreter/storybook.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/jessie.js
+        target: /omnishell/interpreter/jessie.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/vendor/mecha-client.js
+        target: /omnishell/interpreter/vendor/mecha-client.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/vendor/js-yaml.js
+        target: /omnishell/interpreter/vendor/js-yaml.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/vendor/ses.umd.min.js
+        target: /omnishell/interpreter/vendor/ses.umd.min.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/interpreter/vendor/morphlex.js
+        target: /omnishell/interpreter/vendor/morphlex.js
+      - action: sync+restart
+        path: ../../../plugins/omnishell/components/wallclock.js
+        target: /omnishell/components/wallclock.js
+      - action: sync+restart
+        path: ../brief.html
+        target: /srv/docs/brief.html
+      - action: sync+restart
+        path: ../ir.html
+        target: /srv/docs/ir.html
+      - action: sync+restart
+        path: ../acceptance.md
+        target: /srv/docs/acceptance.md
+      - action: sync+restart
+        path: ../DESIGN.md
+        target: /srv/docs/DESIGN.md
+      - action: sync+restart
+        path: ../robots.txt
+        target: /srv/robots.txt
+      - action: sync+restart
+        path: ../sitemap.xml
+        target: /srv/sitemap.xml
+    environment:
+      ELECTRIC_SECRET: ${ELECTRIC_SECRET:-dev-electric-secret}
+    healthcheck:
+      test:
+      - CMD
+      - httpcheck
+      - http://127.0.0.1:8080/health
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+      start_interval: 500ms
+    image: bayt-apps_realworld-caddy:${BAYT_IMAGE_TAG:-latest}
+    networks:
+      default:
+        aliases:
+        - caddy
+    ports:
+    - ${CADDY_TLS_HOST_PORT:-8443}:8443
+    volumes:
+    - ../.certs:/certs:ro
+  apps_realworld-caddy_bayt:
+    build:
+      context: ..
+      dockerfile: .bayt/Dockerfile.caddy
+      target: caddy_bayt
+      args:
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+    image: bayt-apps_realworld-caddy_bayt:latest
+    scale: 0
+  apps_realworld-caddy_srcs:
+    build:
+      context: ..
+      dockerfile: .bayt/Dockerfile.caddy
+      target: caddy_srcs
+      args:
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+    image: bayt-apps_realworld-caddy_srcs:latest
+    scale: 0

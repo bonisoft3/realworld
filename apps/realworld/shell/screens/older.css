@@ -1,0 +1,76 @@
+@import "./shared/chrome.css";
+
+@import "./shared/system.css";
+
+
+/* older — ir: #older. The community list continued: the keyset cursor the
+   twentieth card already carried, so the number a screen cannot compute is a
+   value a row already holds. The heading is the app's own words and never the
+   cursor — the screen-level {param.x} pass is a plain interpolation and would
+   print a raw ISO timestamp at the reader. */
+[data-screen="older"] { container-type: inline-size; }
+[data-screen="older"] .masthead { margin: 0 calc(var(--sp-lg) * -1)
+  var(--sp-md); padding: 0 var(--sp-lg) var(--sp-md);
+  border-bottom: 1px solid var(--border); }
+[data-screen="older"] .back { display: inline-block;
+  color: var(--secondary); text-decoration: none; }
+[data-screen="older"] .back:hover { color: var(--primary); }
+[data-screen="older"] .page-title { margin: 6px 0 2px;
+  color: var(--primary); }
+[data-screen="older"] .gloss { margin: 0; color: var(--secondary); }
+[data-screen="older"] .search { display: flex; gap: var(--sp-sm);
+  flex-wrap: wrap; margin: 0 0 var(--sp-md); }
+[data-screen="older"] .search input { flex: 1; min-width: 0;
+  border-radius: var(--r-full); padding: 8px 16px; }
+[data-screen="older"] .search button { border-radius: var(--r-full); }
+[data-screen="older"] .search .invalid { flex-basis: 100%; }
+/* The twentieth card carries the cursor into the next page — :nth-child(20),
+   never :last-child, so a short final page ends without offering a page that
+   is not there (ir decision-paging-keyset). */
+[data-screen="older"] .older { display: none; position: relative;
+  z-index: 2; align-self: flex-start; margin-top: 3px;
+  color: var(--secondary); text-decoration: underline;
+  text-underline-offset: 2px; }
+[data-screen="older"] .older:hover { color: var(--primary); }
+[data-screen="older"] .list > *:nth-child(20) .older { display: block; }
+@container (max-width: 460px) {
+  [data-screen="older"] .preview-head { flex-wrap: wrap; }
+  [data-screen="older"] .preview-foot { flex-direction: column;
+    align-items: flex-start; }
+  [data-screen="older"] .arms { align-items: flex-start; }
+}
+
+/* States — data-state is shell-owned; the screen only styles it. */
+[data-screen="older"] .skeleton,
+[data-screen="older"] .beginning,
+[data-screen="older"] .offline { display: none; }
+/* A skeleton covers region-bound content only: the back-link, the heading, its
+   gloss and the search box are screen-level static markup and are drawn as
+   themselves while the read is in flight. */
+[data-screen="older"][data-state="loading"] .skeleton { display: flex;
+  flex-direction: column; gap: var(--sp-sm); }
+[data-screen="older"][data-state="loading"] .list { display: none; }
+[data-screen="older"] .skel-card { height: 96px;
+  background: var(--surface-muted); border-radius: var(--r-md); }
+[data-screen="older"] .skel-card.tall { height: 110px; }
+/* Until the first refresh sweeps the <template> a probe reads non-empty, so
+   the unset arm would flash (ir decision-probe-empty). */
+[data-screen="older"][data-state="loading"] .arms { visibility: hidden; }
+/* empty — one top-level region, so the screen state is the whole answer: the
+   end of the archive said in words, with the one way out. The accent is
+   permitted here: an empty state with no committing control may spend it on
+   its only call to action. */
+[data-screen="older"][data-state="empty"] .list { display: none; }
+[data-screen="older"][data-state="empty"] .beginning { display: block;
+  text-align: center; margin: calc(var(--sp-xl) * 2) auto 0;
+  max-width: 34ch; }
+[data-screen="older"] .beginning-line { margin: 0; color: var(--primary); }
+[data-screen="older"] .beginning-sub { margin: 6px 0 var(--sp-lg);
+  color: var(--secondary); }
+[data-screen="older"] .beginning-out { display: inline-block;
+  color: var(--accent); text-decoration: none; }
+[data-screen="older"] .beginning-out:hover { text-decoration: underline;
+  text-underline-offset: 3px; }
+/* Every screen with a server-computed read carries the offline sentence; this
+   screen's cursor read is one (lt. plus limit). */
+[data-screen="older"][data-state="network-error"] .offline { display: block; }

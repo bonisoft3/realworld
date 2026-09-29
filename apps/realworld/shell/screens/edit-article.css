@@ -1,0 +1,198 @@
+@import "./shared/chrome.css";
+
+@import "./shared/system.css";
+
+
+/* edit-article — ir: #edit-article. The revision sheet at the new-article
+   sheet's geometry to the pixel: same measure, same field heights, same
+   gaps, so a writer who has published once already knows this screen. */
+[data-screen="edit-article"] { max-width: 680px; container-type: inline-size; }
+[data-screen="edit-article"] .masthead {
+  margin: 0 calc(var(--sp-lg) * -1) var(--sp-md);
+  padding: 0 var(--sp-lg) var(--sp-md);
+  border-bottom: 1px solid var(--border);
+  font-size: 1.25rem; font-weight: 650; line-height: 1.3;
+  letter-spacing: -.01em; }
+
+/* The back-link and its ghost occupy one line: the live anchor exists only
+   once the row has landed and the slug is known, the ghost holds the line
+   until then, and exactly one of them is ever drawn. */
+[data-screen="edit-article"] .backline:empty { display: none; }
+[data-screen="edit-article"] .backline > *:not(:first-child) { display: none; }
+[data-screen="edit-article"] .backline:not(:empty) ~ .ghost { display: none; }
+[data-screen="edit-article"] .ghost { pointer-events: none; }
+
+/* One row, and CSS picks it: the filter is a primary key, so a second node can
+   only be the storybook's fixture roster. */
+[data-screen="edit-article"] .piece > *:not(:first-child) { display: none; }
+
+/* The revising strip: what is being changed, and what changing it costs. */
+[data-screen="edit-article"] .strip { padding-bottom: var(--sp-md);
+  border-bottom: 1px solid var(--border); }
+[data-screen="edit-article"] .revising { margin: 0; color: var(--secondary);
+  font-weight: 600; }
+[data-screen="edit-article"] .hint { margin: 4px 0 0; color: var(--secondary); }
+/* The saved line takes the hint's place for the six hundred milliseconds after
+   a save, naming the piece at whatever address the new title just gave it. */
+[data-screen="edit-article"] .landed { display: none; margin: 4px 0 0 -8px;
+  padding: 2px 8px; border-radius: var(--r-sm); }
+[data-screen="edit-article"] .landing { display: inline-flex;
+  align-items: baseline; gap: 8px; color: var(--primary);
+  text-decoration: none; }
+[data-screen="edit-article"] .landing-title {
+  border-bottom: 1px solid var(--accent); }
+[data-screen="edit-article"] .landing-go { color: var(--accent);
+  font-weight: 600; }
+[data-screen="edit-article"] .landing:focus-visible { outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: var(--r-sm); }
+
+/* The sheet. Title, description and body are the authored surface and take the
+   serif at the size the words will land in; tags and the button are the app
+   talking and stay sans. The body is markdown source, shown as it was typed —
+   the one place in Conduit the two representations sit one tap apart. */
+[data-screen="edit-article"] .sheet { display: flex; flex-direction: column;
+  gap: var(--sp-md); padding-top: var(--sp-lg); }
+[data-screen="edit-article"] .field { width: 100%; box-sizing: border-box; }
+[data-screen="edit-article"] .title { padding: 14px; }
+[data-screen="edit-article"] .description { padding: 10px 14px; }
+[data-screen="edit-article"] .body { min-height: 220px; max-width: 65ch;
+  padding: 14px; resize: vertical; }
+[data-screen="edit-article"] .tags { padding: 10px 14px; }
+[data-screen="edit-article"] .commit { display: flex; align-items: center;
+  gap: var(--sp-md); margin-top: var(--sp-sm); }
+[data-screen="edit-article"] .commit button { align-self: flex-start; }
+[data-screen="edit-article"] .saved { display: none; color: var(--accent);
+  font-weight: 600; }
+
+/* Refusal copy: the sheet names what is missing and says plainly that nothing
+   left the tab. Both sentences can be true at once. */
+[data-screen="edit-article"] .sheet .invalid:not([hidden]),
+[data-screen="edit-article"] .sheet .store-error:not([hidden]) { display: flex;
+  flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; }
+[data-screen="edit-article"] .invalid .need-title,
+[data-screen="edit-article"] .invalid .need-body { display: none; }
+[data-screen="edit-article"] .sheet:has(input[name="title"]:invalid) .need-title,
+[data-screen="edit-article"] .sheet:has(textarea[name="body"]:invalid) .need-body {
+  display: inline; }
+[data-screen="edit-article"] .unsaved { margin-left: auto;
+  color: var(--secondary); }
+/* The server's refusal is about the row, not about any one field: every word
+   stays exactly as it was, the fields keep their hairlines, and the danger
+   outline lands on the submit — the only control that did anything wrong. The
+   button stays live, because any keystroke clears the state. */
+[data-screen="edit-article"] .sheet:has(> .store-error:not([hidden]))
+  :is(input:not([type="hidden"]), textarea):not(:focus-visible) {
+  border-color: var(--border); box-shadow: none; }
+[data-screen="edit-article"] .sheet:has(> .store-error:not([hidden])) button[type="submit"],
+[data-screen="edit-article"][data-state="validation-error"] .sheet button[type="submit"] {
+  background: var(--surface); color: var(--danger);
+  box-shadow: inset 0 0 0 1.5px var(--danger); }
+[data-screen="edit-article"] .sheet:has(> .store-error:not([hidden])) button[type="submit"]:hover,
+[data-screen="edit-article"][data-state="validation-error"] .sheet button[type="submit"]:hover {
+  filter: none; background: var(--neutral); }
+/* The refused button keeps its outline while focused: the danger ring and the
+   focus ring are two different facts and the second may not eat the first. */
+[data-screen="edit-article"] .sheet:has(> .store-error:not([hidden])) button[type="submit"]:focus-visible,
+[data-screen="edit-article"][data-state="validation-error"] .sheet button[type="submit"]:focus-visible {
+  box-shadow: inset 0 0 0 1.5px var(--danger),
+              0 0 0 3px color-mix(in srgb, var(--danger) 30%, transparent); }
+
+/* States — data-state is shell-owned; the screen only styles it. */
+[data-screen="edit-article"] .skeleton,
+[data-screen="edit-article"] .gone-note { display: none; }
+[data-screen="edit-article"][data-state="loading"] .skeleton { display: block; }
+[data-screen="edit-article"][data-state="loading"] .piece { display: none; }
+/* Held down explicitly rather than left to :empty: until the first refresh
+   sweeps it, the region still holds its <template> and reads as non-empty,
+   which would take the ghost away and leave the line blank. */
+[data-screen="edit-article"][data-state="loading"] .backline { display: none; }
+[data-screen="edit-article"][data-state="loading"] .backline ~ .ghost {
+  display: inline-block; }
+/* Skeleton fills at the exact geometry of the sheet, so nothing shifts when the
+   row arrives; surface-muted and nothing else, because this screen is about to
+   be full of somebody's words and guessing at them would be a lie. */
+[data-screen="edit-article"] .skel-strip { display: flex; flex-direction: column;
+  gap: 8px; padding-bottom: var(--sp-md);
+  border-bottom: 1px solid var(--border); }
+[data-screen="edit-article"] .skel-bar { display: block; height: 10px;
+  border-radius: var(--r-sm); background: var(--surface-muted); }
+[data-screen="edit-article"] .skel-bar.w-who { width: 45%; }
+[data-screen="edit-article"] .skel-bar.w-latest { width: 62%; }
+[data-screen="edit-article"] .skel-sheet { display: flex; flex-direction: column;
+  gap: var(--sp-md); padding-top: var(--sp-lg); }
+[data-screen="edit-article"] .skel-field { display: block;
+  border-radius: var(--r-sm); background: var(--surface-muted); }
+[data-screen="edit-article"] .skel-field.h-title { height: 58px; }
+[data-screen="edit-article"] .skel-field.h-desc { height: 51px; }
+[data-screen="edit-article"] .skel-field.h-body { height: 220px; max-width: 65ch; }
+[data-screen="edit-article"] .skel-field.h-tags { height: 34px; }
+[data-screen="edit-article"] .skel-field.h-button { height: 47px; width: 116px;
+  margin-top: var(--sp-sm); }
+
+/* validation-error — a storybook hook, and scoped to one. The frame is stamped
+   last and never ran a submit, so .store-error keeps its hidden attribute and
+   the shared form:has() rule cannot fire; this rule is what makes the refused
+   save reviewable. Unscoped it also fires on the running screen, where
+   validation-error is what a blank title produces — and this paragraph says the
+   piece is not yours to change, which is an accusation the app has not checked
+   and, on your own piece, cannot be true. The button's outline is in the rule
+   above. */
+[data-storybook][data-screen="edit-article"][data-state="validation-error"] .sheet .store-error {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  margin: 0; }
+
+/* success — the sheet is not cleared: a revision is not a new page, and the
+   fields keep the text that was saved. The accent ring is a hairline, not a
+   fill, or it reads as a banner. */
+[data-screen="edit-article"][data-state="success"] .hint { display: none; }
+[data-screen="edit-article"][data-state="success"] .landed { display: block;
+  box-shadow: 0 0 0 1px var(--accent); }
+[data-screen="edit-article"][data-state="success"] .saved { display: inline; }
+/* The address is held back one beat longer than the words: `slug` is GENERATED
+   from the title, so an unconfirmed row still carries the old one and a link
+   built from it would point at an address the retitle has already moved. */
+[data-screen="edit-article"] .stamp,
+[data-screen="edit-article"] .sending { display: none; }
+[data-screen="edit-article"] .sending { color: var(--secondary); }
+[data-screen="edit-article"] .revision[data-pending="true"] .landing {
+  display: none; }
+[data-screen="edit-article"] .revision[data-pending="true"] .stamp,
+[data-screen="edit-article"] .revision[data-pending="true"] .sending {
+  display: inline; }
+
+/* empty — a one-row list region with zero rows reports `empty`, never `gone`,
+   so this state carries the vanished-piece copy, in the same three lines the
+   article screen uses. The masthead stays: it lives outside the region. The
+   ghost back-link is held down explicitly, because the swept region keeps its
+   <template> and so still matches :not(:empty) — leaving the ghost to the
+   rule above would draw a link to an address the delete has already retired. */
+[data-screen="edit-article"][data-state="empty"] .gone-note { display: block; }
+[data-screen="edit-article"][data-state="empty"] .backline ~ .ghost {
+  display: none; }
+[data-screen="edit-article"] .gone-note { text-align: center;
+  padding: 88px var(--sp-md) 96px; }
+[data-screen="edit-article"] .gone-head { margin: 0; color: var(--primary);
+  font-weight: 600; }
+[data-screen="edit-article"] .gone-sub { margin: 6px 0 0;
+  color: var(--secondary); }
+[data-screen="edit-article"] .gone-link { display: inline-block;
+  margin-top: var(--sp-lg); color: var(--accent); font-weight: 600;
+  text-decoration: none; }
+[data-screen="edit-article"] .gone-link:hover { text-decoration: underline;
+  text-underline-offset: 3px; }
+
+/* The storybook renders this screen in a 360px frame on a wide viewport, so
+   the narrow arrangement is a container query — a media query would read the
+   viewport and never fire. */
+@container (max-width: 420px) {
+  [data-screen="edit-article"] .body { min-height: 168px; }
+  [data-screen="edit-article"] .skel-field.h-body { height: 168px; }
+  [data-screen="edit-article"] .commit { flex-wrap: wrap; gap: var(--sp-sm); }
+  [data-screen="edit-article"] .unsaved { margin-left: 0; }
+}
+
+/* The note the shared layer hides by default. network-error is a runtime state
+   the interpreter can set on any screen, whatever the storyboard draws, so a
+   screen carrying the markup owes it a reveal. */
+[data-screen="edit-article"][data-state="network-error"] .offline { display: block; }

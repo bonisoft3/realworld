@@ -1,0 +1,352 @@
+{
+  "0xffeeef2f0457cd0c": {
+    "name": "app_user",
+    "fields": {
+      "1": {
+        "name": "id",
+        "type": "uuid",
+        "retired": false
+      },
+      "2": {
+        "name": "handle",
+        "type": "string",
+        "retired": false
+      },
+      "3": {
+        "name": "display_name",
+        "type": "string",
+        "retired": false
+      },
+      "4": {
+        "name": "bio",
+        "type": "string",
+        "retired": false
+      },
+      "5": {
+        "name": "image_url",
+        "type": "string",
+        "retired": false
+      },
+      "6": {
+        "name": "created_at",
+        "type": "timestamp",
+        "retired": false
+      }
+    }
+  },
+  "0xa590918c3d7bc870": {
+    "name": "me",
+    "fields": {
+      "1": {
+        "name": "id",
+        "type": "uuid",
+        "retired": false
+      },
+      "2": {
+        "name": "handle",
+        "type": "string",
+        "retired": false
+      }
+    }
+  },
+  "0x899a3c66fba1e59d": {
+    "name": "article",
+    "fields": {
+      "1": {
+        "name": "id",
+        "type": "uuid",
+        "retired": false
+      },
+      "2": {
+        "name": "author_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "3": {
+        "name": "title",
+        "type": "string",
+        "retired": false
+      },
+      "4": {
+        "name": "description",
+        "type": "string",
+        "retired": false
+      },
+      "5": {
+        "name": "body",
+        "type": "string",
+        "retired": false
+      },
+      "6": {
+        "name": "tags",
+        "type": "string",
+        "retired": false
+      },
+      "7": {
+        "name": "cover_url",
+        "type": "string",
+        "retired": false
+      },
+      "8": {
+        "name": "cover_credit",
+        "type": "string",
+        "retired": false
+      },
+      "9": {
+        "name": "slug",
+        "type": "string",
+        "retired": false
+      },
+      "10": {
+        "name": "created_at",
+        "type": "timestamp",
+        "retired": false
+      },
+      "11": {
+        "name": "updated_at",
+        "type": "timestamp",
+        "retired": false
+      },
+      "12": {
+        "name": "search",
+        "type": "tsvector",
+        "retired": false
+      },
+      "13": {
+        "name": "reading_minutes",
+        "type": "int32",
+        "retired": false
+      }
+    }
+  },
+  "0xed76a04d0fffe5e4": {
+    "name": "article_tag",
+    "fields": {
+      "1": {
+        "name": "id",
+        "type": "uuid",
+        "retired": false
+      },
+      "2": {
+        "name": "article_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "3": {
+        "name": "tag",
+        "type": "string",
+        "retired": false
+      }
+    }
+  },
+  "0xc11aa0c88f8ccab7": {
+    "name": "comment",
+    "fields": {
+      "1": {
+        "name": "id",
+        "type": "uuid",
+        "retired": false
+      },
+      "2": {
+        "name": "article_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "3": {
+        "name": "author_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "4": {
+        "name": "body",
+        "type": "string",
+        "retired": false
+      },
+      "5": {
+        "name": "created_at",
+        "type": "timestamp",
+        "retired": false
+      }
+    }
+  },
+  "0x98c341a47aacae19": {
+    "name": "favorite",
+    "fields": {
+      "1": {
+        "name": "id",
+        "type": "uuid",
+        "retired": false
+      },
+      "2": {
+        "name": "user_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "3": {
+        "name": "article_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "4": {
+        "name": "created_at",
+        "type": "timestamp",
+        "retired": false
+      },
+      "5": {
+        "name": "deleted_at",
+        "type": "timestamp",
+        "retired": false
+      }
+    }
+  },
+  "0x9f9da42612642009": {
+    "name": "bookmark",
+    "fields": {
+      "1": {
+        "name": "id",
+        "type": "uuid",
+        "retired": false
+      },
+      "2": {
+        "name": "user_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "3": {
+        "name": "article_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "4": {
+        "name": "created_at",
+        "type": "timestamp",
+        "retired": false
+      }
+    }
+  },
+  "0xd0b18b1f685bdf9c": {
+    "name": "follow",
+    "fields": {
+      "1": {
+        "name": "id",
+        "type": "uuid",
+        "retired": false
+      },
+      "2": {
+        "name": "follower_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "3": {
+        "name": "followed_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "4": {
+        "name": "created_at",
+        "type": "timestamp",
+        "retired": false
+      }
+    }
+  },
+  "0xa8012732a778199b": {
+    "name": "favorite_count",
+    "fields": {
+      "1": {
+        "name": "id",
+        "type": "string",
+        "retired": false
+      },
+      "2": {
+        "name": "user_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "3": {
+        "name": "article_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "4": {
+        "name": "mine_counted",
+        "type": "int32",
+        "retired": false
+      },
+      "5": {
+        "name": "total_at_read",
+        "type": "int32",
+        "retired": false
+      },
+      "6": {
+        "name": "as_of_txid",
+        "type": "int64",
+        "retired": false
+      }
+    }
+  },
+  "0x9a91dc318d94d5ee": {
+    "name": "article_stats",
+    "fields": {
+      "1": {
+        "name": "article_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "2": {
+        "name": "favorite_count",
+        "type": "int32",
+        "retired": false
+      },
+      "3": {
+        "name": "counted_txid",
+        "type": "int64",
+        "retired": false
+      }
+    }
+  },
+  "0x86d7de1cf29fee6f": {
+    "name": "tag_count",
+    "fields": {
+      "1": {
+        "name": "id",
+        "type": "string",
+        "retired": false
+      },
+      "2": {
+        "name": "article_count",
+        "type": "int32",
+        "retired": false
+      }
+    }
+  },
+  "0x9826a4461b100e6d": {
+    "name": "favorite_index",
+    "fields": {
+      "1": {
+        "name": "id",
+        "type": "string",
+        "retired": false
+      },
+      "2": {
+        "name": "user_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "3": {
+        "name": "article_id",
+        "type": "uuid",
+        "retired": false
+      },
+      "4": {
+        "name": "active",
+        "type": "bool",
+        "retired": false
+      },
+      "5": {
+        "name": "favorited_at",
+        "type": "timestamp",
+        "retired": false
+      }
+    }
+  }
+}

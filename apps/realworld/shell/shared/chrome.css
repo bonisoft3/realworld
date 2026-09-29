@@ -1,0 +1,107 @@
+/* The terminal's strip, dressed by the app. The terminal owns the markup and
+   its stable classes (nav, .shell-me, .shell-who, .shell-signout) and stamps
+   aria-current on the route you are on; everything below is this app deciding
+   what those mean here. Imported by every screen, so it is declared once.
+
+   Every value comes through a token declared in shell/design.css — this file
+   names no colour of its own. */
+
+/* The strip does three jobs — the name of the place, the places you can go,
+   and the one thing the app makes — and dresses each differently. Medium
+   separates them the same way: a wordmark, then navigation, then Write.
+
+   The first route is the ground the app starts from, so it carries the ink
+   the other labels do not. It is NOT set as a wordmark: this route is glossed
+   "Community", and dressing a destination as a logo would put the brand's
+   voice on a word that is not the brand — the masthead on home is where
+   "Conduit" is said, once (decision-design-identity). */
+body > nav > a:first-child {
+  color: var(--primary); font-weight: 700; margin-inline-end: var(--sp-sm); }
+
+/* Where you are, marked rather than hidden: an underline under the current
+   route is the pattern a reader already knows from every tabbed page. The
+   wordmark never wears it — a brand is not a tab. */
+body > nav > a[aria-current="page"]:not(:first-child) {
+  color: var(--primary);
+  box-shadow: inset 0 -2px 0 0 var(--accent); }
+
+/* The last route is the one creative act, and it reads as a control rather
+   than as a fourth place to go. Accent, because DESIGN.md spends that colour
+   on creation and commitment and this is the only creation in the chrome. */
+body > nav > a:last-of-type {
+  background: var(--accent); color: var(--neutral);
+  border-radius: var(--r-full); padding: 6px 14px; margin-inline-start: var(--sp-sm); }
+body > nav > a:last-of-type::before { content: "\270e\00a0"; }
+body > nav > a:last-of-type:hover { filter: brightness(1.08); }
+/* The action keeps its own colours on the route it points at: the
+   current-route rule above is more specific than the pill's, so without this
+   it paints ink on the accent fill — 2.74:1 in light and 1.82:1 in dark, on
+   the one control the identity spends its accent on. */
+body > nav > a:last-of-type[aria-current="page"] { box-shadow: none;
+  color: var(--neutral); }
+/* A one-route app would make the wordmark the action too; guard against it. */
+body > nav > a:first-child:last-of-type {
+  background: none; color: var(--primary); padding: 0; }
+body > nav > a:first-child:last-of-type::before { content: none; }
+
+/* The reader, as a letter disc: the handle's own first letter, which needs no
+   column, no upload and no request. The full handle returns as a pill once the
+   strip has room for it. */
+/* Pinned to the strip's right edge, not carried along by its scroll. The
+   routes may scroll out of sight; the way out may not — accept-signin-handle
+   asks for the handle beside sign out until the reader takes it, and a control
+   that has scrolled off the end is not on screen. */
+body > nav .shell-me { flex: none;
+  position: sticky; inset-inline-end: 0; padding-inline-start: var(--sp-sm);
+  background: var(--shell-bg); }
+body > nav .shell-who { text-decoration: none; }
+body > nav .shell-who .name { display: none; }
+body > nav .shell-who .handle {
+  display: block; width: 30px; height: 30px; flex: none;
+  border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--primary);
+  line-height: 28px; text-align: center; text-transform: uppercase;
+  /* The disc shows one letter: the rest of the handle is sized away rather
+     than truncated, so no ellipsis can appear inside a 30px circle. */
+  font-size: 0;
+}
+body > nav .shell-who .handle::first-letter { font-size: .9375rem; font-weight: 700; }
+body > nav .shell-who:hover .handle { border-color: var(--secondary); }
+
+@media (min-width: 700px) {
+  body > nav .shell-who .name { display: block; }
+  body > nav .shell-who .handle {
+    width: auto; height: auto; max-width: 16ch; flex: 0 1 auto;
+    border: none; background: none; border-radius: 0;
+    line-height: 1.5; text-transform: none; font-size: .9375rem;
+  }
+  body > nav .shell-who .handle::first-letter { font-size: .9375rem; font-weight: inherit; }
+}
+
+/* A phone's strip is tighter than a desk's. Sign out stays on it at every
+   width: accept-signin-handle asks for the handle beside the way out until
+   the reader takes it, so shrinking it is allowed and hiding it is not. */
+@media (max-width: 699px) {
+  /* At 400px four destinations plus the identity need 89px more than the
+     viewport gives, and the action comes to rest UNDER the pinned identity
+     (check-visual's no-interactive-overlap, on every route where nothing is
+     current and so nothing drops out). Gap, padding and type come down
+     together because no one of them is worth 89px on its own. */
+  body > nav { gap: var(--sp-sm); padding: 11px 12px; font-size: .875rem; }
+  body > nav .shell-signout { font-size: .8125rem; flex: none; }
+  body > nav > a:first-child { margin-inline-end: 4px; }
+  /* The action keeps its mark and loses its words: the strip has to fit at
+     400px on every route, including the parametrized ones where nothing is
+     current and so nothing drops out. Sized away rather than hidden, the same
+     way the handle's disc keeps one letter. */
+  body > nav > a:last-of-type { padding: 6px 8px; font-size: 0; }
+  body > nav > a:last-of-type::before { content: "\270e"; font-size: 1rem; }
+  /* On a phone the strip has no room to keep a route it is already on — the
+     first route included, whose ground the screen's own masthead names anyway.
+     Dropping it is what lets the rest fit without scrolling, which is what
+     keeps sign out on screen rather than pinned over the top of a pill. The
+     action is never dropped: it is the one thing here that is not navigation. */
+  body > nav > a[aria-current="page"]:not(:last-of-type) { display: none; }
+}

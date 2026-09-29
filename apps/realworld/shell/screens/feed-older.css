@@ -1,0 +1,77 @@
+@import "./shared/chrome.css";
+
+@import "./shared/system.css";
+
+
+/* feed-older — ir: the feed-older screen. Your Feed continued: the feed's own
+   read, character for character, plus the keyset cursor, so page two of the
+   feed is still only the writers this reader follows. */
+[data-screen="feed-older"] { container-type: inline-size; }
+[data-screen="feed-older"] .masthead { margin: 0 calc(var(--sp-lg) * -1)
+  var(--sp-md); padding: 0 var(--sp-lg) var(--sp-md);
+  border-bottom: 1px solid var(--border); }
+[data-screen="feed-older"] .back { display: inline-block;
+  color: var(--secondary); text-decoration: none; }
+[data-screen="feed-older"] .back:hover { color: var(--primary); }
+[data-screen="feed-older"] .page-title { margin: 6px 0 2px;
+  color: var(--primary); }
+[data-screen="feed-older"] .gloss { margin: 0; color: var(--secondary); }
+[data-screen="feed-older"] .search { display: flex; gap: var(--sp-sm);
+  flex-wrap: wrap; margin: 0 0 var(--sp-md); }
+[data-screen="feed-older"] .search input { flex: 1; min-width: 0;
+  border-radius: var(--r-full); padding: 8px 16px; }
+[data-screen="feed-older"] .search button { border-radius: var(--r-full); }
+[data-screen="feed-older"] .search .invalid { flex-basis: 100%; }
+/* The twentieth card carries the cursor into the next page — :nth-child(20),
+   never :last-child, so a short final page ends without offering a page that
+   is not there (ir decision-paging-keyset). */
+[data-screen="feed-older"] .older { display: none; position: relative;
+  z-index: 2; align-self: flex-start; margin-top: 3px;
+  color: var(--secondary); text-decoration: underline;
+  text-underline-offset: 2px; }
+[data-screen="feed-older"] .older:hover { color: var(--primary); }
+[data-screen="feed-older"] .list > *:nth-child(20) .older { display: block; }
+/* The storybook frame is 360px wide, which is 312px of content: the card holds
+   its byline/date row and its chips/pill row there, as the wireframes draw
+   them, and only a narrower container than any phone stacks them. */
+@container (max-width: 250px) {
+  [data-screen="feed-older"] .preview-head { flex-wrap: wrap; }
+  [data-screen="feed-older"] .preview-foot { flex-direction: column;
+    align-items: flex-start; }
+  [data-screen="feed-older"] .arms { align-items: flex-start; }
+}
+
+/* States — data-state is shell-owned; the screen only styles it. */
+[data-screen="feed-older"] .skeleton,
+[data-screen="feed-older"] .beginning,
+[data-screen="feed-older"] .offline { display: none; }
+/* A skeleton covers region-bound content only: the back-link, the heading, its
+   gloss and the search box are screen-level static markup and are drawn as
+   themselves while the read is in flight. */
+[data-screen="feed-older"][data-state="loading"] .skeleton { display: flex;
+  flex-direction: column; gap: var(--sp-sm); }
+[data-screen="feed-older"][data-state="loading"] .list { display: none; }
+[data-screen="feed-older"] .skel-card { height: 96px;
+  background: var(--surface-muted); border-radius: var(--r-md); }
+[data-screen="feed-older"] .skel-card.tall { height: 110px; }
+/* Until the first refresh sweeps the <template> a probe reads non-empty, so
+   the unset arm would flash (ir decision-probe-empty). */
+[data-screen="feed-older"][data-state="loading"] .arms { visibility: hidden; }
+/* empty — one top-level region, so the screen state is the whole answer, and
+   it is said in this reader's terms rather than the community's. The accent is
+   permitted here: an empty state with no committing control may spend it on
+   its one way out. */
+[data-screen="feed-older"][data-state="empty"] .list { display: none; }
+[data-screen="feed-older"][data-state="empty"] .beginning { display: block;
+  text-align: center; margin: calc(var(--sp-xl) * 2) auto 0;
+  max-width: 34ch; }
+[data-screen="feed-older"] .beginning-line { margin: 0; color: var(--primary); }
+[data-screen="feed-older"] .beginning-sub { margin: 6px 0 var(--sp-lg);
+  color: var(--secondary); }
+[data-screen="feed-older"] .beginning-out { display: inline-block;
+  color: var(--accent); text-decoration: none; }
+[data-screen="feed-older"] .beginning-out:hover { text-decoration: underline;
+  text-underline-offset: 3px; }
+/* Every screen with a server-computed read carries the offline sentence; this
+   screen's cursor read is one (lt. plus limit). */
+[data-screen="feed-older"][data-state="network-error"] .offline { display: block; }

@@ -1,0 +1,76 @@
+@import "./shared/chrome.css";
+
+@import "./shared/system.css";
+
+
+/* tag — ir: #tag. The community list narrowed to one word. The heading and the
+   empty sentence take the screen-level {param.x} pass, which does not encode;
+   the region filter takes interpolateFilter, which does. Nothing here needs the
+   difference: 013 emits single lowercase [a-z0-9-] words. */
+[data-screen="tag"] { container-type: inline-size; }
+[data-screen="tag"] .masthead { margin: 0 calc(var(--sp-lg) * -1)
+  var(--sp-md); padding: 0 var(--sp-lg) var(--sp-md);
+  border-bottom: 1px solid var(--border); }
+[data-screen="tag"] .back { display: inline-block;
+  color: var(--secondary); text-decoration: none; }
+[data-screen="tag"] .back:hover { color: var(--primary); }
+[data-screen="tag"] .page-title { margin: 6px 0 0; color: var(--primary);
+  overflow-wrap: anywhere; }
+[data-screen="tag"] .search { display: flex; gap: var(--sp-sm);
+  flex-wrap: wrap; margin: 0 0 var(--sp-md); }
+[data-screen="tag"] .search input { flex: 1; min-width: 0;
+  border-radius: var(--r-full); padding: 8px 16px; }
+[data-screen="tag"] .search button { border-radius: var(--r-full); }
+[data-screen="tag"] .search .invalid { flex-basis: 100%; }
+/* The ceiling rides the twentieth card — :nth-child(20), never :last-child, so
+   a tag with one piece under it is never told twenty exist. */
+[data-screen="tag"] .ceiling { display: none; position: relative; z-index: 2;
+  margin: var(--sp-sm) 0 0; padding-top: var(--sp-sm);
+  border-top: 1px solid var(--border); color: var(--secondary); }
+[data-screen="tag"] .list > *:nth-child(20) .ceiling { display: block; }
+@container (max-width: 460px) {
+  [data-screen="tag"] .preview-head { flex-wrap: wrap; }
+  [data-screen="tag"] .preview-foot { flex-direction: column;
+    align-items: flex-start; }
+  [data-screen="tag"] .arms { align-items: flex-start; }
+}
+
+/* States — data-state is shell-owned; the screen only styles it. */
+[data-screen="tag"] .skeleton,
+[data-screen="tag"] .nothing,
+[data-screen="tag"] .offline { display: none; }
+/* A skeleton covers region-bound content only: the back-link, the #tag heading
+   and the search box are screen-level static markup and are drawn as themselves
+   while the read is in flight. */
+[data-screen="tag"][data-state="loading"] .skeleton { display: flex;
+  flex-direction: column; gap: var(--sp-sm); }
+[data-screen="tag"][data-state="loading"] .list { display: none; }
+[data-screen="tag"] .skel-card { height: 96px;
+  background: var(--surface-muted); border-radius: var(--r-md); }
+[data-screen="tag"] .skel-card.tall { height: 110px; }
+/* Until the first refresh sweeps the <template> a probe reads non-empty, so
+   the unset arm would flash (ir decision-probe-empty). */
+[data-screen="tag"][data-state="loading"] .arms { visibility: hidden; }
+/* empty — one top-level region, so the screen state is the whole answer: which
+   tag is empty, why a tag can be empty at all, and one way out. All sans; the
+   app is talking, not a writer. The two text tiers must stay distinguishable or
+   the sentence flattens into one grey block. The accent is permitted here: an
+   empty state with no committing control may spend it on its call to action. */
+[data-screen="tag"][data-state="empty"] .list { display: none; }
+[data-screen="tag"][data-state="empty"] .nothing { display: block;
+  text-align: center; margin: calc(var(--sp-xl) * 2) auto 0;
+  max-width: 34ch; }
+[data-screen="tag"] .role-body-md.nothing-line { font-size: 1.0625rem;
+  font-weight: 600; }
+[data-screen="tag"] .nothing-line { margin: 0; color: var(--primary);
+  overflow-wrap: anywhere; }
+[data-screen="tag"] .nothing-sub { margin: 6px 0 var(--sp-lg);
+  color: var(--secondary); }
+[data-screen="tag"] .role-body-md.nothing-out { font-weight: 600; }
+[data-screen="tag"] .nothing-out { display: inline-block;
+  color: var(--accent); text-decoration: none; }
+[data-screen="tag"] .nothing-out:hover { text-decoration: underline;
+  text-underline-offset: 3px; }
+/* Every screen with a server-computed read carries the offline sentence; this
+   screen's embed-path filter is one. */
+[data-screen="tag"][data-state="network-error"] .offline { display: block; }

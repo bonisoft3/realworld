@@ -1,0 +1,31 @@
+# tag-recount (ir tag-recount, test-tag-recount-distinct,
+# test-tag-recount-zero): absolute recount of `article_tag` per tag, emitted as
+# the ARRAY of tag_count upsert rows {id, article_count} conflicting on id.
+# The count is the set cardinality of distinct article_ids wearing the tag, not
+# a row count, so a duplicate pair could not inflate it even if
+# uq_article_tag_pair allowed one.
+#
+# Harness contract: as the other two.
+let rows = if this.type() == "array" { throw("tag-recount: harness discarded the CDC event (result_map: root = this); #rpkPipeline must preserve it as root.rows") } else { this.rows }
+let event_row = if this.exists("data") && this.data.type() == "string" && this.data.length() > 0 { this.data.parse_json() } else { null }
+
+# Source discriminator: `tag` occurs only on article_tag among the crud tables
+# (article carries the text column `tags`, not `tag`), so a favorite or a
+# comment never rewrites the popular-tags panel. Dropping beats reasserting for
+# the reason stated in favorite-recount.
+let from_article_tag = $event_row.type() == "object" && $event_row.exists("tag")
+
+# The event's own tag is unioned in so the last piece to shed it drives the
+# count to zero rather than leaving it at one; the panel's article_count=gt.0
+# filter then drops the chip.
+let event_tags = if $from_article_tag { [$event_row.tag] } else { [] }
+let tags = $rows.map_each(r -> r.tag).concat($event_tags).unique()
+
+root = if $from_article_tag {
+  $tags.map_each(t -> {
+    "id": t,
+    "article_count": $rows.filter(r -> r.tag == t).map_each(r -> r.article_id).unique().length(),
+  })
+} else {
+  deleted()
+}

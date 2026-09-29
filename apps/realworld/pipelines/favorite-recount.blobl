@@ -1,0 +1,76 @@
+# favorite-recount (ir favorite-recount, test-favorite-recount-groups,
+# test-favorite-recount-zero): absolute recount of `favorite` grouped per
+# article_id, emitted as the ARRAY of article_stats upsert rows
+# {article_id, favorite_count, counted_txid}, conflicting on article_id.
+#
+# Harness contract this mapping requires: the branch preserves the CDC event
+# beside the fetched rows (result_map: root.rows = this). The bus message is
+# the dapr CloudEvent envelope whose .data field is the changed row as a JSON
+# string — conduit posts Payload.After, with a delete's After back-filled from
+# Before by the restore-deleted-row processor. A bare rows array at the root
+# means the harness discarded the event, which would ship the stale-final bug
+# silently: refuse loudly instead.
+let rows = if this.type() == "array" { throw("favorite-recount: harness discarded the CDC event (result_map: root = this); #rpkPipeline must preserve it as root.rows") } else { this.rows }
+let event_row = if this.exists("data") && this.data.type() == "string" && this.data.length() > 0 { this.data.parse_json() } else { null }
+
+# Source discriminator. The bus carries every table and this stream reads all
+# of it, so a foreign message must be dropped rather than reassert the sink:
+# merge-duplicates is ON CONFLICT DO UPDATE, which restamps txid on every row
+# it touches and would fan the whole sink out to every tab.
+#
+# It tests the table conduit stamped onto the row, NOT the shape of the row.
+# Shape cannot decide this: `bookmark` and `favorite` are column-identical, so
+# the `user_id` witness this once used matched both and every bookmark write
+# silently restamped article_stats.
+# The key must be present too. A conduit misconfiguration can put a row on the
+# bus carrying only the stamp — a delete whose before-image was lost — and
+# without this the mapping emits a null-keyed sink row, PostgREST rejects it,
+# the retry never succeeds and the whole stream wedges behind it.
+let from_favorite = $event_row.type() == "object" && $event_row.__table == "favorite" && $event_row.exists("article_id")
+
+# ONE row: the article the event touched, and nothing else. The count is still
+# absolute — it is the length of the fetched set, never a delta — but the SCOPE
+# of the emission is the event's own article (ir decision-narrow-recount).
+#
+# Emitting every group was the earlier shape and it was expensive in a way that
+# reached the screen. merge-duplicates is ON CONFLICT DO UPDATE and the
+# restamp_txid trigger fires on any UPDATE, including one writing an unchanged
+# count — so re-emitting every article restamped every article_stats row on
+# every favorite anywhere.
+#
+# No union is needed: the last un-favorite drops the article out of the fetched
+# grouping, and the event's own article_id is emitted regardless, so the count
+# is driven to zero by construction rather than by a special case.
+#
+# ACCEPTED LOSS, named rather than discovered: recounting every article made a
+# dropped event self-healing — the next event for any article repaired all of
+# them. Narrowed, a dropped event leaves that one article's count stale until
+# something touches it again.
+let id = $event_row.article_id
+# Every row for this article, active or retracted. The COUNT takes the active
+# ones; the WATERMARK takes the newest txid of all of them, and that difference
+# is load-bearing. Filtering the read to active rows would leave a row the
+# reader has just retracted sitting above the watermark, where the browser
+# reads it as a change the sink has not seen and subtracts it a second time.
+let mine = $rows.filter(r -> r.article_id == $id)
+let live = $mine.filter(r -> r.deleted_at == null)
+
+# counted_txid is the READ WATERMARK: the newest source row this count
+# includes. It is not article_stats.txid and cannot be — that one is stamped
+# when the sink row is WRITTEN, which is strictly after this read, so every
+# favorite committed in between looks older than the sink while never having
+# been counted. The browser's optimistic projection subtracts on exactly this
+# comparison (ir decision-optimistic-fold), and with the write stamp it drops
+# the reader's own fresh favorite and shows a count one too low.
+# Zero for an empty group: every local row is then newer, which is correct.
+# The txids sort as integers and leave as the int64 carrier's canonical string;
+# sorted as strings, "9" would outrank "10".
+root = if $from_favorite {
+  [{
+    "article_id":     $id,
+    "favorite_count": $live.length(),
+    "counted_txid":   if $mine.length() == 0 { "0" } else { $mine.map_each(r -> r.txid.or(0).int64()).sort().index(-1).string() },
+  }]
+} else {
+  deleted()
+}

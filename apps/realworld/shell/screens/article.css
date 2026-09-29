@@ -1,0 +1,527 @@
+@import "./shared/chrome.css";
+
+@import "./shared/system.css";
+
+
+/* article — ir: #article. One column at the reading measure: the piece is the
+   page, and everything else is the frame around it. Every rule below is scoped
+   to this screen, because screen stylesheets are injected once and never
+   removed — an unscoped rule here would restyle every other screen the session
+   has already visited. */
+[data-screen="article"] { container-type: inline-size; max-width: 760px; }
+
+/* How far in the reader is. The scroller drives it — `animation-timeline`
+   binds the keyframe to the document's own scroll progress, so the bar is a
+   stylesheet and not a handler, and it costs nothing on a frame that does not
+   scroll. Behind @supports because a browser without scroll-driven animations
+   would run `grow` as an ordinary zero-duration animation and paint the bar
+   full on arrival, which is the one wrong answer. Accent, and the only accent
+   in the chrome: progress through a piece is the reading surface talking about
+   itself, not navigation. */
+[data-screen="article"] .progress { display: none; }
+@supports (animation-timeline: scroll()) {
+  @keyframes article-read-progress { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+  [data-screen="article"] .progress { display: block; position: fixed;
+    inset: 0 0 auto 0; height: 2px; z-index: 20; transform-origin: 0 50%;
+    background: var(--accent);
+    /* The declared transform is what a piece too short to scroll gets: an
+       inactive scroll timeline applies no effect at all, and without a base
+       scaleX(0) the bar would paint full-width on the one screen that has no
+       progress to report. An active timeline overrides it, animations winning
+       over normal declarations. */
+    transform: scaleX(0);
+    animation: article-read-progress linear both;
+    animation-timeline: scroll(root block); }
+}
+
+/* Chrome row. The back-link and the search box are static markup outside every
+   region, so the loading frame draws them as themselves. */
+[data-screen="article"] .topbar { display: flex; flex-wrap: wrap;
+  align-items: flex-start; justify-content: space-between; gap: var(--sp-sm);
+  margin-bottom: var(--sp-md); }
+[data-screen="article"] .topbar .back { margin-bottom: 0; padding-top: 9px; }
+[data-screen="article"] .search { display: flex; flex-wrap: wrap;
+  gap: var(--sp-sm); min-width: 0; }
+[data-screen="article"] .search input { flex: 1 1 168px; min-width: 0;
+  padding: 8px 12px; }
+[data-screen="article"] .search .invalid { flex-basis: 100%; margin: 0; }
+/* Navigation and reversal are never accent: an accent in the chrome spends the
+   one signal the page has (DESIGN.md). */
+[data-screen="article"] button.outline, [data-screen="article"] .act.outline {
+  background: var(--surface); color: var(--secondary);
+  border: 1px solid var(--border); }
+[data-screen="article"] button.outline:hover,
+[data-screen="article"] .act.outline:hover { color: var(--primary);
+  border-color: var(--secondary); filter: none; }
+[data-screen="article"] .search button { padding: 8px 14px; }
+
+/* The piece. */
+[data-screen="article"] .piece-title { margin: 0; color: var(--primary);
+  text-wrap: balance; }
+/* Centre, not baseline. The byline is an inline-flex holding a 26px avatar, so
+   its baseline is its content's, not the text's — against plain-text siblings
+   that puts the writer's name and the date on two different lines of the same
+   row, which is what it looked like: everything correct and nothing aligned. */
+[data-screen="article"] .byline-row { display: flex; flex-wrap: wrap;
+  align-items: center; gap: 4px var(--sp-sm); margin-top: var(--sp-md); }
+/* Avatar, name and handle are one link, and it is the same door the preview
+   card carries — hence the underline. */
+[data-screen="article"] .byline { display: inline-flex; align-items: center;
+  gap: 6px; min-width: 0; color: var(--secondary); text-decoration: underline;
+  text-underline-offset: 2px; }
+[data-screen="article"] .byline:hover { color: var(--primary); }
+[data-screen="article"] .byline .name { color: var(--primary); }
+[data-screen="article"] .avatar { flex: none; width: 26px; height: 26px;
+  border-radius: var(--r-full); background: var(--surface-muted);
+  object-fit: cover; }
+[data-screen="article"] .avatar.small { width: 20px; height: 20px; }
+[data-screen="article"] .name, [data-screen="article"] .handle { min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* No conditional in the markup: a writer who set no name reads as their handle
+   alone. */
+[data-screen="article"] .name:empty { display: none; }
+[data-screen="article"] .name:not(:empty)::after { content: " · "; }
+[data-screen="article"] .date { color: var(--secondary); white-space: nowrap; }
+/* An article with no description shows none: :empty collapses the deck rather
+   than leaving a gap the title has to explain. */
+/* Primary, not secondary: the deck is {description} — authored text, and the
+   same string the preview card sets in primary. DESIGN.md puts secondary on
+   chrome and never on what a person wrote, because a description in chrome
+   colour stops selling its piece. */
+[data-screen="article"] .deck { margin: var(--sp-sm) 0 0; color: var(--primary);
+  font-size: 1.25rem; line-height: 1.45; text-wrap: pretty; max-width: 46ch; }
+[data-screen="article"] .deck:empty { display: none; }
+
+/* Controls row: the ownership swap on the left, the pill on the right. The row
+   is positioned so the armed delete panel can span it without pushing the
+   byline around when it opens. */
+[data-screen="article"] .controls { position: relative; display: flex;
+  flex-wrap: wrap; align-items: center; gap: var(--sp-sm);
+  margin-top: var(--sp-md); }
+[data-screen="article"] .arms { position: relative; margin-left: auto;
+  display: inline-flex; align-items: center; gap: var(--sp-sm); }
+[data-screen="article"] .when-reader, [data-screen="article"] .when-owner {
+  display: inline-flex; align-items: center; gap: var(--sp-sm); }
+
+/* Probes are never seen: a probe region carries no data-empty, so "has rows"
+   is exactly ":not(:empty)" and both arms live in the markup while CSS
+   chooses (decision-probe-empty). */
+[data-screen="article"] .me-probe, [data-screen="article"] .follow-probe,
+[data-screen="article"] .fav-probe, [data-screen="article"] .save-probe,
+[data-screen="article"] .own-probe {
+  display: none; }
+/* The one thing the me probe swaps: Edit · Delete where a reader gets Follow. */
+[data-screen="article"] .me-probe:empty ~ .when-owner { display: none; }
+[data-screen="article"] .me-probe:not(:empty) ~ .when-reader { display: none; }
+[data-screen="article"] .follow-probe:empty ~ .when-following { display: none; }
+[data-screen="article"] .follow-probe:not(:empty) ~ .when-unfollowed { display: none; }
+[data-screen="article"] .fav-probe:empty ~ .when-set { display: none; }
+[data-screen="article"] .fav-probe:not(:empty) ~ .when-unset { display: none; }
+[data-screen="article"] .save-probe:empty ~ .when-saved { display: none; }
+[data-screen="article"] .save-probe:not(:empty) ~ .when-unsaved { display: none; }
+[data-screen="article"] .own-probe:empty ~ .when-mine { display: none; }
+
+/* Buttons and button-shaped links in the controls row read as one family: the
+   accent is spent on Follow alone, because following is a commitment. */
+[data-screen="article"] .act { display: inline-block; font-weight: 600;
+  font-size: .8125rem; border-radius: var(--r-sm); padding: 8px 14px;
+  text-decoration: none; white-space: nowrap;
+  transition: filter var(--motion-fast) var(--motion-ease); }
+[data-screen="article"] a.act { background: var(--surface);
+  color: var(--secondary); border: 1px solid var(--border); }
+[data-screen="article"] a.act:hover { color: var(--primary);
+  border-color: var(--secondary); }
+[data-screen="article"] button.act { border: 1px solid var(--accent); }
+[data-screen="article"] .when-unfollowed button.act { background: var(--accent);
+  color: var(--neutral); }
+[data-screen="article"] .when-reader form, [data-screen="article"] .when-owner form {
+  display: inline-block; }
+
+/* The favorite pill: one control in both arms, its count riding inside each,
+   its set state read as a fill and not as a second colour. */
+[data-screen="article"] .when-unset, [data-screen="article"] .when-set {
+  display: inline-flex; }
+[data-screen="article"] .pill { display: inline-flex; align-items: center;
+  gap: 6px; font-size: .8125rem; background: var(--surface);
+  color: var(--secondary); border: 1px solid var(--border);
+  border-radius: var(--r-full); padding: 6px 14px; }
+[data-screen="article"] .pill:hover { color: var(--primary);
+  border-color: var(--secondary); filter: none; }
+[data-screen="article"] .pill.set { background: var(--accent);
+  color: var(--neutral); border-color: var(--accent); }
+[data-screen="article"] .pill.set:hover { color: var(--neutral);
+  border-color: var(--accent); filter: brightness(.94); }
+/* A refused pill has no editable control of its own to clear it, so its
+   sentence hangs under the control it belongs to and the search box is what
+   returns the screen to base.
+   The arms hold TWO independent toggles now, and each carries its own refusal.
+   Absolutely positioning both at right: 0 stacked them in the same place and
+   drew one sentence through the other — so the forms are display: contents,
+   which makes each button and each sentence a flex item of .arms directly, and
+   a sentence claims a whole line. Two refusals then stack instead of
+   overprinting, and neither pushes the pills around, which is what the
+   absolute positioning was for. The probe rules still hide the arm that is not
+   current: their `display: none` outranks this. */
+[data-screen="article"] .arms form { display: contents; }
+[data-screen="article"] .arms .invalid, [data-screen="article"] .arms .store-error {
+  flex-basis: 100%; text-align: right; margin: 4px 0 0; }
+
+/* Delete: armed by markup, never by a handler. The summary is the button; the
+   panel it opens spans the controls row and says exactly what will be lost. */
+[data-screen="article"] details.danger { position: static; }
+[data-screen="article"] .armer { list-style: none; cursor: pointer;
+  background: var(--surface); color: var(--danger);
+  border: 1px solid var(--danger); }
+[data-screen="article"] .armer::-webkit-details-marker { display: none; }
+[data-screen="article"] .armer:hover {
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
+[data-screen="article"] .confirm { position: absolute; left: 0; right: 0;
+  top: calc(100% + var(--sp-sm)); }
+[data-screen="article"] .wreck { display: block; width: 100%;
+  font-size: .8125rem; text-align: center; background: var(--surface);
+  color: var(--danger); border: 1px solid var(--danger); padding: 10px 14px; }
+[data-screen="article"] .wreck:hover {
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  filter: none; }
+[data-screen="article"] .confirm .invalid,
+[data-screen="article"] .confirm .store-error { text-align: center; }
+/* Nothing else on the page moves when it opens. */
+[data-screen="article"] .controls:has(details.danger[open]) {
+  padding-bottom: 52px; }
+
+/* The body. The rule under the controls is the masthead of the reading
+   surface; below it nothing is chrome. */
+[data-screen="article"] .body { max-width: 65ch;
+  border-top: 1px solid var(--border); margin-top: var(--sp-lg);
+  padding-top: var(--sp-lg); color: var(--primary); }
+/* The markdown renderer emits no classes and refuses style attributes, so the
+   authored elements are styled here — the one place in this stylesheet where a
+   size is set outside a role class, because a role class cannot be put on a
+   node the terminal built (screens guide §2.4). */
+[data-screen="article"] .body > :first-child { margin-top: 0; }
+[data-screen="article"] .body > :last-child { margin-bottom: 0; }
+[data-screen="article"] .body p { margin: 0 0 1.1em; }
+[data-screen="article"] .body h1, [data-screen="article"] .body h2,
+[data-screen="article"] .body h3, [data-screen="article"] .body h4,
+[data-screen="article"] .body h5, [data-screen="article"] .body h6 {
+  font-weight: 600; line-height: 1.25; margin: 1.7em 0 .5em; }
+[data-screen="article"] .body h1 { font-size: 1.625rem; }
+[data-screen="article"] .body h2 { font-size: 1.375rem; }
+[data-screen="article"] .body h3 { font-size: 1.1875rem; }
+[data-screen="article"] .body :is(h4, h5, h6) { font-size: 1.0625rem; }
+[data-screen="article"] .body :is(ul, ol) { margin: 0 0 1.1em;
+  padding-left: 1.35em; }
+[data-screen="article"] .body li { margin: .25em 0; }
+[data-screen="article"] .body li::marker { color: var(--secondary); }
+/* A quote a writer pulled out is the one place the body is allowed to break
+   its own measure and stop the scroll — set at display weight against the
+   accent, not indented and italicised into a footnote. */
+[data-screen="article"] .body blockquote { margin: 1.9em 0;
+  border-left: 3px solid var(--accent); padding-left: var(--sp-lg);
+  font-size: 1.3rem; line-height: 1.4; font-weight: 600;
+  color: var(--primary); text-wrap: pretty; }
+[data-screen="article"] .body blockquote p { margin: 0; }
+/* The drop cap is the identity's one flourish and it belongs to the body's
+   first paragraph alone; a heading or a quote opening the piece gets none. */
+[data-screen="article"] .body > p:first-of-type::first-letter { float: left;
+  font-size: 3.7em; line-height: .84; font-weight: 600; margin: .06em .09em 0 0;
+  color: var(--primary); }
+[data-screen="article"] .body pre { margin: 1.4em 0;
+  background: var(--surface-muted); border-radius: var(--r-sm);
+  padding: var(--sp-md); overflow-x: auto; }
+/* No mono role exists in DESIGN.md and code is neither authored prose nor app
+   chrome; the ir's populated sketch sets it in the system monospace. */
+[data-screen="article"] .body :is(code, pre) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .875rem; }
+[data-screen="article"] .body pre code { background: none; padding: 0;
+  font-size: inherit; }
+[data-screen="article"] .body code { background: var(--surface-muted);
+  border-radius: var(--r-sm); padding: 1px 5px; }
+[data-screen="article"] .body hr { border: 0;
+  border-top: 1px solid var(--border); margin: 1.8em 0; }
+[data-screen="article"] .body a { color: var(--primary);
+  text-underline-offset: 2px; }
+[data-screen="article"] .body img { max-width: 100%; height: auto;
+  border-radius: var(--r-sm); }
+
+[data-screen="article"] .chips { display: flex; flex-wrap: wrap; gap: 6px;
+  margin: var(--sp-lg) 0 0; padding: 0; list-style: none; }
+[data-screen="article"] .chip { display: inline-block;
+  background: var(--surface-muted); color: var(--secondary);
+  border-radius: var(--r-full); padding: 3px 12px; text-decoration: none; }
+[data-screen="article"] .chip:hover { color: var(--primary); }
+
+/* Comments. The thread is the second authored surface on the page: the writers
+   and the dates are sans, what they said is serif. */
+[data-screen="article"] .comments { margin-top: var(--sp-xl);
+  border-top: 1px solid var(--border); padding-top: var(--sp-lg); }
+[data-screen="article"] .comments-label { margin: 0 0 var(--sp-md);
+  color: var(--secondary); font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; }
+[data-screen="article"] .comment-list { display: grid; gap: var(--sp-md); }
+[data-screen="article"] .comment { position: relative; display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  grid-template-areas: "who when x" "said said said";
+  align-items: center; column-gap: var(--sp-sm); row-gap: 4px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: var(--sp-md); }
+[data-screen="article"] .comment .byline { grid-area: who; }
+[data-screen="article"] .comment .date { grid-area: when;
+  justify-self: start; }
+[data-screen="article"] .comment-body { grid-area: said; margin: 0;
+  color: var(--primary); white-space: pre-wrap; overflow-wrap: anywhere; }
+[data-screen="article"] .when-mine { grid-area: x; justify-self: end; }
+/* Removing one row of your own needs no second step; it takes nothing that
+   belongs to anybody else. */
+[data-screen="article"] .remove { background: none; border: 0;
+  color: var(--danger); font-size: 1.125rem; line-height: 1;
+  padding: 2px var(--sp-sm); }
+[data-screen="article"] .remove:hover { filter: none;
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border-radius: var(--r-sm); }
+[data-screen="article"] .when-mine .invalid,
+[data-screen="article"] .when-mine .store-error { position: absolute;
+  right: var(--sp-md); top: calc(100% - 4px); width: max-content;
+  max-width: 28ch; text-align: right; margin: 0; }
+[data-screen="article"] .comment:has(.invalid:not([hidden])),
+[data-screen="article"] .comment:has(.store-error:not([hidden])) {
+  border-color: var(--danger); margin-bottom: var(--sp-md); }
+/* The region's own sentence, in sans because it is the app speaking, sitting
+   above a live box rather than a bare form. */
+[data-screen="article"] .comment-list .empty { text-align: left;
+  padding: 0 0 var(--sp-sm); color: var(--primary); }
+[data-screen="article"] .quiet-note { display: none;
+  margin: 0 0 var(--sp-sm); color: var(--primary); }
+
+[data-screen="article"] .comment-box { display: grid;
+  grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-sm);
+  align-items: start; margin: 0 0 var(--sp-lg); }
+[data-screen="article"] .comment-box textarea { grid-column: 1;
+  min-height: 84px; resize: vertical; }
+[data-screen="article"] .comment-box button { grid-column: 2;
+  white-space: nowrap; }
+[data-screen="article"] .comment-box .invalid,
+[data-screen="article"] .comment-box .store-error { grid-column: 1 / -1;
+  margin: 0; }
+
+/* States — data-state is shell-owned; the screen only styles it. */
+[data-screen="article"] .skeleton, [data-screen="article"] .gone-note {
+  display: none; }
+[data-screen="article"][data-state="loading"] .skeleton { display: block; }
+[data-screen="article"][data-state="loading"] .piece { display: none; }
+/* Held down until every probe has swept its template, or an unset arm flashes
+   before the first refresh answers. */
+[data-screen="article"][data-state="loading"] .controls { visibility: hidden; }
+/* Skeletons stand where the follow and favorite controls will be, at the
+   geometry of the piece, so nothing shifts when the words arrive. */
+[data-screen="article"] .skel-bar { display: block; height: 10px;
+  border-radius: var(--r-sm); background: var(--surface-muted); }
+[data-screen="article"] .skel-bar.w-title { height: 30px; width: 72%; }
+[data-screen="article"] .skel-byline { display: flex; align-items: center;
+  gap: var(--sp-sm); margin-top: var(--sp-md); }
+[data-screen="article"] .skel-avatar { width: 26px; height: 26px;
+  border-radius: var(--r-full); background: var(--surface-muted); }
+[data-screen="article"] .skel-who { display: grid; gap: 5px; }
+[data-screen="article"] .skel-bar.w-name { width: 132px; }
+[data-screen="article"] .skel-bar.w-handle { height: 8px; width: 84px; }
+[data-screen="article"] .skel-controls { display: flex; align-items: center;
+  gap: var(--sp-sm); margin-top: var(--sp-md); }
+[data-screen="article"] .skel-button { height: 33px; width: 148px;
+  border-radius: var(--r-sm); background: var(--surface-muted); }
+[data-screen="article"] .skel-pill { height: 31px; width: 66px;
+  margin-left: auto; border-radius: var(--r-full);
+  background: var(--surface-muted); }
+[data-screen="article"] .skel-body { display: grid; gap: 12px; max-width: 65ch;
+  border-top: 1px solid var(--border); margin-top: var(--sp-lg);
+  padding-top: var(--sp-lg); }
+[data-screen="article"] .skel-bar.w-last { width: 58%; }
+
+/* gone — the presence probe's row is missing, so the piece itself is gone
+   rather than a list being short. The search box stays: it lives outside the
+   region. The accent link is the one way out. */
+[data-screen="article"][data-state="gone"] .gone-note { display: block; }
+/* The probe is a data source, never a surface; it renders no row and must not
+   hold a line in the layout. */
+[data-screen="article"] .piece-probe { display: none; }
+[data-screen="article"] .gone-note { text-align: center;
+  padding: 88px var(--sp-md) 96px; }
+[data-screen="article"] .gone-head { margin: 0; color: var(--primary);
+  font-weight: 600; }
+[data-screen="article"] .gone-sub { margin: 6px 0 0; color: var(--secondary); }
+[data-screen="article"] .gone-link { display: inline-block;
+  margin-top: var(--sp-lg); color: var(--accent); font-weight: 600;
+  text-decoration: none; }
+[data-screen="article"] .gone-link:hover { text-decoration: underline;
+  text-underline-offset: 3px; }
+
+/* owner / delete-armed / no-comments are storyboard frames the interpreter
+   never sets (screens guide §1.4), so a plain [data-state] hook is inert at
+   runtime and the frame is reviewable. At runtime the same appearance comes
+   from the me probe and from <details open>. */
+[data-screen="article"][data-state="owner"] .when-owner,
+[data-screen="article"][data-state="delete-armed"] .when-owner {
+  display: inline-flex; }
+[data-screen="article"][data-state="owner"] .when-reader,
+[data-screen="article"][data-state="delete-armed"] .when-reader {
+  display: none; }
+/* A closed <details> hides its panel in the UA shadow tree, and no fixture can
+   set the open attribute; ::details-content is the handle that makes the armed
+   step reviewable. */
+[data-screen="article"][data-state="delete-armed"] details.danger::details-content {
+  content-visibility: visible; }
+[data-screen="article"][data-state="delete-armed"] .confirm { display: block; }
+[data-screen="article"][data-state="delete-armed"] .controls {
+  padding-bottom: 52px; }
+[data-screen="article"][data-state="no-comments"] .comment-list { display: none; }
+[data-screen="article"][data-state="no-comments"] .quiet-note { display: block; }
+
+/* populated and validation-error ARE runtime states, so their storyboard
+   corrections carry the storybook's own `.storybook .frame` ancestry and can
+   never reach the app — unlike the frames above, which the interpreter never
+   sets. The fixture tier gives every list three rows, which makes every probe
+   non-empty, so without these the populated frame would wear the owner's
+   controls, "Following" and a filled heart, none of which its figure draws.
+   The doubled attribute is what puts these ahead of the probe rules. */
+.storybook .frame [data-screen="article"][data-state]:is([data-state="populated"],
+  [data-state="populated-dark"], [data-state="validation-error"],
+  [data-state="no-comments"]) .when-owner { display: none; }
+.storybook .frame [data-screen="article"][data-state]:is([data-state="populated"],
+  [data-state="populated-dark"], [data-state="validation-error"],
+  [data-state="no-comments"]) .when-reader { display: inline-flex; }
+.storybook .frame [data-screen="article"][data-state]:is([data-state="populated"],
+  [data-state="populated-dark"], [data-state="validation-error"],
+  [data-state="no-comments"]) .when-following { display: none; }
+.storybook .frame [data-screen="article"][data-state]:is([data-state="populated"],
+  [data-state="populated-dark"], [data-state="validation-error"],
+  [data-state="no-comments"]) .when-unfollowed { display: inline-block; }
+/* The progress bar is fixed to the viewport and a storybook frame is a box on a
+   page of boxes: left alone it would draw one accent line across the top of the
+   review page per frame, all of them at the same place and none of them about
+   the frame under them. */
+.storybook .frame [data-screen="article"] .progress { display: none; }
+/* gone is a runtime state, so its storyboard correction carries the storybook's
+   own ancestry and can never reach the app. At runtime the region holds no rows
+   in this state; only the fixture tier puts pieces under the gone copy. */
+.storybook .frame [data-screen="article"][data-state="gone"] .piece {
+  display: none; }
+/* The filled heart is reserved for "I have favorited this" and always carries
+   the accent fill, so an unpressed pill reads ♡ — including on the owner's own
+   piece, where the pill is not swapped at all. */
+.storybook .frame [data-screen="article"][data-state] .when-set { display: none; }
+.storybook .frame [data-screen="article"][data-state] .when-unset {
+  display: inline-flex; }
+/* And the same for the star: an unpressed save is what every frame draws, so
+   the fixture's non-empty probe must not fill it. */
+/* The refusal frame reveals BOTH sentences, because both arms can be refused
+   at once and that is the case the frame is for — one drawn through the other
+   is exactly what shipped before this frame existed. The stamp happens after
+   the state machine ran, so .invalid keeps its hidden attribute and only these
+   rules can show them. */
+.storybook .frame [data-screen="article"][data-state="validation-error"] .arms .store-error {
+  display: block; }
+.storybook .frame [data-screen="article"][data-state] .when-saved { display: none; }
+.storybook .frame [data-screen="article"][data-state] .when-unsaved {
+  display: inline-flex; }
+/* Only the reader's own comment carries the ×; the fixture makes every comment
+   look owned, so the frames show it on the last one alone. */
+.storybook .frame [data-screen="article"][data-state] .comment-list > :not(:last-child) .when-mine {
+  display: none; }
+/* The frame is stamped after the state machine ran, so checkValidity never
+   fired and .invalid keeps its hidden attribute; these two rules are what make
+   the refused comment box reviewable. */
+.storybook .frame [data-screen="article"][data-state="validation-error"] .comment-box .invalid {
+  display: block; }
+.storybook .frame [data-screen="article"][data-state="validation-error"] .comment-box textarea {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 16%, transparent); }
+
+/* The storybook renders this screen in a 360px frame on a wide viewport, so
+   the narrow arrangement is a container query — a media query would read the
+   viewport and never fire. */
+@container (max-width: 460px) {
+  [data-screen="article"] .topbar { flex-direction: column; }
+  [data-screen="article"] .topbar .back { padding-top: 0; }
+  [data-screen="article"] .search { width: 100%; }
+  [data-screen="article"] .arms { margin-left: 0; }
+  [data-screen="article"] .comment-box { grid-template-columns: minmax(0, 1fr); }
+  [data-screen="article"] .comment-box button { grid-column: 1;
+    justify-self: start; }
+  [data-screen="article"] .skel-pill { margin-left: 0; }
+}
+
+/* The writer's card. Grid so the face spans the three text rows and the bio
+   wraps under the name rather than beside the face. */
+[data-screen="article"] .writer { display: grid; align-items: start;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "face label" "face name" "face handle" "face bio" "face act";
+  column-gap: var(--sp-md); row-gap: 2px; max-width: 65ch;
+  margin-top: var(--sp-xl); padding: var(--sp-lg);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); }
+[data-screen="article"] .writer-face { grid-area: face; width: 56px;
+  height: 56px; border-radius: var(--r-full); background: var(--surface-muted);
+  object-fit: cover; }
+[data-screen="article"] .writer-label { grid-area: label;
+  color: var(--secondary); letter-spacing: .08em; text-transform: uppercase; }
+[data-screen="article"] .writer-name { grid-area: name; color: var(--primary);
+  text-decoration: none; }
+[data-screen="article"] .writer-name:hover { text-decoration: underline;
+  text-underline-offset: 3px; }
+/* The handle is the identity that always exists; the display name may be
+   empty, and then the name row simply collapses. */
+[data-screen="article"] .writer-name:empty { display: none; }
+[data-screen="article"] .writer-handle { grid-area: handle;
+  color: var(--secondary); text-decoration: underline;
+  text-underline-offset: 2px; justify-self: start; }
+[data-screen="article"] .writer-handle:hover { color: var(--primary); }
+[data-screen="article"] .writer-bio { grid-area: bio; margin: var(--sp-sm) 0 0;
+  color: var(--primary); }
+[data-screen="article"] .writer-bio:empty { display: none; }
+/* The card's own follow, in the grid's last row. Only the wrapper is placed:
+   the probes are display:none and a display:none grid child claims no cell, so
+   the swap costs the layout nothing. */
+[data-screen="article"] .writer .when-reader { grid-area: act;
+  margin-top: var(--sp-md); }
+
+/* The hero. A region rather than a bare <img> because an unset URL binds to a
+   transparent pixel, which would hold the box open on every piece that has no
+   cover; the filter means the figure exists only when the column does. */
+[data-screen="article"] .cover { margin: var(--sp-lg) 0 0; }
+[data-screen="article"] .cover:empty { display: none; }
+[data-screen="article"] .cover-item { margin: 0; }
+/* The credit, centred under the picture it belongs to and quieter than the
+   deck: it is attribution, not part of the piece. Collapses when the writer
+   supplied none, so a cover without one draws no gap. */
+[data-screen="article"] .cover-credit { margin: var(--sp-sm) 0 0;
+  color: var(--secondary); text-align: center; }
+[data-screen="article"] .cover-credit:empty { display: none; }
+[data-screen="article"] .cover-img { display: block; width: 100%; height: auto;
+  aspect-ratio: 2 / 1; object-fit: cover; border-radius: var(--r-md);
+  background: var(--surface-muted); }
+
+/* Earlier from this writer. A region with no rows renders nothing and the
+   heading goes with it, so a writer's first piece shows no empty shelf. */
+[data-screen="article"] .earlier { max-width: 65ch; margin: var(--sp-lg) 0 0;
+  display: grid; gap: 1px; background: var(--border);
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  overflow: hidden; }
+[data-screen="article"] .earlier:empty { display: none; }
+[data-screen="article"] .earlier::before { content: "Earlier from this writer";
+  background: var(--surface); color: var(--secondary);
+  font-size: .6875rem; letter-spacing: .08em; text-transform: uppercase;
+  padding: var(--sp-sm) var(--sp-md); }
+[data-screen="article"] .earlier-piece { display: flex; align-items: baseline;
+  justify-content: space-between; gap: var(--sp-md);
+  background: var(--surface); color: var(--primary); text-decoration: none;
+  padding: 11px var(--sp-md); }
+[data-screen="article"] .earlier-piece:hover { background: var(--surface-muted); }
+[data-screen="article"] .earlier-title { min-width: 0; }
+[data-screen="article"] .earlier-meta { flex: none; color: var(--secondary);
+  white-space: nowrap; }
+
+
+/* The note the shared layer hides by default. network-error is a runtime state
+   the interpreter can set on any screen, whatever the storyboard draws, so a
+   screen carrying the markup owes it a reveal. */
+[data-screen="article"][data-state="network-error"] .offline { display: block; }

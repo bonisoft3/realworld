@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="pronto-artifact" content="brief">
+<title>Conduit — pronto brief</title>
+<script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js" integrity="sha384-wLhprpjsmjc/XYIcF+LpMxd8yS1gss6jhevOp6F6zhiIoFK6AmHtm4bGKtehTani" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/markdown-it-attrs@4.3.1/markdown-it-attrs.browser.js" integrity="sha384-x7/cajBAdDAXNBhe8vNNlRjlB/UuamDg9uMIUg3C+kQOPaBWDg7khpyX13BiKuue" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js" integrity="sha384-+pxiN6T7yvpryuJmE1gM9PX7yQit15auDb+ZwwvJOd/4be2Cie5/IuVXgQb/S9du" crossorigin="anonymous"></script>
+<style>
+  :root {
+    --primary: #1B1D1F; --secondary: #6C7278; --accent: #2F6F4F;
+    --danger: #B8422E; --neutral: #FAFAF8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--neutral); color: var(--primary);
+    font: 1rem/1.5 system-ui, sans-serif;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 16px 24px; border-bottom: 1px solid #e5e2dc;
+  }
+  header h1 { font-size: 1.1rem; margin: 0; }
+  header .artifact { color: var(--secondary); font-size: 0.8125rem; }
+  header .spacer { flex: 1; }
+  button {
+    font: inherit; font-size: 0.8125rem; padding: 4px 12px;
+    border: 1px solid #d8d5cf; border-radius: 4px;
+    background: white; color: var(--primary); cursor: pointer;
+  }
+  button:hover { border-color: var(--secondary); }
+  .layout { display: flex; gap: 24px; max-width: 960px; margin: 0 auto; padding: 24px; }
+  main { flex: 1; min-width: 0; max-width: 640px; }
+  aside {
+    width: 240px; flex-shrink: 0; font-size: 0.8125rem; color: var(--secondary);
+    border-left: 1px solid #e5e2dc; padding-left: 16px; height: fit-content;
+  }
+  aside h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px; }
+  aside dt { font-weight: 600; margin-top: 8px; }
+  aside dd { margin: 0; overflow-wrap: break-word; }
+  main h1 { font-size: 1.5rem; font-weight: 650; }
+  main h2 { font-size: 1.125rem; margin-top: 32px; border-bottom: 1px solid #e5e2dc; padding-bottom: 4px; }
+  a { color: var(--accent); }
+  a.wikilink { text-decoration: none; border-bottom: 1px dotted var(--accent); font-weight: 550; }
+  a.agent::before, a.context::before {
+    font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.03em;
+    border-radius: 3px; padding: 1px 5px; margin-right: 4px; vertical-align: 1px;
+  }
+  a.agent::before { content: "agent"; background: #ede5f4; color: #5b3a80; }
+  a.context::before { content: "context"; background: #e3ecf7; color: #2c5687; }
+  section.transclude { border: 1px solid #e5e2dc; border-radius: 8px; padding: 4px 16px; margin: 16px 0; }
+  section.transclude.unresolved { padding: 12px 16px; background: #f2efe9; }
+  section.transclude.unresolved::before {
+    content: "transcluded — serve over http to inline: "; color: var(--secondary); font-size: 0.8125rem;
+  }
+  #editor {
+    width: 100%; min-height: 480px; font: 0.875rem/1.5 ui-monospace, monospace;
+    border: 1px solid #d8d5cf; border-radius: 4px; padding: 12px;
+    background: white; color: var(--primary); resize: vertical;
+  }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<script type="text/markdown" id="pronto-brief">
+
+---
+pronto: alpha
+name: realworld
+team: studio
+tiers: [container]
+design: ./DESIGN.md
+agents:
+  - ../../plugins/pronto/agents/pipeline-designer.md
+context:
+  - ../../libraries/mecha/README.md
+---
+
+# Conduit
+
+A place to read and write, in public. Someone comes in, reads what the
+community has posted, follows the writers worth following, and — when
+they have something to say — writes it themselves. Think a small,
+well-made publishing community: everything written here is public to
+everyone in it, and everything *done* about it — writing, following,
+favoriting, commenting — belongs to a person. This is the app the
+[RealWorld](https://github.com/gothinkster/realworld) project uses as
+its common example, built as it should have been.
+
+## People
+
+Coming in is one gesture, and there is nothing to fill in:
+
+- A person signs in with a **passkey** in one tap, or as a **guest**
+  in one click; either way Conduit gives them a friendly **handle**
+  (like *velvet-crow-4*), and no two people share one. Nothing is
+  typed — no email, no password, no chosen username. The handle is how
+  the community refers to them, and it never changes.
+- **Public means public to the community.** Conduit has no anonymous
+  reader: the door comes first, and a guest click is the whole price
+  of admission. Past it, everything is open — every person sees every
+  article, every profile, every tag, every comment, and the same
+  favorite count as everyone else.
+- What belongs to a person is what they *did*: their articles, their
+  comments, their follows, their favorites, their own profile. Only
+  the author of an article may change or remove it, only a comment's
+  writer may remove it, and only a person may edit their own profile —
+  and Conduit refuses the rest rather than hiding the button.
+- Every person has a **public page**: their handle, a **display name**
+  they may set, a line **about** themselves, and a **picture**. It is
+  where their writing lives, and it is the only page that is *theirs*.
+- A person is called by the **display name** they set, with their
+  **handle** beside it — the same everywhere they appear: bylines,
+  comments, previews, their public page, and the name a reader is
+  signed in under. Someone who has set no name is simply their handle.
+  The handle never leaves their side, because two people may choose the
+  same display name and only one of them can be *velvet-crow-4*.
+- Who a reader is signed in as is always on screen, and it is a way in,
+  not a label: one click on their own name reaches their public page,
+  and everything they have written is there. **Sign out** sits beside
+  it, ends the session, and returns to the door leaving nothing of the
+  session behind it.
+
+## Data
+
+An [[Article]] is one piece of writing:
+
+- a **title**, a one-line **description** that sells it in a list, and
+  a **body** in markdown — headings, emphasis, links, lists, quotes and
+  code, written plainly and read as formatting
+- a short list of **tags** — a handful of single words, entered
+  together, that file the piece under each of them
+- a **readable address** derived from its title, so a link to an
+  article looks like the article and can be handed to someone
+- **who wrote it** and **when it was written**, both stamped
+  automatically, and **when it was last changed**
+- everyone reads it; only its author changes or removes it, and
+  removing it takes its comments and its favorites with it
+
+Tags are not something a writer manages — they exist because articles
+carry them. The community's tags, and how many live articles wear
+each, are always current: that is the [[TagCount]] behind the popular
+tags a reader browses by.
+
+A [[Favorite]] is one person saying an article is worth it — at most
+one per person per article, taken back by pressing again. Every
+article shows **how many** people have favorited it, always current
+and the same number for everyone reading: that is its
+[[ArticleStats]].
+
+A [[Follow]] is one person choosing to hear from another. It is
+one-directional and needs no consent; a person cannot follow
+themselves. Following is what fills a reader's own feed.
+
+A [[Comment]] is one reply under an article: its text, its writer, and
+when it was left. Everyone reads the comments; only their writer
+removes them.
+
+Articles can be **searched** by their own words — a title, a
+description, or the body is enough to find one, from anywhere.
+
+## Screens
+
+The front door is [[home]]:
+
+- a **masthead** that says what the place is, for the person who has
+  just come in
+- two ways to read: **the whole community**, newest first, and **your
+  feed** — only the people you follow — which tells a reader with no
+  follows yet how to fill it, rather than showing them nothing
+- each article reads as a **preview**: its writer's picture and handle,
+  its date, its title, its description, its tags, and its favorite
+  count as a control you can press
+- a **popular tags** panel beside the list, each tag opening [[tag]]
+- a **search box** — a few words and go
+- long lists do not dump everything at once: a reader gets a screenful
+  and a plain way to more
+
+[[article]] is one piece, read properly:
+
+- the **title** and the writer's byline — picture, handle, date — with
+  **follow** and **favorite** beside it, and, on the reader's own
+  piece, **edit** and **delete** instead
+- the **body**, rendered as the markdown it was written in, at a
+  measure that is comfortable to read
+- its **tags**
+- the **comments** beneath, oldest first, each with its writer and
+  date, each removable by its own writer, under a **leave a comment**
+  form; a piece with no comments yet says so and invites the first
+
+[[editor]] is where an article is written and rewritten: title,
+description, body, tags — the same surface for a new piece and for
+changing one, landing on the finished article when it is published. An
+article with no title or no body is refused with a message the writer
+can read, and nothing is saved.
+
+[[profile]] is a person's public page: their picture, handle, display
+name and about; **their articles** and **the ones they have
+favorited**, in the same previews as the home list; and a **follow**
+button — except on your own page, which offers **edit your profile**
+instead. Your own page is one click from anywhere, on your own name;
+it is where your writing is kept, and the way to [[settings]].
+
+[[settings]] is where a person changes their own display name, about,
+and picture. It is reached from their own page, and offers the way
+back to it.
+
+[[tag]] is the whole community's list filtered to one tag, in the same
+previews, saying plainly when a tag has nothing live under it.
+
+[[search]] shows what the typed words find, newest first, in the same
+previews, and says so plainly when nothing matches.
+
+## Behavior
+
+- Publishing an article lands the writer on the finished piece, and it
+  is on the community list for everyone immediately. Editing it changes
+  it everywhere it appears.
+- Favoriting an article moves its count on the spot, everywhere that
+  article shows, for everyone reading — without a reload, and without
+  the reader pressing anything twice. Pressing again takes it back.
+  For how the counts should be derived, lean on
+  [pipeline-designer](../../plugins/pronto/agents/pipeline-designer.md){.agent}.
+- Following someone adds their writing to your feed immediately, and
+  unfollowing removes it; the button reads its true state on every
+  screen it appears on, including a fresh visit.
+- Leaving a comment shows it under the article at once and clears the
+  form; removing one takes it away on the spot.
+- Deleting an article removes it from every list, tag, feed and
+  profile it appeared in, and takes its comments and favorites with
+  it.
+- The tags a writer types on an article are the tags it is filed
+  under, immediately — including in the popular tags panel, whose
+  counts stay honest as articles are published, retagged and deleted.
+- Editing a profile changes how that person reads everywhere they
+  appear — every byline, every comment, every preview, and the name
+  they are signed in under — not just on their own page.
+- The whole app follows the device's appearance: it reads correctly in
+  light and in dark, and switching costs nothing.
+- Signing out returns to the door and takes the session's screen with
+  it — nothing of what was being read stays up behind the door. Signing
+  back in finds every article, follow and favorite exactly where it was
+  left.
+- See [mecha's data path](../../libraries/mecha/README.md){.context}
+  for what the storage layer already guarantees.
+
+![[acceptance.md]]
+
+## Out of scope
+
+No anonymous reading — the door is the platform's and it comes first;
+a guest click is the whole ceremony. No email anywhere: no
+notifications, no digests, no password recovery — a passkey is the
+only key, and handles never change. No editing a comment (remove it
+and leave another), no replies to comments, no voting on them. No
+drafts, no scheduled publishing, no revision history — an edit
+replaces what was there. Markdown is written plainly, not with a
+formatting toolbar or a live preview, and a body carries no tables, no
+nested lists and no raw HTML. No uploads either: a profile picture is
+a link the person supplies. No blocking, muting or reporting; no private
+articles; no direct messages. No reading statistics beyond the
+favorite count.
+</script>
+
+
+<header>
+  <h1 id="app-name">brief</h1>
+  <span class="artifact">pronto brief · <a href="ir.html">ir.html</a></span>
+  <span class="spacer"></span>
+  <button id="edit-btn">Edit</button>
+  <button id="save-btn" hidden>Save</button>
+</header>
+
+<div class="layout">
+  <main>
+    <div id="rendered"></div>
+    <textarea id="editor" hidden spellcheck="false"></textarea>
+  </main>
+  <aside id="harness"></aside>
+</div>
+
+<script>
+(() => {
+  const srcEl = document.getElementById('pronto-brief');
+  const rendered = document.getElementById('rendered');
+  const harness = document.getElementById('harness');
+  const editor = document.getElementById('editor');
+  const editBtn = document.getElementById('edit-btn');
+  const saveBtn = document.getElementById('save-btn');
+
+  // Pronto link taxonomy: [[Id]] → ir.html#Id, ![[path]] → transclusion.
+  // Classed links ({.agent}/{.context}) are handled by markdown-it-attrs + CSS.
+  function pronto(md) {
+    md.inline.ruler.before('link', 'pronto_wikilink', (state, silent) => {
+      const s = state.src;
+      let pos = state.pos;
+      const embed = s.startsWith('![[', pos);
+      const open = embed ? pos + 1 : pos;
+      if (!s.startsWith('[[', open)) return false;
+      const close = s.indexOf(']]', open + 2);
+      if (close < 0) return false;
+      if (!silent) {
+        const t = state.push(embed ? 'transclude' : 'wikilink', '', 0);
+        t.meta = { target: s.slice(open + 2, close) };
+      }
+      state.pos = close + 2;
+      return true;
+    });
+    md.renderer.rules.wikilink = (tok, i) => {
+      const id = tok[i].meta.target;
+      return `<a class="wikilink" href="ir.html#${id}">${id}</a>`;
+    };
+    md.renderer.rules.transclude = (tok, i) => {
+      const p = tok[i].meta.target;
+      return `</p><section class="transclude" data-src="${p}"><a href="${p}">${p}</a></section><p>`;
+    };
+  }
+
+  const md = window.markdownit({ linkify: true })
+    .use(window.markdownItAttrs)
+    .use(pronto);
+
+  function parse(text) {
+    let body = text.replace(/^\s+/, '');
+    let fm = null;
+    const m = /^---\n([\s\S]*?)\n---\n?/.exec(body);
+    if (m) {
+      fm = jsyaml.load(m[1]);
+      body = body.slice(m[0].length);
+    }
+    return { fm, body };
+  }
+
+  function renderHarness(fm) {
+    if (!fm) { harness.innerHTML = ''; return; }
+    const item = (v) => Array.isArray(v)
+      ? v.map((x) => `<dd>${x}</dd>`).join('')
+      : `<dd>${v}</dd>`;
+    harness.innerHTML = '<h2>Harness</h2><dl>' +
+      Object.entries(fm).map(([k, v]) => `<dt>${k}</dt>${item(v)}`).join('') +
+      '</dl>';
+  }
+
+  async function hydrateTranscludes() {
+    for (const el of rendered.querySelectorAll('section.transclude')) {
+      try {
+        const r = await fetch(el.dataset.src);
+        if (!r.ok) throw new Error(r.status);
+        el.innerHTML = md.render(await r.text());
+        el.classList.add('resolved');
+      } catch {
+        el.classList.add('unresolved'); // file:// or missing — stays a boxed link
+      }
+    }
+  }
+
+  function render() {
+    const { fm, body } = parse(srcEl.textContent);
+    document.getElementById('app-name').textContent = (fm && fm.name) || 'brief';
+    document.title = `${(fm && fm.name) || 'brief'} — pronto brief`;
+    renderHarness(fm);
+    rendered.innerHTML = md.render(body);
+    hydrateTranscludes();
+  }
+
+  editBtn.addEventListener('click', () => {
+    const editing = editor.hidden;
+    if (editing) editor.value = srcEl.textContent.replace(/^\n/, '');
+    editor.hidden = !editing;
+    saveBtn.hidden = !editing;
+    editBtn.textContent = editing ? 'Preview only' : 'Edit';
+  });
+
+  let debounce;
+  editor.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => {
+      srcEl.textContent = '\n' + editor.value.replace(/\s+$/, '') + '\n';
+      render();
+    }, 200);
+  });
+
+  function serialize() {
+    const doc = document.documentElement.cloneNode(true);
+    doc.querySelector('#rendered').innerHTML = '';
+    doc.querySelector('#harness').innerHTML = '';
+    const ta = doc.querySelector('#editor');
+    ta.textContent = '';
+    ta.setAttribute('hidden', '');
+    doc.querySelector('#save-btn').setAttribute('hidden', '');
+    doc.querySelector('#edit-btn').textContent = 'Edit';
+    return '<!doctype html>\n' + doc.outerHTML + '\n';
+  }
+
+  saveBtn.addEventListener('click', async () => {
+    const text = serialize();
+    if (window.showSaveFilePicker) {
+      try {
+        const h = await showSaveFilePicker({
+          suggestedName: 'brief.html',
+          types: [{ description: 'HTML', accept: { 'text/html': ['.html'] } }],
+        });
+        const w = await h.createWritable();
+        await w.write(text);
+        await w.close();
+        return;
+      } catch (e) {
+        if (e.name === 'AbortError') return;
+      }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/html' }));
+    a.download = 'brief.html';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

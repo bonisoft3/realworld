@@ -1,0 +1,117 @@
+<!-- edit-article — ir: #edit-article. The revision sheet: the new-article sheet
+     with the row's own words already in it, at the same geometry, so the two
+     editors read as one component. Keyed on the id and not the slug, because
+     the slug is generated from the title and a slug-keyed screen would find
+     zero rows the instant a retitle saved (ir decision-edit-route-by-id). The
+     read is local — col=eq with no select — so the fields fill from the synced
+     collection with no round trip. The row is public and the write is not: a
+     save against somebody else's piece is refused out loud rather than hidden
+     (ir decision-show-and-refuse). No search box, as on the blank sheet: a
+     stray submit would navigate away from unsent text. -->
+<section class="screen" data-screen="edit-article">
+  <details class="lang-picker">
+    <summary class="lang-summary role-meta-sm">
+      <span class="sr-only" data-text="{msg.language_picker_label}">Language</span>
+      <span class="lang-globe" aria-hidden="true">🌐</span>
+      <span class="lang-current" aria-hidden="true"><i data-t="id" data-text="{msg.lang_id}">Bahasa Indonesia</i><i data-t="de" data-text="{msg.lang_de}">Deutsch</i><i data-t="en" data-text="{msg.lang_en}">English</i><i data-t="es" data-text="{msg.lang_es}">Español</i><i data-t="fr" data-text="{msg.lang_fr}">Français</i><i data-t="sw" data-text="{msg.lang_sw}">Kiswahili</i><i data-t="pt" data-text="{msg.lang_pt}">Português</i><i data-t="tr" data-text="{msg.lang_tr}">Türkçe</i><i data-t="ru" data-text="{msg.lang_ru}">Русский</i><i data-t="ur" dir="rtl" data-text="{msg.lang_ur}">اردو</i><i data-t="ar" dir="rtl" data-text="{msg.lang_ar}">العربية</i><i data-t="hi" data-text="{msg.lang_hi}">हिन्दी</i><i data-t="bn" data-text="{msg.lang_bn}">বাংলা</i><i data-t="zh" data-text="{msg.lang_zh}">中文</i><i data-t="ja" data-text="{msg.lang_ja}">日本語</i></span>
+    </summary>
+    <nav class="lang-menu" aria-label="{msg.language_picker_label}">
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="id" data-locale-current="page" lang="id" hreflang="id"><span class="lang-name" data-text="{msg.lang_id}">Bahasa Indonesia</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="de" data-locale-current="page" lang="de" hreflang="de"><span class="lang-name" data-text="{msg.lang_de}">Deutsch</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="en" data-locale-current="page" lang="en" hreflang="en"><span class="lang-name" data-text="{msg.lang_en}">English</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="es" data-locale-current="page" lang="es" hreflang="es"><span class="lang-name" data-text="{msg.lang_es}">Español</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="fr" data-locale-current="page" lang="fr" hreflang="fr"><span class="lang-name" data-text="{msg.lang_fr}">Français</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="sw" data-locale-current="page" lang="sw" hreflang="sw"><span class="lang-name" data-text="{msg.lang_sw}">Kiswahili</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="pt" data-locale-current="page" lang="pt" hreflang="pt"><span class="lang-name" data-text="{msg.lang_pt}">Português</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="tr" data-locale-current="page" lang="tr" hreflang="tr"><span class="lang-name" data-text="{msg.lang_tr}">Türkçe</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="ru" data-locale-current="page" lang="ru" hreflang="ru"><span class="lang-name" data-text="{msg.lang_ru}">Русский</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="ur" data-locale-current="page" lang="ur" hreflang="ur"><span class="lang-name" dir="rtl" data-text="{msg.lang_ur}">اردو</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="ar" data-locale-current="page" lang="ar" hreflang="ar"><span class="lang-name" dir="rtl" data-text="{msg.lang_ar}">العربية</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="hi" data-locale-current="page" lang="hi" hreflang="hi"><span class="lang-name" data-text="{msg.lang_hi}">हिन्दी</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="bn" data-locale-current="page" lang="bn" hreflang="bn"><span class="lang-name" data-text="{msg.lang_bn}">বাংলা</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="zh" data-locale-current="page" lang="zh" hreflang="zh"><span class="lang-name" data-text="{msg.lang_zh}">中文</span></a>
+      <a class="lang-item role-meta-sm" data-route="edit-article" data-param-id="{param.id}" data-locale="ja" data-locale-current="page" lang="ja" hreflang="ja"><span class="lang-name" data-text="{msg.lang_ja}">日本語</span></a>
+    </nav>
+  </details>
+  <!-- The piece's address is its GENERATED slug, so the live back-link can only
+       be built inside a region; the ghost beside it holds the line until the
+       row lands and is the back-link the loading frame draws. Both regions read
+       the same single row, so the two top-level refreshes always agree on
+       empty/populated and the last-writer race has one answer. -->
+  <div class="backline" data-live="article" data-filter="id=eq.{param.id}">
+    <template data-item>
+      <a class="back role-meta-sm" data-route="article" data-param-slug="{slug}" data-text="{msg.back_piece}">← Back to the piece</a>
+    </template>
+  </div>
+  <span class="back ghost role-meta-sm" aria-hidden="true" data-text="{msg.back_piece}">← Back to the piece</span>
+  <h1 class="masthead role-body-md" data-text="{msg.edit_article_title}">Edit</h1>
+
+  <div class="skeleton" aria-hidden="true">
+    <div class="skel-strip">
+      <span class="skel-bar w-who"></span>
+      <span class="skel-bar w-latest"></span>
+    </div>
+    <div class="skel-sheet">
+      <span class="skel-field h-title"></span>
+      <span class="skel-field h-desc"></span>
+      <span class="skel-field h-body"></span>
+      <span class="skel-field h-tags"></span>
+      <span class="skel-field h-button"></span>
+    </div>
+  </div>
+
+  <!-- The gone copy is a sibling of the region, not a data-empty: static markup
+       inside a list region is swept as stale chrome on the first refresh. -->
+  <div class="gone-note">
+    <p class="gone-head role-body-md" data-text="{msg.gone_head}">That piece is gone.</p>
+    <p class="gone-sub role-meta-sm" data-text="{msg.gone_sub_edit}">It was deleted, so there is nothing left to revise.</p>
+    <a class="gone-link role-body-md" data-route="home" data-text="{msg.read_community_cta}">Read the community →</a>
+  </div>
+
+  <div class="piece" data-live="article" data-filter="id=eq.{param.id}">
+    <template data-item>
+      <div class="revision">
+        <div class="strip">
+          <p class="revising role-meta-sm"><span data-text="{msg.revising_label}">Revising · published</span> <time datetime="{created_at}" data-text="{created_at}" data-text-format="datetime"></time></p>
+          <p class="hint role-meta-sm" data-text="{msg.slug_hint}">Change the title and its address changes with it.</p>
+          <p class="landed">
+            <a class="landing" data-route="article" data-param-slug="{slug}">
+              <span class="landing-title role-prose" data-text="{title}"></span>
+              <span class="landing-go role-meta-sm" data-text="{msg.read_it_cta}">Read it →</span>
+            </a>
+            <span class="stamp role-prose" data-text="{title}"></span>
+            <span class="sending role-meta-sm" data-text="{msg.saving_suffix}">· saving</span>
+          </p>
+        </div>
+
+        <form class="sheet" data-form="revise-article" data-entity="article" data-action="update">
+          <input class="field title role-display-md" name="title" required maxlength="200"
+                 placeholder="{msg.article_title_placeholder}" aria-label="{msg.article_title_aria}" value="{title}">
+          <input class="field description role-prose" name="description" maxlength="300"
+                 placeholder="{msg.about_line_placeholder}" aria-label="{msg.about_piece_aria}"
+                 value="{description}">
+          <textarea class="field body role-prose" name="body" required rows="8"
+                    placeholder="{msg.body_placeholder_short}" aria-label="{msg.your_piece_aria}" data-value="{body}"></textarea>
+          <p class="invalid" hidden><span class="need-title" data-text="{msg.need_title}">Give it a title.</span><span class="need-body" data-text="{msg.need_body}">An article needs a body.</span><span class="unsaved" data-text="{msg.nothing_saved}">Nothing was saved.</span></p>
+          <p class="store-error" hidden><span data-text="{msg.edit_store_error}">This piece isn't yours to change.</span><span class="unsaved" data-text="{msg.nothing_saved}">Nothing was saved.</span></p>
+          <input class="field cover role-meta-sm" name="cover_url" maxlength="2048"
+                 placeholder="{msg.cover_placeholder}" aria-label="{msg.cover_aria}"
+                 value="{cover_url}">
+          <input class="field credit role-meta-sm" name="cover_credit" maxlength="120"
+                 placeholder="{msg.credit_placeholder}" aria-label="{msg.credit_aria}" value="{cover_credit}">
+          <input class="field tags role-meta-sm" name="tags" maxlength="200"
+                 placeholder="{msg.tags_placeholder}" aria-label="{msg.tags_aria}" value="{tags}">
+          <!-- Always submitted: a column default fires only on INSERT
+               (ir decision-updated-at-hidden-now). -->
+          <input type="hidden" name="updated_at" data-value="{now}">
+          <div class="commit">
+            <button type="submit" data-text="{msg.save_changes_button}">Save changes</button>
+            <span class="saved role-meta-sm" data-text="{msg.saved_note}">Saved.</span>
+          </div>
+        </form>
+      </div>
+    </template>
+  </div>
+
+  <p class="offline" data-text="{msg.offline}">Conduit isn't answering. It keeps trying — this will fill in when it does.</p>
+</section>

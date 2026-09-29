@@ -1,0 +1,196 @@
+@import "./shared/chrome.css";
+
+@import "./shared/system.css";
+
+
+/* editor — ir: #editor. One column at the reading measure, so a line breaks in
+   the sheet where it will break on the page. */
+[data-screen="editor"] { max-width: 680px; container-type: inline-size; }
+[data-screen="editor"] .masthead {
+  margin: 0 calc(var(--sp-lg) * -1) var(--sp-md);
+  padding: 0 var(--sp-lg) var(--sp-md);
+  border-bottom: 1px solid var(--border);
+  font-size: 1.25rem; font-weight: 650; line-height: 1.3;
+  letter-spacing: -.01em; }
+
+/* The byline strip: who is writing, and the piece they published last. */
+[data-screen="editor"] .byline-strip { padding-bottom: var(--sp-md);
+  border-bottom: 1px solid var(--border); }
+[data-screen="editor"] .writing-as { margin: 0; color: var(--secondary); }
+[data-screen="editor"] .latest-line { display: flex; flex-wrap: wrap;
+  align-items: baseline; gap: 8px; margin: 4px 0 0 -8px; padding: 2px 8px;
+  border-radius: var(--r-sm); box-shadow: 0 0 0 1px transparent;
+  transition: box-shadow var(--motion-base) var(--motion-ease); }
+[data-screen="editor"] .latest-label { color: var(--secondary); }
+/* One line, not a list: the newest piece is the first row and CSS picks it,
+   the same move the pill arms use. */
+[data-screen="editor"] .latest > *:not(:first-child) { display: none; }
+[data-screen="editor"] .latest .empty { display: inline; margin: 0; padding: 0;
+  text-align: left; font-size: .8125rem; }
+[data-screen="editor"] .landing { display: inline-flex; align-items: baseline;
+  gap: 6px; color: var(--primary); text-decoration: none; }
+[data-screen="editor"] .landing-title { border-bottom: 1px solid var(--border); }
+[data-screen="editor"] .landing:hover .landing-title {
+  border-bottom-color: var(--primary); }
+[data-screen="editor"] .landing-arrow { color: var(--secondary); }
+[data-screen="editor"] .landing:focus-visible { outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: var(--r-sm); }
+
+/* The sheet. Title, description and body are the authored surface and take the
+   serif at the size the words will land in; tags and the button are the app
+   talking and stay sans. */
+[data-screen="editor"] .sheet { display: flex; flex-direction: column;
+  gap: var(--sp-sm); padding-top: var(--sp-lg); max-width: 65ch; }
+/* The sheet is a document, not a form. A bordered box per field makes four
+   equal-weight controls out of a headline, a standfirst and a body, and none
+   of them looks like the thing it publishes as. The fields carry no border and
+   no fill; the placeholder is the only label, and the caret is the affordance
+   — which is what makes the words land at the size and family they will be
+   read at. The focus ring is the one piece of chrome kept: without a border
+   there is otherwise nothing to say which field has the caret. */
+[data-screen="editor"] .field { width: 100%; box-sizing: border-box;
+  background: none; border: none; border-radius: 0; padding: 4px 0; }
+[data-screen="editor"] .field:focus-visible { outline: none; box-shadow: none;
+  border: none; }
+/* The caret's field is marked on the sheet's left edge rather than around the
+   control, so focus never redraws a box the design just removed. */
+[data-screen="editor"] .sheet { position: relative; }
+[data-screen="editor"] .field:focus-visible { padding-left: var(--sp-md);
+  margin-left: calc(-1 * var(--sp-md));
+  box-shadow: inset 2px 0 0 0 var(--accent); }
+[data-screen="editor"] .title { font-family: ui-serif, Georgia, "Times New Roman", serif;
+  font-size: 2.5rem; font-weight: 600; line-height: 1.15; letter-spacing: -.02em;
+  color: var(--primary); }
+[data-screen="editor"] .description { font-size: 1.25rem; line-height: 1.45;
+  color: var(--secondary); }
+[data-screen="editor"] .body { min-height: 46vh; resize: vertical;
+  color: var(--primary); }
+[data-screen="editor"] .tags { color: var(--secondary);
+  border-top: 1px solid var(--border); padding-top: var(--sp-md);
+  margin-top: var(--sp-sm); }
+/* Publishing is the one committed act on this screen, so it is not a small
+   button sharing a row's baseline with a status word. */
+[data-screen="editor"] .commit { display: flex; align-items: center;
+  gap: var(--sp-md); margin-top: var(--sp-md);
+  border-top: 1px solid var(--border); padding-top: var(--sp-md); }
+[data-screen="editor"] .commit button { align-self: flex-start;
+  border-radius: var(--r-full); padding: 11px var(--sp-lg); font-weight: 600; }
+[data-screen="editor"] .published { display: none; color: var(--accent);
+  font-weight: 600; }
+
+/* Refusal copy: the sheet names the piece that is missing, and says plainly
+   that nothing left the tab. Both sentences can be true at once. */
+[data-screen="editor"] .sheet .invalid:not([hidden]),
+[data-screen="editor"] .sheet .store-error:not([hidden]) { display: flex;
+  flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; }
+[data-screen="editor"] .invalid .need-title,
+[data-screen="editor"] .invalid .need-body { display: none; }
+[data-screen="editor"] .sheet:has(input[name="title"]:invalid) .need-title,
+[data-screen="editor"] .sheet:has(textarea[name="body"]:invalid) .need-body {
+  display: inline; }
+[data-screen="editor"] .unsaved { margin-left: auto; color: var(--secondary); }
+
+/* States — data-state is shell-owned; the screen only styles it. */
+[data-screen="editor"] .skeleton { display: none; }
+[data-screen="editor"][data-state="loading"] .skeleton { display: block; }
+[data-screen="editor"][data-state="loading"] .byline-strip,
+[data-screen="editor"][data-state="loading"] .sheet { display: none; }
+/* Skeleton fills at the exact geometry of the sheet, so nothing shifts when it
+   arrives; no placeholder text, because there is nothing to read yet. */
+[data-screen="editor"] .skel-strip { display: flex; flex-direction: column;
+  gap: 8px; padding-bottom: var(--sp-md);
+  border-bottom: 1px solid var(--border); }
+[data-screen="editor"] .skel-bar { display: block; height: 10px;
+  border-radius: var(--r-sm); background: var(--surface-muted); }
+[data-screen="editor"] .skel-bar.w-who { width: 45%; }
+[data-screen="editor"] .skel-bar.w-latest { width: 62%; }
+[data-screen="editor"] .skel-sheet { display: flex; flex-direction: column;
+  gap: var(--sp-md); padding-top: var(--sp-lg); }
+[data-screen="editor"] .skel-field { display: block;
+  border-radius: var(--r-sm); background: var(--surface-muted); }
+[data-screen="editor"] .skel-field.h-title { height: 58px; }
+[data-screen="editor"] .skel-field.h-desc { height: 51px; }
+[data-screen="editor"] .skel-field.h-body { height: 220px; max-width: 65ch; }
+[data-screen="editor"] .skel-field.h-tags { height: 34px; }
+[data-screen="editor"] .skel-field.h-button { height: 47px; width: 116px;
+  margin-top: var(--sp-sm); }
+
+/* validation-error — storybook hook beside the runtime treatment. The frame is
+   stamped last and never ran checkValidity, so .invalid keeps its hidden
+   attribute and the shared `form:has(> .invalid:not([hidden]))` rule cannot
+   fire; these two rules are what make the refused sheet reviewable. */
+[data-screen="editor"][data-state="validation-error"] .sheet .invalid {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  margin: 0; }
+[data-screen="editor"][data-state="validation-error"] .sheet .body {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 16%, transparent); }
+
+/* success — the sheet is clear and the live line has flipped to the piece that
+   was a blank field a second ago. The accent ring is a hairline, not a fill,
+   or it reads as a banner. */
+[data-screen="editor"][data-state="success"] .latest-line {
+  box-shadow: 0 0 0 1px var(--accent); }
+[data-screen="editor"][data-state="success"] .published { display: inline; }
+/* The anchor is held back one beat longer than the title: `slug` is GENERATED
+   and an unconfirmed row carries none, so `#/article/{slug}` would resolve to
+   `#/article/` — a route matchRoute rejects on the empty segment, after which
+   currentRoute() throws and takes the app down until reload. The address, the
+   underline and the arrow all arrive together when the txid confirms. */
+[data-screen="editor"] .stamp, [data-screen="editor"] .sending { display: none; }
+[data-screen="editor"] .sending { color: var(--secondary); }
+[data-screen="editor"][data-state="success"] .landing,
+[data-screen="editor"] .latest-item[data-pending="true"] .landing {
+  display: none; }
+[data-screen="editor"][data-state="success"] .stamp,
+[data-screen="editor"][data-state="success"] .sending,
+[data-screen="editor"] .latest-item[data-pending="true"] .stamp,
+[data-screen="editor"] .latest-item[data-pending="true"] .sending {
+  display: inline; }
+
+/* The storybook renders this screen in a 360px frame on a wide viewport, so
+   the narrow arrangement is a container query — a media query would read the
+   viewport and never fire. */
+@container (max-width: 420px) {
+  [data-screen="editor"] .body { min-height: 168px; }
+  [data-screen="editor"] .skel-field.h-body { height: 168px; }
+  [data-screen="editor"] .commit { flex-wrap: wrap; gap: var(--sp-sm); }
+  [data-screen="editor"] .unsaved { margin-left: 0; }
+}
+
+/* The publishing bar. :placeholder-shown is the whole mechanism — an empty
+   control still shows its placeholder, so each line reads its own field with
+   no state to keep and nothing to reset. Unmet is the resting look; met is
+   struck through and dimmed, so the list empties itself as the piece fills. */
+[data-screen="editor"] .ready { list-style: none; margin: var(--sp-lg) 0 0;
+  padding: var(--sp-md) 0 0; border-top: 1px solid var(--border);
+  display: grid; gap: 5px; max-width: 65ch; }
+[data-screen="editor"] .ready li { color: var(--primary); font-size: .8125rem;
+  display: flex; align-items: center; gap: 8px;
+  transition: color var(--motion-fast) var(--motion-ease); }
+[data-screen="editor"] .ready li::before { content: "○"; color: var(--secondary);
+  font-size: .875rem; line-height: 1; }
+/* A met line stops asking: struck, dimmed, and its mark filled. */
+/* Stated positively — :has(control:not(:placeholder-shown)) — because the
+   negation reads a control that is not on the screen as one that is filled in,
+   and a line that ticks itself for a field nobody can type into is worse than
+   no line. */
+[data-screen="editor"] .sheet:has(input[name="title"]:not(:placeholder-shown)) .ready-title,
+[data-screen="editor"] .sheet:has(textarea[name="body"]:not(:placeholder-shown)) .ready-body,
+[data-screen="editor"] .sheet:has(input[name="description"]:not(:placeholder-shown)) .ready-desc,
+[data-screen="editor"] .sheet:has(input[name="cover_url"]:not(:placeholder-shown)) .ready-cover,
+[data-screen="editor"] .sheet:has(input[name="tags"]:not(:placeholder-shown)) .ready-tags {
+  color: var(--secondary); text-decoration: line-through;
+  text-decoration-color: var(--border); }
+[data-screen="editor"] .sheet:has(input[name="title"]:not(:placeholder-shown)) .ready-title::before,
+[data-screen="editor"] .sheet:has(textarea[name="body"]:not(:placeholder-shown)) .ready-body::before,
+[data-screen="editor"] .sheet:has(input[name="description"]:not(:placeholder-shown)) .ready-desc::before,
+[data-screen="editor"] .sheet:has(input[name="cover_url"]:not(:placeholder-shown)) .ready-cover::before,
+[data-screen="editor"] .sheet:has(input[name="tags"]:not(:placeholder-shown)) .ready-tags::before {
+  content: "●"; color: var(--accent); }
+
+/* The note the shared layer hides by default. network-error is a runtime state
+   the interpreter can set on any screen, whatever the storyboard draws, so a
+   screen carrying the markup owes it a reveal. */
+[data-screen="editor"][data-state="network-error"] .offline { display: block; }

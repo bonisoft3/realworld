@@ -1,0 +1,348 @@
+<!-- article — ir: #article. One piece, read properly. The root is a one-row LIST
+     region over Article (decision-one-row-list): every other region hangs inside
+     it, which is what gives the comment form an article_id at all, and a piece
+     that has been removed leaves the region with zero rows — which sets `empty`,
+     never `gone`, so the vanished-piece copy lives in the empty frame beside the
+     region. The terminal owns the nav strip and the back stack; this fragment
+     draws only the screen. -->
+<section class="screen" data-screen="article">
+  <details class="lang-picker">
+    <summary class="lang-summary role-meta-sm">
+      <span class="sr-only" data-text="{msg.language_picker_label}">Language</span>
+      <span class="lang-globe" aria-hidden="true">🌐</span>
+      <span class="lang-current" aria-hidden="true"><i data-t="id" data-text="{msg.lang_id}">Bahasa Indonesia</i><i data-t="de" data-text="{msg.lang_de}">Deutsch</i><i data-t="en" data-text="{msg.lang_en}">English</i><i data-t="es" data-text="{msg.lang_es}">Español</i><i data-t="fr" data-text="{msg.lang_fr}">Français</i><i data-t="sw" data-text="{msg.lang_sw}">Kiswahili</i><i data-t="pt" data-text="{msg.lang_pt}">Português</i><i data-t="tr" data-text="{msg.lang_tr}">Türkçe</i><i data-t="ru" data-text="{msg.lang_ru}">Русский</i><i data-t="ur" dir="rtl" data-text="{msg.lang_ur}">اردو</i><i data-t="ar" dir="rtl" data-text="{msg.lang_ar}">العربية</i><i data-t="hi" data-text="{msg.lang_hi}">हिन्दी</i><i data-t="bn" data-text="{msg.lang_bn}">বাংলা</i><i data-t="zh" data-text="{msg.lang_zh}">中文</i><i data-t="ja" data-text="{msg.lang_ja}">日本語</i></span>
+    </summary>
+    <nav class="lang-menu" aria-label="{msg.language_picker_label}">
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="id" data-locale-current="page" lang="id" hreflang="id"><span class="lang-name" data-text="{msg.lang_id}">Bahasa Indonesia</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="de" data-locale-current="page" lang="de" hreflang="de"><span class="lang-name" data-text="{msg.lang_de}">Deutsch</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="en" data-locale-current="page" lang="en" hreflang="en"><span class="lang-name" data-text="{msg.lang_en}">English</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="es" data-locale-current="page" lang="es" hreflang="es"><span class="lang-name" data-text="{msg.lang_es}">Español</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="fr" data-locale-current="page" lang="fr" hreflang="fr"><span class="lang-name" data-text="{msg.lang_fr}">Français</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="sw" data-locale-current="page" lang="sw" hreflang="sw"><span class="lang-name" data-text="{msg.lang_sw}">Kiswahili</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="pt" data-locale-current="page" lang="pt" hreflang="pt"><span class="lang-name" data-text="{msg.lang_pt}">Português</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="tr" data-locale-current="page" lang="tr" hreflang="tr"><span class="lang-name" data-text="{msg.lang_tr}">Türkçe</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="ru" data-locale-current="page" lang="ru" hreflang="ru"><span class="lang-name" data-text="{msg.lang_ru}">Русский</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="ur" data-locale-current="page" lang="ur" hreflang="ur"><span class="lang-name" dir="rtl" data-text="{msg.lang_ur}">اردو</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="ar" data-locale-current="page" lang="ar" hreflang="ar"><span class="lang-name" dir="rtl" data-text="{msg.lang_ar}">العربية</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="hi" data-locale-current="page" lang="hi" hreflang="hi"><span class="lang-name" data-text="{msg.lang_hi}">हिन्दी</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="bn" data-locale-current="page" lang="bn" hreflang="bn"><span class="lang-name" data-text="{msg.lang_bn}">বাংলা</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="zh" data-locale-current="page" lang="zh" hreflang="zh"><span class="lang-name" data-text="{msg.lang_zh}">中文</span></a>
+      <a class="lang-item role-meta-sm" data-route="article" data-param-slug="{param.slug}" data-locale="ja" data-locale-current="page" lang="ja" hreflang="ja"><span class="lang-name" data-text="{msg.lang_ja}">日本語</span></a>
+    </nav>
+  </details>
+  <!-- How much of the piece is left, drawn by the scroller itself: a
+       scroll-driven animation, so there is no handler and nothing to run on
+       a frame. Outside every region — it measures the document, not a row. -->
+  <div class="progress" aria-hidden="true"></div>
+
+  <div class="topbar">
+    <a class="back role-meta-sm" data-route="home" data-text="{msg.back_community}">← Community</a>
+    <!-- Screen-level static markup, outside every region: it has nothing to load,
+         so the loading frame draws it as itself. It is also the one editable
+         control on this screen that is never row-scoped, so a keystroke in it
+         clears a refusal the pill or the × stranded. -->
+    <form class="search" data-form="search" data-action="navigate" data-route="search" data-param-q="{q}">
+      <input class="role-body-md" name="q" required placeholder="{msg.search_placeholder}" aria-label="{msg.search_placeholder}">
+      <button type="submit" class="outline role-meta-sm" data-text="{msg.search_button}">Search</button>
+      <p class="invalid role-meta-sm" hidden data-text="{msg.search_invalid}">Type a word to look for.</p>
+    </form>
+  </div>
+
+  <div class="skeleton" aria-hidden="true">
+    <span class="skel-bar w-title"></span>
+    <div class="skel-byline">
+      <span class="skel-avatar"></span>
+      <div class="skel-who">
+        <span class="skel-bar w-name"></span>
+        <span class="skel-bar w-handle"></span>
+      </div>
+    </div>
+    <div class="skel-controls">
+      <span class="skel-button"></span>
+      <span class="skel-pill"></span>
+    </div>
+    <div class="skel-body">
+      <span class="skel-bar"></span>
+      <span class="skel-bar"></span>
+      <span class="skel-bar"></span>
+      <span class="skel-bar"></span>
+      <span class="skel-bar w-last"></span>
+    </div>
+  </div>
+
+  <!-- Presence probe, and the only thing on this screen that can say the piece
+       has VANISHED rather than that a list came back short. It carries no
+       <template>, so the terminal drives it as a singleton region: a top-level
+       singleton whose row is missing sets `gone` (screen.js), which the region
+       below cannot express — a one-row list with zero rows reports `empty`, and
+       `empty` is a fact about a collection, not about a subject. Renders
+       nothing; the frame belongs to the gone note. -->
+  <div class="piece-probe" data-live="article" data-filter="slug=eq.{param.slug}"></div>
+
+  <!-- The gone copy is a sibling of the region, not a data-empty: static markup
+       inside a list region is swept as stale chrome on the first refresh. -->
+  <div class="gone-note">
+    <p class="gone-head role-body-md" data-text="{msg.gone_head}">That piece is gone.</p>
+    <p class="gone-sub role-meta-sm" data-text="{msg.gone_sub_article}">It may have been removed by its writer.</p>
+    <a class="gone-link role-body-md" data-route="home" data-text="{msg.read_community_cta}">Read the community →</a>
+  </div>
+
+  <div class="piece" data-live="article"
+       data-select="*,author:app_user(handle,display_name,image_url,bio)"
+       data-filter="slug=eq.{param.slug}">
+    <template data-item>
+      <article class="piece-body">
+        <h1 class="piece-title role-display-lg" data-text="{title}"></h1>
+        <p class="deck role-prose" data-text="{description}"></p>
+
+        <div class="byline-row">
+          <a class="byline role-meta-sm" data-route="profile" data-param-handle="{author.handle}">
+            <img class="avatar" src="{author.image_url}" alt="">
+            <bdi class="name" data-text="{author.display_name}"></bdi>
+            <bdi class="handle" data-text="{author.handle}"></bdi>
+          </a>
+          <time class="date role-meta-sm" datetime="{created_at}" data-text="{created_at}" data-text-format="datetime"></time>
+          <span class="read role-meta-sm" data-msg-plural="reading_minutes" data-text="{msg.reading_time}"></span>
+        </div>
+
+        <div class="cover" data-live="article" data-filter="id=eq.{id}&cover_url=not.is.null&cover_url=neq.">
+          <template data-item>
+            <figure class="cover-item">
+              <img class="cover-img" src="{cover_url}" alt="" width="1600" height="800">
+              <!-- Inside the cover region, so it exists only where a cover does;
+                   :empty collapses it for a picture with no credit, the same way
+                   an unset display name collapses in a byline. Sans: the app is
+                   attributing, not quoting. -->
+              <figcaption class="cover-credit role-meta-sm" data-text="{cover_credit}"></figcaption>
+            </figure>
+          </template>
+        </div>
+
+        <div class="controls">
+          <!-- Ownership probe: non-empty exactly when I wrote this, because Me is
+               owned on id and RLS has already answered. Both arms are SIBLINGS of
+               it — a child would be hydrated against the me row. It decides
+               exactly one thing: Edit · Delete instead of Follow. -->
+          <span class="me-probe" data-live="me" data-filter="id=eq.{author_id}">
+            <template data-item><i></i></template>
+          </span>
+
+          <span class="when-reader">
+            <!-- "Do I follow them", so the byline reads its true state on a fresh
+                 visit rather than after a press. -->
+            <span class="follow-probe" data-live="follow" data-filter="followed_id=eq.{author_id}">
+              <template data-item><i></i></template>
+            </span>
+            <form class="when-unfollowed" data-form="follow" data-entity="follow" data-action="create">
+              <input type="hidden" name="followed_id" data-value="{author_id}">
+              <button type="submit" class="act role-meta-sm"><span data-text="{msg.follow_button}"></span> <bdi data-text="{author.handle}"></bdi></button>
+              <p class="invalid role-meta-sm" hidden data-text="{msg.follow_failed}">That follow didn't take — try again.</p>
+              <p class="store-error role-meta-sm" hidden data-text="{msg.follow_failed}">That follow didn't take — try again.</p>
+            </form>
+            <!-- The retraction carries the filter: a bare sibling delete would
+                 address the article's id and remove nothing. RLS narrows the
+                 matching ids to my own follow row. Outline, never danger — a
+                 reversal is not a destruction. -->
+            <form class="when-following" data-form="unfollow" data-entity="follow" data-action="delete"
+                  data-filter="followed_id=eq.{author_id}">
+              <button type="submit" class="act outline role-meta-sm" data-text="{msg.following_button}">Following</button>
+              <p class="invalid role-meta-sm" hidden data-text="{msg.follow_failed}">That follow didn't take — try again.</p>
+              <p class="store-error role-meta-sm" hidden data-text="{msg.follow_failed}">That follow didn't take — try again.</p>
+            </form>
+          </span>
+
+          <span class="when-owner">
+            <a class="act outline role-meta-sm" data-route="edit-article" data-param-id="{id}" data-text="{msg.edit_link}">Edit</a>
+            <!-- Two-step delete, in markup and nothing else: one tap on the
+                 summary arms it, a second commits, a third closes it. The gesture
+                 takes other people's comments with the piece and no refusal
+                 message can give those back. -->
+            <details class="danger">
+              <summary class="act armer role-meta-sm" data-text="{msg.delete_summary}">Delete…</summary>
+              <form class="confirm" data-form="delete-article" data-entity="article" data-action="delete">
+                <button type="submit" class="wreck role-meta-sm" data-text="{msg.delete_confirm}">Yes, delete it permanently — its comments and favorites go too.</button>
+                <p class="invalid role-meta-sm" hidden data-text="{msg.delete_refused}">This piece isn't yours to delete.</p>
+                <p class="store-error role-meta-sm" hidden data-text="{msg.delete_refused}">This piece isn't yours to delete.</p>
+              </form>
+            </details>
+          </span>
+
+          <!-- The pill is NOT part of the ownership swap: it is the same pressable
+               control every list screen carries on this piece, and one article
+               with two affordances depending on where the reader stands is what
+               "keep every preview identical" exists to prevent. -->
+          <span class="arms">
+            <span class="fav-probe" data-live="favorite" data-filter="article_id=eq.{id}&deleted_at=is.null">
+              <template data-item><i></i></template>
+            </span>
+            <form class="when-unset" data-form="favorite" data-entity="favorite" data-action="upsert">
+              <input type="hidden" name="article_id" data-value="{id}">
+              <input type="hidden" name="deleted_at" data-value="null">
+              <button type="submit" class="pill role-meta-sm"><span class="sr-only" data-text="{msg.favorite_sr_off}">Favorite this piece —</span> ♡
+                <span class="count" data-live="article_stats" data-filter="article_id=eq.{id}"
+                      data-empty-row='{"favorite_count":0}' data-text="{favorite_count}">0</span>
+              </button>
+              <p class="invalid role-meta-sm" hidden data-text="{msg.favorite_failed}">That favourite didn't go through — try again.</p>
+              <p class="store-error role-meta-sm" hidden data-text="{msg.favorite_failed}">That favourite didn't go through — try again.</p>
+            </form>
+            <form class="when-set" data-form="unfavorite" data-entity="favorite" data-action="upsert">
+              <input type="hidden" name="article_id" data-value="{id}">
+              <input type="hidden" name="deleted_at" data-value="{now}">
+              <button type="submit" class="pill set role-meta-sm"><span class="sr-only" data-text="{msg.favorite_sr_on}">Remove this favorite —</span> ♥
+                <span class="count" data-live="article_stats" data-filter="article_id=eq.{id}"
+                      data-empty-row='{"favorite_count":0}' data-text="{favorite_count}">0</span>
+              </button>
+              <p class="invalid role-meta-sm" hidden data-text="{msg.retract_failed}">That didn't come back — try again.</p>
+              <p class="store-error role-meta-sm" hidden data-text="{msg.retract_failed}">That didn't come back — try again.</p>
+            </form>
+            <!-- Save, beside the pill and in the same family: what a reader does with a
+                 piece they have not finished. Not accent — a save is a note to
+                 yourself, not a commitment anyone else can see
+                 (ir decision-bookmark-no-public-face). Like the pill it is outside the
+                 ownership swap: your own piece is savable, because the control is the
+                 same control on every screen that lists it. -->
+            <span class="save-probe" data-live="bookmark" data-filter="article_id=eq.{id}">
+              <template data-item><i></i></template>
+            </span>
+            <form class="when-unsaved" data-form="save" data-entity="bookmark" data-action="create">
+              <input type="hidden" name="article_id" data-value="{id}">
+              <button type="submit" class="mark role-meta-sm" aria-label="{msg.save_aria_off}" data-text="{msg.save_label_off}">Save</button>
+              <p class="invalid role-meta-sm" hidden data-text="{msg.save_failed}">That save didn't take — try again.</p>
+              <p class="store-error role-meta-sm" hidden data-text="{msg.save_failed}">That save didn't take — try again.</p>
+            </form>
+            <form class="when-saved" data-form="unsave" data-entity="bookmark" data-action="delete"
+                  data-filter="article_id=eq.{id}">
+              <button type="submit" class="mark set role-meta-sm" aria-label="{msg.save_aria_on}" data-text="{msg.save_label_on}">Saved</button>
+              <p class="invalid role-meta-sm" hidden data-text="{msg.retract_failed}">That didn't come back — try again.</p>
+              <p class="store-error role-meta-sm" hidden data-text="{msg.retract_failed}">That didn't come back — try again.</p>
+            </form>
+          </span>
+        </div>
+
+        <!-- The app's most important surface. The terminal's own renderer builds
+             every node with createElement/textContent and never touches
+             innerHTML, so a body containing markup renders as the characters its
+             writer typed and a link whose scheme is not web renders as text. -->
+        <div class="body role-prose" data-text="{body}" data-text-format="markdown"></div>
+
+        <ul class="chips" data-live="article_tag" data-filter="article_id=eq.{id}" data-order="tag.asc">
+          <template data-item>
+            <li><a class="chip role-meta-sm" data-route="tag" data-param-name="{tag}" data-text="{tag}"></a></li>
+          </template>
+        </ul>
+
+        <!-- The writer, after the reading rather than before it: the byline
+             sells the piece and this sells the person. Every value is already
+             in the article row's author embed, so the card is markup and adds
+             no region (ir decision-author-card). -->
+        <aside class="writer">
+          <img class="writer-face" src="{author.image_url}" alt="">
+          <span class="writer-label role-meta-sm" data-text="{msg.written_by_label}">Written by</span>
+          <a class="writer-name role-display-md" dir="auto" data-route="profile" data-param-handle="{author.handle}" data-text="{author.display_name}"></a>
+          <a class="writer-handle role-meta-sm" dir="auto" data-route="profile" data-param-handle="{author.handle}" data-text="{author.handle}"></a>
+          <p class="writer-bio role-prose" data-text="{author.bio}"></p>
+
+          <!-- The same two arms the controls row carries, repeated where the
+               reading ends: the top of the piece is where a reader decides to
+               start, the foot is where they decide about the writer. Same form
+               names, same filters, so both places are the one contract and the
+               probes settle them together. Class names are the controls row's
+               verbatim — the sibling combinators that drive the swap are scoped
+               by parent, so one set of rules serves both. -->
+          <span class="me-probe" data-live="me" data-filter="id=eq.{author_id}">
+            <template data-item><i></i></template>
+          </span>
+          <span class="when-reader">
+            <span class="follow-probe" data-live="follow" data-filter="followed_id=eq.{author_id}">
+              <template data-item><i></i></template>
+            </span>
+            <form class="when-unfollowed" data-form="follow" data-entity="follow" data-action="create">
+              <input type="hidden" name="followed_id" data-value="{author_id}">
+              <button type="submit" class="act role-meta-sm"><span data-text="{msg.follow_button}"></span> <bdi data-text="{author.handle}"></bdi></button>
+              <p class="invalid role-meta-sm" hidden data-text="{msg.follow_failed}">That follow didn't take — try again.</p>
+              <p class="store-error role-meta-sm" hidden data-text="{msg.follow_failed}">That follow didn't take — try again.</p>
+            </form>
+            <form class="when-following" data-form="unfollow" data-entity="follow" data-action="delete"
+                  data-filter="followed_id=eq.{author_id}">
+              <button type="submit" class="act outline role-meta-sm" data-text="{msg.following_button}">Following</button>
+              <p class="invalid role-meta-sm" hidden data-text="{msg.follow_failed}">That follow didn't take — try again.</p>
+              <p class="store-error role-meta-sm" hidden data-text="{msg.follow_failed}">That follow didn't take — try again.</p>
+            </form>
+          </span>
+        </aside>
+
+        <!-- Earlier, not "more": the filter is a cursor on this piece's own
+             created_at, which excludes the piece being read by construction —
+             there is no neq to exclude it by id. Same table the screen already
+             syncs, so the strip costs a region and no new shape. -->
+        <section class="earlier" data-live="article"
+                 data-filter="author_id=eq.{author_id}&created_at=lt.{created_at}&limit=3"
+                 data-order="created_at.desc">
+          <template data-item>
+            <a class="earlier-piece" data-route="article" data-param-slug="{slug}">
+              <span class="earlier-title role-body-md" data-text="{title}"></span>
+              <span class="earlier-meta role-meta-sm">
+                <time datetime="{created_at}" data-text="{created_at}" data-text-format="datetime"></time>
+                <span class="read" data-msg-plural="reading_minutes" data-text="{msg.reading_time}"></span>
+              </span>
+            </a>
+          </template>
+        </section>
+
+        <section class="comments">
+          <h2 class="comments-label role-meta-sm" data-text="{msg.comments_label}">Comments</h2>
+
+          <!-- Above the thread, not under it: the invitation is the point of
+               this section and a reader should not have to pass everybody
+               else's reply to reach it. Inside the article row and outside the
+               comment region, so {id} is the piece's. No author field
+               (auth_uid()), no date field (now()). -->
+          <form class="comment-box" data-form="leave-comment" data-entity="comment" data-action="create">
+            <textarea class="role-prose" name="body" required maxlength="2000"
+                      placeholder="{msg.comment_placeholder}" aria-label="{msg.comment_aria}"></textarea>
+            <input type="hidden" name="article_id" data-value="{id}">
+            <button type="submit" data-text="{msg.post_comment_button}">Post comment</button>
+            <p class="invalid role-meta-sm" hidden data-text="{msg.comment_required}">Write something first.</p>
+            <p class="store-error role-meta-sm" hidden data-text="{msg.comment_store_error}">That comment didn't go through.</p>
+          </form>
+
+          <div class="comment-list" data-live="comment"
+               data-select="*,author:app_user(handle,display_name,image_url)"
+               data-filter="article_id=eq.{id}" data-order="created_at.asc"
+               data-empty="{msg.no_comments_yet}">
+            <template data-item>
+              <article class="comment">
+                <a class="byline role-meta-sm" data-route="profile" data-param-handle="{author.handle}">
+                  <img class="avatar small" src="{author.image_url}" alt="">
+                  <bdi class="name" data-text="{author.display_name}"></bdi>
+                  <bdi class="handle" data-text="{author.handle}"></bdi>
+                </a>
+                <time class="date role-meta-sm" datetime="{created_at}" data-text="{created_at}" data-text-format="datetime"></time>
+                <p class="comment-body role-prose" data-text="{body}"></p>
+                <!-- Ownership probe at depth 3: the × belongs to the reader's own
+                     comment. Its form is a PLAIN sibling with no filter — the row
+                     context here is the comment, which is already correct. -->
+                <span class="own-probe" data-live="me" data-filter="id=eq.{author_id}">
+                  <template data-item><i></i></template>
+                </span>
+                <form class="when-mine" data-form="remove-comment" data-entity="comment" data-action="delete">
+                  <button type="submit" class="remove role-meta-sm" aria-label="{msg.remove_comment_aria}">×</button>
+                  <p class="invalid role-meta-sm" hidden data-text="{msg.comment_delete_refused}">Only the person who wrote it can remove it.</p>
+                  <p class="store-error role-meta-sm" hidden data-text="{msg.comment_delete_refused}">Only the person who wrote it can remove it.</p>
+                </form>
+              </article>
+            </template>
+          </div>
+
+          <!-- Storybook stand-in for the sentence the region appends at runtime;
+               the fixture tier gives every list three rows, so the no-comments
+               frame has no other way to show its own copy. Revealed only inside
+               a storybook frame — see the CSS. -->
+          <p class="quiet-note" data-text="{msg.no_comments_yet}">No one has said anything yet. Say the first thing.</p>
+        </section>
+      </article>
+    </template>
+  </div>
+
+  <p class="offline" data-text="{msg.offline}">Conduit isn't answering. It keeps trying — this will fill in when it does.</p>
+</section>

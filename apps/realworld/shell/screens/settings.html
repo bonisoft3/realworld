@@ -1,0 +1,108 @@
+<!-- settings — ir: #settings. The one route with no :param that still has to
+     know who is asking: Me is a top-level one-row list (RLS narrows it to my
+     row) nesting a leaf app_user singleton, so the update form has a real row
+     context and needs no hidden id. No sign-out button and no picture upload —
+     the terminal owns the first and the second does not exist
+     (ir decision-terminal-chrome). No search box: a stray submit here would
+     navigate away from unsent text. -->
+<section class="screen" data-screen="settings">
+  <details class="lang-picker">
+    <summary class="lang-summary role-meta-sm">
+      <span class="sr-only" data-text="{msg.language_picker_label}">Language</span>
+      <span class="lang-globe" aria-hidden="true">🌐</span>
+      <span class="lang-current" aria-hidden="true"><i data-t="id" data-text="{msg.lang_id}">Bahasa Indonesia</i><i data-t="de" data-text="{msg.lang_de}">Deutsch</i><i data-t="en" data-text="{msg.lang_en}">English</i><i data-t="es" data-text="{msg.lang_es}">Español</i><i data-t="fr" data-text="{msg.lang_fr}">Français</i><i data-t="sw" data-text="{msg.lang_sw}">Kiswahili</i><i data-t="pt" data-text="{msg.lang_pt}">Português</i><i data-t="tr" data-text="{msg.lang_tr}">Türkçe</i><i data-t="ru" data-text="{msg.lang_ru}">Русский</i><i data-t="ur" dir="rtl" data-text="{msg.lang_ur}">اردو</i><i data-t="ar" dir="rtl" data-text="{msg.lang_ar}">العربية</i><i data-t="hi" data-text="{msg.lang_hi}">हिन्दी</i><i data-t="bn" data-text="{msg.lang_bn}">বাংলা</i><i data-t="zh" data-text="{msg.lang_zh}">中文</i><i data-t="ja" data-text="{msg.lang_ja}">日本語</i></span>
+    </summary>
+    <nav class="lang-menu" aria-label="{msg.language_picker_label}">
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="id" data-locale-current="page" lang="id" hreflang="id"><span class="lang-name" data-text="{msg.lang_id}">Bahasa Indonesia</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="de" data-locale-current="page" lang="de" hreflang="de"><span class="lang-name" data-text="{msg.lang_de}">Deutsch</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="en" data-locale-current="page" lang="en" hreflang="en"><span class="lang-name" data-text="{msg.lang_en}">English</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="es" data-locale-current="page" lang="es" hreflang="es"><span class="lang-name" data-text="{msg.lang_es}">Español</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="fr" data-locale-current="page" lang="fr" hreflang="fr"><span class="lang-name" data-text="{msg.lang_fr}">Français</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="sw" data-locale-current="page" lang="sw" hreflang="sw"><span class="lang-name" data-text="{msg.lang_sw}">Kiswahili</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="pt" data-locale-current="page" lang="pt" hreflang="pt"><span class="lang-name" data-text="{msg.lang_pt}">Português</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="tr" data-locale-current="page" lang="tr" hreflang="tr"><span class="lang-name" data-text="{msg.lang_tr}">Türkçe</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="ru" data-locale-current="page" lang="ru" hreflang="ru"><span class="lang-name" data-text="{msg.lang_ru}">Русский</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="ur" data-locale-current="page" lang="ur" hreflang="ur"><span class="lang-name" dir="rtl" data-text="{msg.lang_ur}">اردو</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="ar" data-locale-current="page" lang="ar" hreflang="ar"><span class="lang-name" dir="rtl" data-text="{msg.lang_ar}">العربية</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="hi" data-locale-current="page" lang="hi" hreflang="hi"><span class="lang-name" data-text="{msg.lang_hi}">हिन्दी</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="bn" data-locale-current="page" lang="bn" hreflang="bn"><span class="lang-name" data-text="{msg.lang_bn}">বাংলা</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="zh" data-locale-current="page" lang="zh" hreflang="zh"><span class="lang-name" data-text="{msg.lang_zh}">中文</span></a>
+      <a class="lang-item role-meta-sm" data-route="settings" data-locale="ja" data-locale-current="page" lang="ja" hreflang="ja"><span class="lang-name" data-text="{msg.lang_ja}">日本語</span></a>
+    </nav>
+  </details>
+  <header class="masthead">
+    <a class="back role-meta-sm" data-route="home"><span class="under" data-text="{msg.back_community}">← Community</span></a>
+    <h1 class="masthead-title role-body-md" data-text="{msg.settings_title}">Settings</h1>
+  </header>
+
+  <!-- Values only: the three field labels are static chrome that never loads,
+       so the loading frame draws them as themselves. -->
+  <div class="skeleton" aria-hidden="true">
+    <div class="skel-strip">
+      <span class="skel-avatar"></span>
+      <span class="skel-bar skel-name"></span>
+      <span class="skel-bar skel-handle"></span>
+      <span class="skel-bar skel-link"></span>
+    </div>
+    <p class="field-label role-meta-sm" data-text="{msg.display_name_label}">Display name</p>
+    <span class="skel-bar skel-input"></span>
+    <p class="field-label role-meta-sm" data-text="{msg.about_label}">About</p>
+    <span class="skel-bar skel-area"></span>
+    <p class="field-label role-meta-sm" data-text="{msg.picture_link_label}">Picture link</p>
+    <span class="skel-bar skel-input skel-short"></span>
+    <span class="skel-bar skel-button"></span>
+  </div>
+
+  <div class="sheet" data-live="me">
+    <template data-item>
+      <div class="me">
+        <a class="public-link role-meta-sm" data-route="profile" data-param-handle="{handle}"><span class="under" data-text="{msg.view_public_page}">View your public page</span> <span class="arrow" aria-hidden="true">→</span></a>
+
+        <!-- Nested in the Me item, so no screen state stands for it: the
+             sheet around it stays drawn whatever this finds. The FK from me.id
+             is what makes a visible Me without its app_user row a case nothing
+             reaches; the sentence is the one the editor's byline already
+             gives the same fact. -->
+        <div class="you" data-live="app_user" data-filter="id=eq.{id}"
+             data-empty="{msg.session_gone}">
+          <div class="strip">
+            <img class="avatar" src="{image_url}" alt="">
+            <p class="name role-prose" dir="auto" data-text="{display_name}"></p>
+            <p class="handle role-meta-sm"><bdi data-text="{handle}"></bdi> <span data-text="{msg.handles_given_not_chosen}"></span></p>
+          </div>
+
+          <form class="profile-form" data-form="edit-profile" data-entity="app_user" data-action="update">
+            <label class="field">
+              <span class="field-label role-meta-sm" data-text="{msg.display_name_label}">Display name</span>
+              <input class="role-prose" type="text" name="display_name" maxlength="60"
+                     placeholder="{msg.name_placeholder}" value="{display_name}">
+            </label>
+            <label class="field">
+              <span class="field-label role-meta-sm" data-text="{msg.about_label}">About</span>
+              <textarea class="role-prose about" name="bio" maxlength="300"
+                        placeholder="{msg.bio_placeholder}" data-value="{bio}"></textarea>
+            </label>
+            <label class="field">
+              <span class="field-label role-meta-sm" data-text="{msg.picture_link_label}">Picture link</span>
+              <input class="role-meta-sm" type="text" name="image_url" maxlength="2048"
+                     placeholder="{msg.picture_placeholder}" value="{image_url}">
+            </label>
+            <p class="field-help role-meta-sm" data-text="{msg.picture_help}">A link to a picture on the web. Conduit takes no uploads.</p>
+            <div class="save-row">
+              <button class="role-body-md" type="submit" data-text="{msg.save_label_off}">Save</button>
+              <p class="saved role-meta-sm" data-text="{msg.saved_note}">Saved.</p>
+            </div>
+            <p class="invalid" hidden data-text="{msg.settings_invalid}">That is longer than this field takes — trim it and try again.</p>
+            <p class="store-error" hidden data-text="{msg.settings_store_error}">That didn't save. Nothing was changed — press Save again.</p>
+          </form>
+
+          <p class="saved-note role-meta-sm" data-text="{msg.propagates_note}">Every byline, comment and preview now reads your new name.</p>
+        </div>
+
+        <p class="signout-note role-meta-sm" data-text="{msg.signout_hint}">Sign out is in the bar above, beside your handle.</p>
+      </div>
+    </template>
+  </div>
+
+  <p class="offline" data-text="{msg.offline}">Conduit isn't answering. It keeps trying — this will fill in when it does.</p>
+</section>
