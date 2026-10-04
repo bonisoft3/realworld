@@ -4,7 +4,6 @@
   "chrome_signin_guest": "Continuer en tant qu'invité",
   "chrome_signin_failed": "Cela n'a pas fonctionné. Réessayez.",
   "chrome_signout": "se déconnecter",
-
   "brand_name": "Conduit",
   "search_placeholder": "Rechercher sur Conduit",
   "search_button": "Rechercher",
@@ -17,7 +16,6 @@
   "back_piece": "← Retour à l'article",
   "read_community_cta": "Lire la communauté →",
   "popular_tags_cta": "Tags populaires →",
-
   "favorite_aria_off": "Mettre cet article en favori",
   "favorite_aria_on": "Retirer ce favori",
   "favorite_failed": "Ce favori n'a pas été enregistré — réessayez.",
@@ -27,7 +25,6 @@
   "save_label_on": "Enregistré",
   "save_aria_off": "Enregistrer cet article pour plus tard",
   "save_aria_on": "Enregistré — retirer de votre liste de lecture",
-
   "follow_button": "Suivre",
   "following_button": "Abonné",
   "follow_failed": "Cet abonnement n'a pas fonctionné — réessayez.",
@@ -39,7 +36,6 @@
   "ceiling_search": "Les 20 plus récents. Utilisez la recherche pour trouver un article plus ancien.",
   "ceiling_narrow": "Les 20 plus récents. Affinez avec une recherche ou un autre tag.",
   "gone_head": "Cet article a disparu.",
-
   "language_picker_label": "Langue",
   "lang_en": "English",
   "lang_zh": "中文",
@@ -56,42 +52,33 @@
   "lang_ja": "日本語",
   "lang_sw": "Kiswahili",
   "lang_tr": "Türkçe",
-
   "nav_home": "Communauté",
   "home_tagline": "Un endroit pour lire et écrire, en public.",
   "home_list_empty": "Rien n'a encore été écrit ici. Le vôtre pourrait être le premier — Nouvel article se trouve dans la barre ci-dessus.",
   "popular_tags_label": "Tags populaires",
   "tags_empty": "Les tags apparaissent dès qu'un auteur en tape un.",
-
   "nav_feed": "Votre fil",
   "feed_quiet_lede": "Votre fil est silencieux.",
   "feed_quiet_body": "Il se remplit avec les auteurs que vous suivez. Lisez la communauté, trouvez quelqu'un qui vaut le détour et appuyez sur Suivre sur sa page.",
-
   "older_title": "Articles plus anciens",
   "older_gloss": "Tout ce qui a été publié avant l'article que vous lisiez",
   "older_end_line": "Vous êtes arrivé au début.",
   "older_end_sub": "Rien n'a été publié avant cela.",
   "back_newest_cta": "Retour aux plus récents →",
-
   "feed_older_title": "Plus ancien dans votre fil",
   "feed_older_gloss": "Les auteurs que vous suivez, avant l'article que vous lisiez",
   "feed_older_end_line": "Vous êtes arrivé au début de votre fil.",
   "feed_older_end_sub": "Rien de plus ancien chez les auteurs que vous suivez.",
   "back_feed_cta": "Retour à Votre fil →",
-
   "nav_reading_list": "Enregistrés",
   "reading_list_lede": "Rien qu'à vous. Enregistrer est privé — aucun compteur ne bouge et personne n'est informé.",
   "reading_list_empty": "Rien n'est encore enregistré. Enregistrer se trouve à côté du cœur sur chaque article ; ce que vous y mettez vous attend ici.",
   "reading_list_ceiling": "Les 20 plus récents. Les enregistrements plus anciens vont plus loin qu'une liste ne devrait aller.",
-
   "no_favorites_yet": "Aucun favori pour l'instant. Un cœur sur un article l'amène ici.",
-
   "tag_nothing": "Rien n'est encore classé sous ce tag.",
   "tag_nothing_sub": "Un tag existe parce qu'un article le porte — le premier article à le porter démarre la liste.",
-
   "search_nothing": "Rien ne correspond à votre recherche.",
   "search_nothing_sub": "Essayez moins de mots, ou un tag.",
-
   "nav_editor": "Nouvel article",
   "writing_as_label": "Vous écrivez en tant que",
   "session_gone": "Cette session appartient à un compte qui n'est plus là. Déconnectez-vous et reconnectez-vous.",
@@ -122,7 +109,6 @@
   "ready_tags": "Un tag ou deux, pour qu'il puisse être trouvé",
   "publish_button": "Publier",
   "published_note": "Publié.",
-
   "settings_title": "Paramètres",
   "view_public_page": "Voir votre page publique",
   "display_name_label": "Nom affiché",
@@ -138,7 +124,6 @@
   "saved_note": "Enregistré.",
   "propagates_note": "Chaque signature, commentaire et aperçu affiche désormais votre nouveau nom.",
   "signout_hint": "Se déconnecter se trouve dans la barre du haut, à côté de votre identifiant.",
-
   "gone_sub_article": "Il a peut-être été retiré par son auteur.",
   "favorite_sr_off": "Mettre cet article en favori —",
   "favorite_sr_on": "Retirer ce favori —",
@@ -156,17 +141,12 @@
   "no_comments_yet": "Personne n'a encore rien dit. Soyez le premier.",
   "remove_comment_aria": "Supprimer ce commentaire",
   "comment_delete_refused": "Seule la personne qui l'a écrit peut le supprimer.",
-
   "edit_article_title": "Modifier",
   "gone_sub_edit": "Il a été supprimé, il ne reste donc rien à réviser.",
   "revising_label": "Révision · publié",
   "slug_hint": "Changez le titre et son adresse change avec lui.",
   "read_it_cta": "Le lire →",
-  "reading_time": {
-    "one": "{reading_minutes} minute de lecture",
-    "many": "{reading_minutes} minutes de lecture",
-    "other": "{reading_minutes} minutes de lecture"
-  },
+  "reading_time": "{reading_minutes, plural, one {{reading_minutes} minute de lecture} many {{reading_minutes} minutes de lecture} other {{reading_minutes} minutes de lecture}}",
   "saving_suffix": "· enregistrement",
   "article_title_placeholder": "Titre de l'article",
   "about_line_placeholder": "De quoi ça parle ? Une ligne.",

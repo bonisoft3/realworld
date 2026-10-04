@@ -4,7 +4,6 @@
   "chrome_signin_guest": "Misafir olarak devam et",
   "chrome_signin_failed": "Bu işlem gerçekleşmedi. Tekrar dene.",
   "chrome_signout": "çıkış yap",
-
   "brand_name": "Conduit",
   "search_placeholder": "Conduit'te ara",
   "search_button": "Ara",
@@ -17,7 +16,6 @@
   "back_piece": "← Yazıya dön",
   "read_community_cta": "Topluluğu oku →",
   "popular_tags_cta": "Popüler etiketler →",
-
   "favorite_aria_off": "Bu yazıyı favorile",
   "favorite_aria_on": "Favoriden kaldır",
   "favorite_failed": "Favoriye eklenemedi — tekrar dene.",
@@ -27,7 +25,6 @@
   "save_label_on": "Kaydedildi",
   "save_aria_off": "Bu yazıyı sonra okumak için kaydet",
   "save_aria_on": "Kaydedildi — okuma listenden çıkar",
-
   "follow_button": "Takip et",
   "following_button": "Takip ediliyor",
   "follow_failed": "Takip işlemi gerçekleşmedi — tekrar dene.",
@@ -39,7 +36,6 @@
   "ceiling_search": "En yeni 20 yazı gösteriliyor. Daha eski bir yazı bulmak için ara.",
   "ceiling_narrow": "En yeni 20 yazı gösteriliyor. Bir arama ya da başka bir etiketle daralt.",
   "gone_head": "Bu yazı artık yok.",
-
   "language_picker_label": "Dil",
   "lang_en": "English",
   "lang_zh": "中文",
@@ -56,42 +52,33 @@
   "lang_ja": "日本語",
   "lang_sw": "Kiswahili",
   "lang_tr": "Türkçe",
-
   "nav_home": "Topluluk",
   "home_tagline": "Herkese açık okuma ve yazma yeri.",
   "home_list_empty": "Burada henüz bir şey yazılmadı. İlk yazı seninki olabilir — Yeni Yazı, yukarıdaki çubukta.",
   "popular_tags_label": "Popüler etiketler",
   "tags_empty": "Bir yazar bir etiket yazar yazmaz burada görünür.",
-
   "nav_feed": "Akışın",
   "feed_quiet_lede": "Akışın sessiz.",
   "feed_quiet_body": "Takip ettiğin yazarlarla dolar. Topluluğu oku, dinlemeye değer birini bul ve sayfasında Takip Et'e bas.",
-
   "older_title": "Daha eski yazılar",
   "older_gloss": "Okuduğun yazıdan önce yayımlanan her şey",
   "older_end_line": "Başa ulaştın.",
   "older_end_sub": "Bundan önce hiçbir şey yayımlanmadı.",
   "back_newest_cta": "En yenilere dön →",
-
   "feed_older_title": "Akışındaki eski yazılar",
   "feed_older_gloss": "Takip ettiğin yazarların, okuduğun yazıdan önceki yazıları",
   "feed_older_end_line": "Akışının başına ulaştın.",
   "feed_older_end_sub": "Takip ettiğin yazarlardan daha eskisi yok.",
   "back_feed_cta": "Akışına dön →",
-
   "nav_reading_list": "Kaydedilenler",
   "reading_list_lede": "Sadece sana ait. Kaydetmek gizlidir — hiçbir sayaç değişmez, kimseye haber verilmez.",
   "reading_list_empty": "Henüz bir şey kaydedilmedi. Kaydet düğmesi her yazıda kalbin yanında; oraya koyduğun her şey burada seni bekler.",
   "reading_list_ceiling": "En yeni 20 kayıt gösteriliyor. Daha eski kayıtlar bir listenin gitmesi gerekenden daha aşağıda kalır.",
-
   "no_favorites_yet": "Henüz favori yok. Herhangi bir yazıdaki kalp onu buraya getirir.",
-
   "tag_nothing": "Bu etiket altında henüz bir şey yok.",
   "tag_nothing_sub": "Bir etiket, onu taşıyan bir yazı olduğu için var olur — onu ilk taşıyan yazı listeyi başlatır.",
-
   "search_nothing": "Aramanla eşleşen bir şey yok.",
   "search_nothing_sub": "Daha az kelimeyle ya da bir etiketle dene.",
-
   "nav_editor": "Yeni Yazı",
   "writing_as_label": "Şu isimle yazıyorsun:",
   "session_gone": "Bu oturum artık burada olmayan bir hesaba ait. Çıkış yapıp tekrar giriş yap.",
@@ -122,7 +109,6 @@
   "ready_tags": "Bulunabilmesi için bir iki etiket",
   "publish_button": "Yayımla",
   "published_note": "Yayımlandı.",
-
   "settings_title": "Ayarlar",
   "view_public_page": "Herkese açık sayfanı görüntüle",
   "display_name_label": "Görünen ad",
@@ -138,7 +124,6 @@
   "saved_note": "Kaydedildi.",
   "propagates_note": "Artık her imza, yorum ve önizleme yeni adını gösteriyor.",
   "signout_hint": "Çıkış yap, yukarıdaki çubukta, kullanıcı adının yanında.",
-
   "gone_sub_article": "Yazarı tarafından kaldırılmış olabilir.",
   "favorite_sr_off": "Bu yazıyı favorile —",
   "favorite_sr_on": "Favoriden kaldır —",
@@ -156,16 +141,12 @@
   "no_comments_yet": "Henüz kimse bir şey söylemedi. İlk sen ol.",
   "remove_comment_aria": "Bu yorumu kaldır",
   "comment_delete_refused": "Sadece yazan kişi kaldırabilir.",
-
   "edit_article_title": "Düzenle",
   "gone_sub_edit": "Silindi, düzenlenecek bir şey kalmadı.",
   "revising_label": "Düzenleniyor · yayımlandı",
   "slug_hint": "Başlığı değiştir, adresi de onunla değişir.",
   "read_it_cta": "Oku →",
-  "reading_time": {
-    "one": "{reading_minutes} dakikalık okuma",
-    "other": "{reading_minutes} dakikalık okuma"
-  },
+  "reading_time": "{reading_minutes, plural, one {{reading_minutes} dakikalık okuma} other {{reading_minutes} dakikalık okuma}}",
   "saving_suffix": "· kaydediliyor",
   "article_title_placeholder": "Yazı başlığı",
   "about_line_placeholder": "Bu ne hakkında? Tek satır.",

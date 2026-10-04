@@ -4,7 +4,6 @@
   "chrome_signin_guest": "以访客身份继续",
   "chrome_signin_failed": "没有成功,请再试一次。",
   "chrome_signout": "退出登录",
-
   "brand_name": "Conduit",
   "search_placeholder": "搜索 Conduit",
   "search_button": "搜索",
@@ -17,7 +16,6 @@
   "back_piece": "← 返回文章",
   "read_community_cta": "去看看社区 →",
   "popular_tags_cta": "热门标签 →",
-
   "favorite_aria_off": "收藏这篇文章",
   "favorite_aria_on": "取消收藏",
   "favorite_failed": "收藏没有成功——请再试一次。",
@@ -27,7 +25,6 @@
   "save_label_on": "已保存",
   "save_aria_off": "保存这篇文章,稍后再读",
   "save_aria_on": "已保存——从稍后阅读列表中移除",
-
   "follow_button": "关注",
   "following_button": "已关注",
   "follow_failed": "关注没有成功——请再试一次。",
@@ -39,7 +36,6 @@
   "ceiling_search": "已显示最新的 20 篇。用搜索查找更早的文章。",
   "ceiling_narrow": "已显示最新的 20 篇。用搜索或其他标签缩小范围。",
   "gone_head": "这篇文章已经不在了。",
-
   "language_picker_label": "语言",
   "lang_en": "English",
   "lang_zh": "中文",
@@ -56,42 +52,33 @@
   "lang_ja": "日本語",
   "lang_sw": "Kiswahili",
   "lang_tr": "Türkçe",
-
   "nav_home": "社区",
   "home_tagline": "一个公开阅读与写作的地方。",
   "home_list_empty": "这里还没有人写点什么。也许你能写第一篇——上方工具栏里就有「新建文章」。",
   "popular_tags_label": "热门标签",
   "tags_empty": "只要有人写下一个标签,它就会出现在这里。",
-
   "nav_feed": "我的关注",
   "feed_quiet_lede": "你的关注列表还很安静。",
   "feed_quiet_body": "关注的作者写的文章会出现在这里。去社区看看,找一个值得关注的人,在TA的主页上点下「关注」。",
-
   "older_title": "更早的文章",
   "older_gloss": "你正在读的这篇文章之前发布的所有内容",
   "older_end_line": "已经到最开始了。",
   "older_end_sub": "在这之前没有发布过任何内容。",
   "back_newest_cta": "回到最新 →",
-
   "feed_older_title": "关注列表中更早的内容",
   "feed_older_gloss": "你关注的作者,在你正在读的这篇文章之前的内容",
   "feed_older_end_line": "已经到你关注列表的最开始了。",
   "feed_older_end_sub": "你关注的作者没有更早的内容了。",
   "back_feed_cta": "回到我的关注 →",
-
   "nav_reading_list": "已保存",
   "reading_list_lede": "只有你能看到。保存是私密的——不会影响任何计数,也不会通知任何人。",
   "reading_list_empty": "还没有保存任何内容。每篇文章的爱心旁边就是保存按钮;保存的内容都会出现在这里。",
   "reading_list_ceiling": "已显示最新的 20 条。更早保存的内容不会再往下显示了。",
-
   "no_favorites_yet": "还没有收藏。在任意文章上点爱心,它就会出现在这里。",
-
   "tag_nothing": "这个标签下还没有内容。",
   "tag_nothing_sub": "标签因文章使用它而存在——第一篇使用这个标签的文章会开启这份列表。",
-
   "search_nothing": "没有找到匹配的内容。",
   "search_nothing_sub": "试试更少的词,或者换一个标签。",
-
   "nav_editor": "新建文章",
   "writing_as_label": "当前身份:",
   "session_gone": "这个登录状态所属的账号已经不存在了。请退出后重新登录。",
@@ -122,7 +109,6 @@
   "ready_tags": "一两个标签,方便别人找到它",
   "publish_button": "发布",
   "published_note": "已发布。",
-
   "settings_title": "设置",
   "view_public_page": "查看你的公开主页",
   "display_name_label": "显示名称",
@@ -138,7 +124,6 @@
   "saved_note": "已保存。",
   "propagates_note": "现在每个署名、评论和预览都会显示你的新名字。",
   "signout_hint": "退出登录在上方工具栏里,就在你的用户名旁边。",
-
   "gone_sub_article": "它可能已经被作者删除了。",
   "favorite_sr_off": "收藏这篇文章 —",
   "favorite_sr_on": "取消收藏 —",
@@ -156,15 +141,12 @@
   "no_comments_yet": "还没有人评论,来抢个沙发吧。",
   "remove_comment_aria": "删除这条评论",
   "comment_delete_refused": "只有发布者本人才能删除这条评论。",
-
   "edit_article_title": "编辑",
   "gone_sub_edit": "它已经被删除,没有内容可以修改了。",
   "revising_label": "编辑中 · 发布于",
   "slug_hint": "修改标题,链接地址也会随之变化。",
   "read_it_cta": "去阅读 →",
-  "reading_time": {
-    "other": "阅读需 {reading_minutes} 分钟"
-  },
+  "reading_time": "{reading_minutes, plural, other {阅读需 {reading_minutes} 分钟}}",
   "saving_suffix": "· 保存中",
   "article_title_placeholder": "文章标题",
   "about_line_placeholder": "这篇文章讲什么?一句话概括。",

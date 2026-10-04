@@ -4,7 +4,6 @@
   "chrome_signin_guest": "Continuar como invitado",
   "chrome_signin_failed": "Eso no funcionó. Inténtalo de nuevo.",
   "chrome_signout": "cerrar sesión",
-
   "brand_name": "Conduit",
   "search_placeholder": "Buscar en Conduit",
   "search_button": "Buscar",
@@ -17,7 +16,6 @@
   "back_piece": "← Volver al artículo",
   "read_community_cta": "Leer la comunidad →",
   "popular_tags_cta": "Etiquetas populares →",
-
   "favorite_aria_off": "Marcar como favorito",
   "favorite_aria_on": "Quitar de favoritos",
   "favorite_failed": "Ese favorito no se guardó — inténtalo de nuevo.",
@@ -27,7 +25,6 @@
   "save_label_on": "Guardado",
   "save_aria_off": "Guardar este artículo para leer después",
   "save_aria_on": "Guardado — quitar de tu lista de lectura",
-
   "follow_button": "Seguir",
   "following_button": "Siguiendo",
   "follow_failed": "Ese seguimiento no se realizó — inténtalo de nuevo.",
@@ -39,7 +36,6 @@
   "ceiling_search": "Mostrando los 20 más recientes. Busca para encontrar un artículo más antiguo.",
   "ceiling_narrow": "Mostrando los 20 más recientes. Acota con una búsqueda u otra etiqueta.",
   "gone_head": "Ese artículo ya no existe.",
-
   "language_picker_label": "Idioma",
   "lang_en": "English",
   "lang_zh": "中文",
@@ -56,42 +52,33 @@
   "lang_ja": "日本語",
   "lang_sw": "Kiswahili",
   "lang_tr": "Türkçe",
-
   "nav_home": "Comunidad",
   "home_tagline": "Un lugar para leer y escribir, en público.",
   "home_list_empty": "Todavía no se ha escrito nada aquí. El tuyo podría ser el primero — Nuevo artículo está en la barra de arriba.",
   "popular_tags_label": "Etiquetas populares",
   "tags_empty": "Las etiquetas aparecen en cuanto alguien escribe una.",
-
   "nav_feed": "Tu Feed",
   "feed_quiet_lede": "Tu feed está tranquilo.",
   "feed_quiet_body": "Se llena con los autores que sigues. Lee la comunidad, encuentra a alguien que valga la pena seguir y pulsa Seguir en su página.",
-
   "older_title": "Textos anteriores",
   "older_gloss": "Todo lo publicado antes del artículo que estabas leyendo",
   "older_end_line": "Has llegado al principio.",
   "older_end_sub": "No se publicó nada antes de esto.",
   "back_newest_cta": "Volver a lo más reciente →",
-
   "feed_older_title": "Anteriores en tu feed",
   "feed_older_gloss": "Los autores que sigues, antes del artículo que estabas leyendo",
   "feed_older_end_line": "Has llegado al principio de tu feed.",
   "feed_older_end_sub": "No hay nada más antiguo de los autores que sigues.",
   "back_feed_cta": "Volver a Tu Feed →",
-
   "nav_reading_list": "Guardados",
   "reading_list_lede": "Solo tuya. Guardar es privado — ningún contador se mueve y a nadie se le avisa.",
   "reading_list_empty": "Todavía no hay nada guardado. Guardar está junto al corazón en cada artículo; lo que guardes ahí te espera aquí.",
   "reading_list_ceiling": "Mostrando los 20 más recientes. Los guardados más antiguos quedan más abajo de lo que una lista debería llegar.",
-
   "no_favorites_yet": "Todavía no hay favoritos. Un corazón en cualquier artículo lo trae aquí.",
-
   "tag_nothing": "Todavía no hay nada bajo esta etiqueta.",
   "tag_nothing_sub": "Una etiqueta existe porque un artículo la lleva — el primero en llevar esta empieza la lista.",
-
   "search_nothing": "Nada coincide con tu búsqueda.",
   "search_nothing_sub": "Prueba con menos palabras, o con una etiqueta.",
-
   "nav_editor": "Nuevo artículo",
   "writing_as_label": "Escribiendo como",
   "session_gone": "Esta sesión pertenece a una cuenta que ya no está aquí. Cierra sesión y vuelve a entrar.",
@@ -122,7 +109,6 @@
   "ready_tags": "Una etiqueta o dos, para que se pueda encontrar",
   "publish_button": "Publicar",
   "published_note": "Publicado.",
-
   "settings_title": "Ajustes",
   "view_public_page": "Ver tu página pública",
   "display_name_label": "Nombre visible",
@@ -138,7 +124,6 @@
   "saved_note": "Guardado.",
   "propagates_note": "Cada firma, comentario y vista previa ahora muestra tu nuevo nombre.",
   "signout_hint": "Cerrar sesión está en la barra de arriba, junto a tu identificador.",
-
   "gone_sub_article": "Puede que su autor lo haya eliminado.",
   "favorite_sr_off": "Marcar como favorito —",
   "favorite_sr_on": "Quitar de favoritos —",
@@ -156,17 +141,12 @@
   "no_comments_yet": "Todavía nadie ha dicho nada. Sé el primero.",
   "remove_comment_aria": "Eliminar este comentario",
   "comment_delete_refused": "Solo quien lo escribió puede eliminarlo.",
-
   "edit_article_title": "Editar",
   "gone_sub_edit": "Se eliminó, así que no queda nada que revisar.",
   "revising_label": "Revisando · publicado",
   "slug_hint": "Cambia el título y su dirección cambia con él.",
   "read_it_cta": "Leerlo →",
-  "reading_time": {
-    "one": "Lectura de {reading_minutes} minuto",
-    "many": "Lectura de {reading_minutes} minutos",
-    "other": "Lectura de {reading_minutes} minutos"
-  },
+  "reading_time": "{reading_minutes, plural, one {Lectura de {reading_minutes} minuto} many {Lectura de {reading_minutes} minutos} other {Lectura de {reading_minutes} minutos}}",
   "saving_suffix": "· guardando",
   "article_title_placeholder": "Título del artículo",
   "about_line_placeholder": "¿De qué trata? Una línea.",

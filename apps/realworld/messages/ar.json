@@ -4,7 +4,6 @@
   "chrome_signin_guest": "المتابعة كضيف",
   "chrome_signin_failed": "لم تنجح العملية. حاول مرة أخرى.",
   "chrome_signout": "تسجيل الخروج",
-
   "brand_name": "Conduit",
   "search_placeholder": "ابحث في Conduit",
   "search_button": "بحث",
@@ -17,7 +16,6 @@
   "back_piece": "← العودة إلى المقال",
   "read_community_cta": "اقرأ المجتمع ←",
   "popular_tags_cta": "الوسوم الشائعة ←",
-
   "favorite_aria_off": "أضف هذا المقال إلى المفضلة",
   "favorite_aria_on": "أزل من المفضلة",
   "favorite_failed": "لم تُحفظ الإضافة إلى المفضلة — حاول مرة أخرى.",
@@ -27,7 +25,6 @@
   "save_label_on": "محفوظ",
   "save_aria_off": "احفظ هذا المقال لقراءته لاحقًا",
   "save_aria_on": "محفوظ — أزل من قائمة القراءة",
-
   "follow_button": "متابعة",
   "following_button": "تتابعه",
   "follow_failed": "لم تنجح المتابعة — حاول مرة أخرى.",
@@ -39,7 +36,6 @@
   "ceiling_search": "تُعرض أحدث 20 مقالًا. استخدم البحث للعثور على مقال أقدم.",
   "ceiling_narrow": "تُعرض أحدث 20 مقالًا. ضيّق النطاق ببحث أو وسم آخر.",
   "gone_head": "هذا المقال لم يعد موجودًا.",
-
   "language_picker_label": "اللغة",
   "lang_en": "English",
   "lang_zh": "中文",
@@ -56,42 +52,33 @@
   "lang_ja": "日本語",
   "lang_sw": "Kiswahili",
   "lang_tr": "Türkçe",
-
   "nav_home": "المجتمع",
   "home_tagline": "مكان للقراءة والكتابة، على الملأ.",
   "home_list_empty": "لم يُكتب هنا شيء بعد. قد يكون مقالك الأول — مقال جديد موجود في الشريط أعلاه.",
   "popular_tags_label": "الوسوم الشائعة",
   "tags_empty": "تظهر الوسوم بمجرد أن يكتب أحد الكتّاب واحدًا منها.",
-
   "nav_feed": "موجزك",
   "feed_quiet_lede": "موجزك هادئ.",
   "feed_quiet_body": "يمتلئ بالكتّاب الذين تتابعهم. اقرأ المجتمع، اعثر على كاتب يستحق المتابعة، واضغط متابعة في صفحته.",
-
   "older_title": "مقالات أقدم",
   "older_gloss": "كل ما نُشر قبل المقال الذي كنت تقرؤه",
   "older_end_line": "لقد وصلت إلى البداية.",
   "older_end_sub": "لم يُنشر شيء قبل هذا.",
   "back_newest_cta": "العودة إلى الأحدث ←",
-
   "feed_older_title": "أقدم في موجزك",
   "feed_older_gloss": "الكتّاب الذين تتابعهم، قبل المقال الذي كنت تقرؤه",
   "feed_older_end_line": "لقد وصلت إلى بداية موجزك.",
   "feed_older_end_sub": "لا يوجد شيء أقدم من الكتّاب الذين تتابعهم.",
   "back_feed_cta": "العودة إلى موجزك ←",
-
   "nav_reading_list": "المحفوظات",
   "reading_list_lede": "لك وحدك. الحفظ خاص — لا يتغير أي عدّاد ولا يُخبر أحد.",
   "reading_list_empty": "لا شيء محفوظ بعد. زر الحفظ إلى جانب القلب في كل مقال؛ ما تضعه هناك ينتظرك هنا.",
   "reading_list_ceiling": "تُعرض أحدث 20 محفوظة. المحفوظات الأقدم تقع أبعد مما ينبغي أن تصل إليه القائمة.",
-
   "no_favorites_yet": "لا مفضلة بعد. قلب على أي مقال يجلبه إلى هنا.",
-
   "tag_nothing": "لا يوجد شيء تحت هذا الوسم بعد.",
   "tag_nothing_sub": "يوجد الوسم لأن مقالًا يحمله — أول مقال يحمله هو من يبدأ القائمة.",
-
   "search_nothing": "لا شيء يطابق بحثك.",
   "search_nothing_sub": "جرّب كلمات أقل، أو وسمًا.",
-
   "nav_editor": "مقال جديد",
   "writing_as_label": "تكتب باسم",
   "session_gone": "تنتمي هذه الجلسة إلى حساب لم يعد موجودًا هنا. سجّل الخروج ثم أعد تسجيل الدخول.",
@@ -122,7 +109,6 @@
   "ready_tags": "وسم أو اثنان، ليمكن العثور عليه",
   "publish_button": "انشر",
   "published_note": "نُشر.",
-
   "settings_title": "الإعدادات",
   "view_public_page": "اعرض صفحتك العامة",
   "display_name_label": "الاسم المعروض",
@@ -138,7 +124,6 @@
   "saved_note": "تم الحفظ.",
   "propagates_note": "يظهر اسمك الجديد الآن في كل توقيع وتعليق ومعاينة.",
   "signout_hint": "تسجيل الخروج موجود في الشريط أعلاه، بجانب معرّفك.",
-
   "gone_sub_article": "ربما أزاله كاتبه.",
   "favorite_sr_off": "أضف هذا المقال إلى المفضلة —",
   "favorite_sr_on": "أزل من المفضلة —",
@@ -156,20 +141,12 @@
   "no_comments_yet": "لم يقل أحد شيئًا بعد. كن أول من يقول شيئًا.",
   "remove_comment_aria": "أزل هذا التعليق",
   "comment_delete_refused": "لا يمكن إزالته إلا لمن كتبه.",
-
   "edit_article_title": "تعديل",
   "gone_sub_edit": "حُذف، فلم يبقَ شيء لمراجعته.",
   "revising_label": "قيد التعديل · نُشر",
   "slug_hint": "غيّر العنوان، وسيتغير رابطه معه.",
   "read_it_cta": "اقرأه ←",
-  "reading_time": {
-    "zero": "قراءة أقل من دقيقة",
-    "one": "قراءة دقيقة واحدة",
-    "two": "قراءة دقيقتين",
-    "few": "قراءة {reading_minutes} دقائق",
-    "many": "قراءة {reading_minutes} دقيقة",
-    "other": "قراءة {reading_minutes} دقيقة"
-  },
+  "reading_time": "{reading_minutes, plural, zero {قراءة أقل من دقيقة} one {قراءة دقيقة واحدة} two {قراءة دقيقتين} few {قراءة {reading_minutes} دقائق} many {قراءة {reading_minutes} دقيقة} other {قراءة {reading_minutes} دقيقة}}",
   "saving_suffix": "· جارٍ الحفظ",
   "article_title_placeholder": "عنوان المقال",
   "about_line_placeholder": "عن ماذا هذا؟ سطر واحد.",

@@ -6,10 +6,10 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS app_user (
   "id" uuid PRIMARY KEY,
-  "handle" portable_string NOT NULL UNIQUE CHECK (char_length(handle) > 0),
-  "display_name" portable_string CHECK (char_length(display_name) <= 60),
-  "bio" portable_string CHECK (char_length(bio) <= 300),
-  "image_url" portable_string CHECK (char_length(image_url) <= 2048),
+  "handle" text NOT NULL UNIQUE CHECK (char_length(handle) > 0),
+  "display_name" text CHECK (char_length(display_name) <= 60),
+  "bio" text CHECK (char_length(bio) <= 300),
+  "image_url" text CHECK (char_length(image_url) <= 2048),
   "created_at" portable_timestamp DEFAULT now() NOT NULL,
   "txid" BIGINT DEFAULT pg_current_xact_id()::text::bigint,
   "scope_id" TEXT GENERATED ALWAYS AS ('public:') STORED NOT NULL
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS app_user (
 
 CREATE TABLE IF NOT EXISTS me (
   "id" uuid PRIMARY KEY REFERENCES app_user(id) ON DELETE CASCADE,
-  "handle" portable_string NOT NULL CHECK (char_length(handle) > 0),
+  "handle" text NOT NULL CHECK (char_length(handle) > 0),
   "txid" BIGINT DEFAULT pg_current_xact_id()::text::bigint,
   "scope_id" TEXT GENERATED ALWAYS AS ('user:' || "id") STORED NOT NULL
 );
@@ -25,17 +25,17 @@ CREATE TABLE IF NOT EXISTS me (
 CREATE TABLE IF NOT EXISTS article (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "author_id" uuid DEFAULT auth_uid() NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
-  "title" portable_string NOT NULL CHECK (char_length(btrim(title)) > 0 AND char_length(title) <= 200),
-  "description" portable_string CHECK (char_length(description) <= 300),
-  "body" portable_string NOT NULL CHECK (char_length(btrim(body)) > 0),
-  "tags" portable_string CHECK (char_length(tags) <= 200),
-  "cover_url" portable_string CHECK (char_length(cover_url) <= 2048),
-  "cover_credit" portable_string CHECK (char_length(cover_credit) <= 120),
-  "slug" portable_string GENERATED ALWAYS AS (coalesce(nullif(btrim(left(regexp_replace(lower(title), '[^a-z0-9]+', '-', 'g'), 80), '-'), ''), 'article') || '-' || left(id::text, 8)) STORED UNIQUE CHECK (char_length(slug) > 0),
+  "title" text NOT NULL CHECK (char_length(regexp_replace(title, '^[\s\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+|[\s\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$', '', 'g')) > 0 AND char_length(title) <= 200),
+  "description" text CHECK (char_length(description) <= 300),
+  "body" text NOT NULL CHECK (char_length(regexp_replace(body, '^[\s\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+|[\s\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$', '', 'g')) > 0),
+  "tags" text CHECK (char_length(tags) <= 200),
+  "cover_url" text CHECK (char_length(cover_url) <= 2048),
+  "cover_credit" text CHECK (char_length(cover_credit) <= 120),
+  "slug" text GENERATED ALWAYS AS (coalesce(nullif(btrim(left(regexp_replace(lower(title), '[^a-z0-9]+', '-', 'g'), 80), '-'), ''), 'article') || '-' || left(id::text, 8)) STORED UNIQUE CHECK (char_length(slug) > 0),
   "created_at" portable_timestamp DEFAULT now() NOT NULL,
   "updated_at" portable_timestamp DEFAULT now() NOT NULL,
   "search" TSVECTOR GENERATED ALWAYS AS (to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(description,'') || ' ' || coalesce(body,''))) STORED,
-  "reading_minutes" portable_int32 GENERATED ALWAYS AS (greatest(1, ceil(coalesce(array_length(regexp_split_to_array(btrim(body), '\s+'), 1), 0) / 220.0)::int)) STORED,
+  "reading_minutes" integer GENERATED ALWAYS AS (greatest(1, ceil(coalesce(array_length(regexp_split_to_array(btrim(body), '\s+'), 1), 0) / 220.0)::int)) STORED,
   "txid" BIGINT DEFAULT pg_current_xact_id()::text::bigint,
   "scope_id" TEXT GENERATED ALWAYS AS ('public:') STORED NOT NULL
 );
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS article (
 CREATE TABLE IF NOT EXISTS article_tag (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "article_id" uuid NOT NULL REFERENCES article(id) ON DELETE CASCADE,
-  "tag" portable_string NOT NULL CHECK (char_length(tag) > 0 AND char_length(tag) <= 40),
+  "tag" text NOT NULL CHECK (char_length(tag) > 0 AND char_length(tag) <= 40),
   "txid" BIGINT DEFAULT pg_current_xact_id()::text::bigint,
   "scope_id" TEXT GENERATED ALWAYS AS ('public:') STORED NOT NULL
 );
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS comment (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "article_id" uuid NOT NULL REFERENCES article(id) ON DELETE CASCADE,
   "author_id" uuid DEFAULT auth_uid() NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
-  "body" portable_string NOT NULL CHECK (char_length(btrim(body)) > 0 AND char_length(body) <= 2000),
+  "body" text NOT NULL CHECK (char_length(regexp_replace(body, '^[\s\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+|[\s\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$', '', 'g')) > 0 AND char_length(body) <= 2000),
   "created_at" portable_timestamp DEFAULT now() NOT NULL,
   "txid" BIGINT DEFAULT pg_current_xact_id()::text::bigint,
   "scope_id" TEXT GENERATED ALWAYS AS ('public:') STORED NOT NULL
@@ -88,11 +88,11 @@ CREATE TABLE IF NOT EXISTS follow (
 );
 
 CREATE TABLE IF NOT EXISTS favorite_count (
-  "id" portable_string PRIMARY KEY,
+  "id" text PRIMARY KEY,
   "user_id" uuid NOT NULL,
   "article_id" uuid NOT NULL,
-  "mine_counted" portable_int32 NOT NULL CHECK (mine_counted >= 0 AND mine_counted <= 1),
-  "total_at_read" portable_int32 NOT NULL CHECK (total_at_read >= 0),
+  "mine_counted" integer NOT NULL CHECK (mine_counted >= 0 AND mine_counted <= 1),
+  "total_at_read" integer NOT NULL CHECK (total_at_read >= 0),
   "as_of_txid" portable_int64,
   "txid" BIGINT DEFAULT pg_current_xact_id()::text::bigint,
   "scope_id" TEXT GENERATED ALWAYS AS ('user:' || "user_id") STORED NOT NULL
@@ -100,24 +100,24 @@ CREATE TABLE IF NOT EXISTS favorite_count (
 
 CREATE TABLE IF NOT EXISTS article_stats (
   "article_id" uuid PRIMARY KEY,
-  "favorite_count" portable_int32 NOT NULL CHECK (favorite_count >= 0),
+  "favorite_count" integer NOT NULL CHECK (favorite_count >= 0),
   "counted_txid" portable_int64 NOT NULL CHECK (counted_txid >= 0),
   "txid" BIGINT DEFAULT pg_current_xact_id()::text::bigint,
   "scope_id" TEXT GENERATED ALWAYS AS ('public:') STORED NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS tag_count (
-  "id" portable_string PRIMARY KEY CHECK (char_length(id) > 0),
-  "article_count" portable_int32 NOT NULL CHECK (article_count >= 0),
+  "id" text PRIMARY KEY CHECK (char_length(id) > 0),
+  "article_count" integer NOT NULL CHECK (article_count >= 0),
   "txid" BIGINT DEFAULT pg_current_xact_id()::text::bigint,
   "scope_id" TEXT GENERATED ALWAYS AS ('public:') STORED NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS favorite_index (
-  "id" portable_string PRIMARY KEY CHECK (char_length(id) > 0),
+  "id" text PRIMARY KEY CHECK (char_length(id) > 0),
   "user_id" uuid NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
   "article_id" uuid NOT NULL,
-  "active" portable_bool NOT NULL,
+  "active" boolean NOT NULL,
   "favorited_at" portable_timestamp NOT NULL,
   "txid" BIGINT DEFAULT pg_current_xact_id()::text::bigint,
   "scope_id" TEXT GENERATED ALWAYS AS ('public:') STORED NOT NULL

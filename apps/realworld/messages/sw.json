@@ -4,7 +4,6 @@
   "chrome_signin_guest": "Endelea kama mgeni",
   "chrome_signin_failed": "Hilo halikufanikiwa. Jaribu tena.",
   "chrome_signout": "toka",
-
   "brand_name": "Conduit",
   "search_placeholder": "Tafuta ndani ya Conduit",
   "search_button": "Tafuta",
@@ -17,7 +16,6 @@
   "back_piece": "← Rudi kwenye makala",
   "read_community_cta": "Soma jamii →",
   "popular_tags_cta": "Vitambulisho maarufu →",
-
   "favorite_aria_off": "Weka makala hii kwenye vipendwa",
   "favorite_aria_on": "Ondoa kwenye vipendwa",
   "favorite_failed": "Kipendwa hicho hakikuhifadhiwa — jaribu tena.",
@@ -27,7 +25,6 @@
   "save_label_on": "Imehifadhiwa",
   "save_aria_off": "Hifadhi makala hii kusoma baadaye",
   "save_aria_on": "Imehifadhiwa — ondoa kwenye orodha yako ya kusoma",
-
   "follow_button": "Fuata",
   "following_button": "Unamfuata",
   "follow_failed": "Kufuata hakukufanikiwa — jaribu tena.",
@@ -39,7 +36,6 @@
   "ceiling_search": "Zinaonyeshwa makala 20 mpya zaidi. Tumia utafutaji kupata makala ya zamani zaidi.",
   "ceiling_narrow": "Zinaonyeshwa makala 20 mpya zaidi. Punguza wigo kwa utafutaji au kitambulisho kingine.",
   "gone_head": "Makala hii haipo tena.",
-
   "language_picker_label": "Lugha",
   "lang_en": "English",
   "lang_zh": "中文",
@@ -56,42 +52,33 @@
   "lang_ja": "日本語",
   "lang_sw": "Kiswahili",
   "lang_tr": "Türkçe",
-
   "nav_home": "Jamii",
   "home_tagline": "Mahali pa kusoma na kuandika, hadharani.",
   "home_list_empty": "Bado hakuna kilichoandikwa hapa. Chako kinaweza kuwa cha kwanza — Makala Mpya iko kwenye mstari wa juu.",
   "popular_tags_label": "Vitambulisho maarufu",
   "tags_empty": "Vitambulisho huonekana mara tu mwandishi anapoandika kimoja.",
-
   "nav_feed": "Mtiririko wako",
   "feed_quiet_lede": "Mtiririko wako uko kimya.",
   "feed_quiet_body": "Unajazwa na waandishi unaowafuata. Soma jamii, mtafute mtu anayefaa kusikilizwa, kisha bonyeza Fuata kwenye ukurasa wake.",
-
   "older_title": "Maandishi ya zamani",
   "older_gloss": "Kila kilichochapishwa kabla ya makala uliyokuwa ukisoma",
   "older_end_line": "Umefika mwanzoni.",
   "older_end_sub": "Hakuna kilichochapishwa kabla ya hili.",
   "back_newest_cta": "Rudi kwenye mapya zaidi →",
-
   "feed_older_title": "Ya zamani zaidi kwenye mtiririko wako",
   "feed_older_gloss": "Waandishi unaowafuata, kabla ya makala uliyokuwa ukisoma",
   "feed_older_end_line": "Umefika mwanzoni mwa mtiririko wako.",
   "feed_older_end_sub": "Hakuna kilicho cha zamani zaidi kutoka kwa waandishi unaowafuata.",
   "back_feed_cta": "Rudi kwenye mtiririko wako →",
-
   "nav_reading_list": "Zilizohifadhiwa",
   "reading_list_lede": "Zako pekee. Kuhifadhi ni jambo la faragha — hakuna hesabu inayobadilika, wala hakuna anayearifiwa.",
   "reading_list_empty": "Bado hakuna kilichohifadhiwa. Kitufe cha kuhifadhi kiko karibu na moyo kwenye kila makala; unachokiweka pale kinakusubiri hapa.",
   "reading_list_ceiling": "Zinaonyeshwa hifadhi 20 mpya zaidi. Hifadhi za zamani zaidi haziendi mbali kuliko hapo.",
-
   "no_favorites_yet": "Bado hakuna vipendwa. Moyo kwenye makala yoyote unaileta hapa.",
-
   "tag_nothing": "Bado hakuna kilichowekwa chini ya kitambulisho hiki.",
   "tag_nothing_sub": "Kitambulisho kipo kwa sababu makala inakibeba — makala ya kwanza kukibeba ndiyo huanzisha orodha hii.",
-
   "search_nothing": "Hakuna kinachofanana na utafutaji wako.",
   "search_nothing_sub": "Jaribu maneno machache zaidi, au kitambulisho.",
-
   "nav_editor": "Makala Mpya",
   "writing_as_label": "Unaandika kama",
   "session_gone": "Kipindi hiki ni cha akaunti isiyopo tena hapa. Toka kisha ingia tena.",
@@ -122,7 +109,6 @@
   "ready_tags": "Kitambulisho kimoja au viwili, ili iweze kupatikana",
   "publish_button": "Chapisha",
   "published_note": "Imechapishwa.",
-
   "settings_title": "Mipangilio",
   "view_public_page": "Angalia ukurasa wako wa hadhara",
   "display_name_label": "Jina la kuonyesha",
@@ -138,7 +124,6 @@
   "saved_note": "Imehifadhiwa.",
   "propagates_note": "Sasa kila saini, maoni na muhtasari unaonyesha jina lako jipya.",
   "signout_hint": "Kutoka kupo kwenye mstari wa juu, karibu na kitambulisho chako.",
-
   "gone_sub_article": "Huenda iliondolewa na mwandishi wake.",
   "favorite_sr_off": "Weka makala hii kwenye vipendwa —",
   "favorite_sr_on": "Ondoa kwenye vipendwa —",
@@ -156,16 +141,12 @@
   "no_comments_yet": "Bado hakuna aliyesema chochote. Kuwa wa kwanza kusema.",
   "remove_comment_aria": "Ondoa maoni haya",
   "comment_delete_refused": "Ni yule aliyeandika pekee anayeweza kuyaondoa.",
-
   "edit_article_title": "Hariri",
   "gone_sub_edit": "Ilifutwa, kwa hivyo hakuna kilichobaki cha kurekebisha.",
   "revising_label": "Inarekebishwa · ilichapishwa",
   "slug_hint": "Badilisha kichwa, na anwani yake itabadilika pia.",
   "read_it_cta": "Isome →",
-  "reading_time": {
-    "one": "Dakika {reading_minutes} kusoma",
-    "other": "Dakika {reading_minutes} kusoma"
-  },
+  "reading_time": "{reading_minutes, plural, one {Dakika {reading_minutes} kusoma} other {Dakika {reading_minutes} kusoma}}",
   "saving_suffix": "· inahifadhi",
   "article_title_placeholder": "Kichwa cha makala",
   "about_line_placeholder": "Hii inahusu nini? Mstari mmoja.",

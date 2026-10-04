@@ -3,6 +3,7 @@ FROM caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd
 WORKDIR /monorepo/apps/realworld
 COPY --chmod=755 --from=tarampampam/microcheck:1@sha256:79c187c05bfa67518078bf4db117771942fa8fe107dc79a905861c75ddf28dfa /bin/httpcheck /usr/local/bin/httpcheck
 COPY docker/Caddyfile /etc/caddy/Caddyfile
+COPY .cert[s] /certs/
 COPY shell/index.html /srv/shell/index.html
 COPY shell/shell.css /srv/shell/shell.css
 COPY shell/boot.js /srv/shell/boot.js
@@ -67,10 +68,13 @@ COPY --from=root plugins/omnishell/interpreter/hatch.js /omnishell/interpreter/h
 COPY --from=root plugins/omnishell/interpreter/hatch-worker.js /omnishell/interpreter/hatch-worker.js
 COPY --from=root plugins/omnishell/interpreter/storybook.js /omnishell/interpreter/storybook.js
 COPY --from=root plugins/omnishell/interpreter/jessie.js /omnishell/interpreter/jessie.js
+COPY --from=root plugins/omnishell/interpreter/kinetic.js /omnishell/interpreter/kinetic.js
+COPY --from=root plugins/omnishell/interpreter/prng.js /omnishell/interpreter/prng.js
 COPY --from=root plugins/omnishell/interpreter/vendor/mecha-client.js /omnishell/interpreter/vendor/mecha-client.js
 COPY --from=root plugins/omnishell/interpreter/vendor/js-yaml.js /omnishell/interpreter/vendor/js-yaml.js
 COPY --from=root plugins/omnishell/interpreter/vendor/ses.umd.min.js /omnishell/interpreter/vendor/ses.umd.min.js
 COPY --from=root plugins/omnishell/interpreter/vendor/morphlex.js /omnishell/interpreter/vendor/morphlex.js
+COPY --from=root plugins/omnishell/interpreter/vendor/messages.js /omnishell/interpreter/vendor/messages.js
 COPY --from=root plugins/omnishell/components/wallclock.js /omnishell/components/wallclock.js
 COPY brief.html /srv/docs/brief.html
 COPY ir.html /srv/docs/ir.html

@@ -53,7 +53,8 @@
         "table": "app_user",
         "column": "display_name"
       }
-    }
+    },
+    "promote": false
   },
   "floors": {
     "touch": 24
@@ -522,6 +523,10 @@
       ]
     }
   ],
+  "sync": {
+    "comment": "on-demand",
+    "favorite_index": "on-demand"
+  },
   "tables": [
     "app_user",
     "article",
@@ -593,6 +598,7 @@
         {
           "name": "id",
           "pk": true,
+          "ref": "app_user",
           "type": "uuid",
           "required": true
         },
@@ -619,6 +625,7 @@
         {
           "default": "auth_uid()",
           "name": "author_id",
+          "ref": "app_user",
           "type": "uuid",
           "required": true
         },
@@ -716,6 +723,7 @@
         },
         {
           "name": "article_id",
+          "ref": "article",
           "type": "uuid",
           "required": true
         },
@@ -751,12 +759,14 @@
         },
         {
           "name": "article_id",
+          "ref": "article",
           "type": "uuid",
           "required": true
         },
         {
           "default": "auth_uid()",
           "name": "author_id",
+          "ref": "app_user",
           "type": "uuid",
           "required": true
         },
@@ -790,11 +800,13 @@
         {
           "default": "auth_uid()",
           "name": "user_id",
+          "ref": "app_user",
           "type": "uuid",
           "required": true
         },
         {
           "name": "article_id",
+          "ref": "article",
           "type": "uuid",
           "required": true
         },
@@ -833,11 +845,13 @@
         {
           "default": "auth_uid()",
           "name": "user_id",
+          "ref": "app_user",
           "type": "uuid",
           "required": true
         },
         {
           "name": "article_id",
+          "ref": "article",
           "type": "uuid",
           "required": true
         },
@@ -871,11 +885,13 @@
         {
           "default": "auth_uid()",
           "name": "follower_id",
+          "ref": "app_user",
           "type": "uuid",
           "required": true
         },
         {
           "name": "followed_id",
+          "ref": "app_user",
           "type": "uuid",
           "required": true
         },
@@ -1011,6 +1027,7 @@
         },
         {
           "name": "user_id",
+          "ref": "app_user",
           "type": "uuid",
           "required": true
         },
@@ -1035,7 +1052,9 @@
   "types": {
     "types": {
       "string": {
-        "sql": "portable_string",
+        "pg": "text",
+        "column": "plain",
+        "subset": true,
         "base": [
           "text",
           "varchar",
@@ -1050,7 +1069,9 @@
         ]
       },
       "bool": {
-        "sql": "portable_bool",
+        "pg": "boolean",
+        "column": "plain",
+        "subset": true,
         "base": [
           "bool",
           "boolean"
@@ -1060,7 +1081,9 @@
         "beyond": []
       },
       "int32": {
-        "sql": "portable_int32",
+        "pg": "integer",
+        "column": "plain",
+        "subset": true,
         "base": [
           "int2",
           "int4",
@@ -1074,6 +1097,9 @@
         "beyond": []
       },
       "int64": {
+        "pg": "bigint",
+        "column": "domain",
+        "subset": false,
         "sql": "portable_int64",
         "base": [
           "int8",
@@ -1087,7 +1113,9 @@
         ]
       },
       "double": {
-        "sql": "portable_double",
+        "pg": "double precision",
+        "column": "checked",
+        "subset": true,
         "base": [
           "float4",
           "float8",
@@ -1099,6 +1127,9 @@
         "beyond": []
       },
       "bytes": {
+        "pg": "bytea",
+        "column": "domain",
+        "subset": false,
         "sql": "portable_bytes",
         "base": [
           "bytea"
@@ -1109,7 +1140,9 @@
         "beyond": []
       },
       "uuid": {
-        "sql": "portable_uuid",
+        "pg": "uuid",
+        "column": "plain",
+        "subset": true,
         "base": [
           "uuid"
         ],
@@ -1119,6 +1152,9 @@
         "beyond": []
       },
       "timestamp": {
+        "pg": "timestamptz",
+        "column": "domain",
+        "subset": false,
         "sql": "portable_timestamp",
         "base": [
           "timestamptz",
@@ -1132,6 +1168,9 @@
         ]
       },
       "duration": {
+        "pg": "interval",
+        "column": "domain",
+        "subset": false,
         "sql": "portable_duration",
         "base": [
           "interval"
@@ -1144,6 +1183,9 @@
         ]
       },
       "decimal": {
+        "pg": "numeric",
+        "column": "domain",
+        "subset": false,
         "base": [
           "numeric",
           "decimal"
@@ -1156,7 +1198,9 @@
         ]
       },
       "date": {
-        "sql": "portable_date",
+        "pg": "date",
+        "column": "checked",
+        "subset": true,
         "base": [
           "date"
         ],
@@ -1168,6 +1212,9 @@
         ]
       },
       "time": {
+        "pg": "time(6)",
+        "column": "domain",
+        "subset": false,
         "sql": "portable_time",
         "base": [
           "time",
@@ -1179,8 +1226,12 @@
         "beyond": []
       },
       "timezone": {
-        "sql": "portable_timezone",
-        "base": [],
+        "pg": "text",
+        "column": "checked",
+        "subset": true,
+        "base": [
+          "text"
+        ],
         "json": "string",
         "pattern": "^[A-Za-z0-9+_/-]+$",
         "order": "none",
@@ -1189,7 +1240,9 @@
         ]
       },
       "json": {
-        "sql": "portable_json",
+        "pg": "json",
+        "column": "checked",
+        "subset": false,
         "base": [
           "json",
           "jsonb"
@@ -1202,8 +1255,12 @@
         ]
       },
       "geojson": {
-        "sql": "portable_geojson",
+        "pg": "json",
+        "column": "checked",
+        "subset": false,
         "base": [
+          "json",
+          "jsonb",
           "geometry",
           "geography"
         ],
@@ -1227,7 +1284,9 @@
   "carriers": {
     "types": {
       "string": {
-        "sql": "portable_string",
+        "pg": "text",
+        "column": "plain",
+        "subset": true,
         "base": [
           "text",
           "varchar",
@@ -1242,7 +1301,9 @@
         ]
       },
       "bool": {
-        "sql": "portable_bool",
+        "pg": "boolean",
+        "column": "plain",
+        "subset": true,
         "base": [
           "bool",
           "boolean"
@@ -1252,7 +1313,9 @@
         "beyond": []
       },
       "int32": {
-        "sql": "portable_int32",
+        "pg": "integer",
+        "column": "plain",
+        "subset": true,
         "base": [
           "int2",
           "int4",
@@ -1266,6 +1329,9 @@
         "beyond": []
       },
       "int64": {
+        "pg": "bigint",
+        "column": "domain",
+        "subset": false,
         "sql": "portable_int64",
         "base": [
           "int8",
@@ -1279,7 +1345,9 @@
         ]
       },
       "double": {
-        "sql": "portable_double",
+        "pg": "double precision",
+        "column": "checked",
+        "subset": true,
         "base": [
           "float4",
           "float8",
@@ -1291,6 +1359,9 @@
         "beyond": []
       },
       "bytes": {
+        "pg": "bytea",
+        "column": "domain",
+        "subset": false,
         "sql": "portable_bytes",
         "base": [
           "bytea"
@@ -1301,7 +1372,9 @@
         "beyond": []
       },
       "uuid": {
-        "sql": "portable_uuid",
+        "pg": "uuid",
+        "column": "plain",
+        "subset": true,
         "base": [
           "uuid"
         ],
@@ -1311,6 +1384,9 @@
         "beyond": []
       },
       "timestamp": {
+        "pg": "timestamptz",
+        "column": "domain",
+        "subset": false,
         "sql": "portable_timestamp",
         "base": [
           "timestamptz",
@@ -1324,6 +1400,9 @@
         ]
       },
       "duration": {
+        "pg": "interval",
+        "column": "domain",
+        "subset": false,
         "sql": "portable_duration",
         "base": [
           "interval"
@@ -1336,6 +1415,9 @@
         ]
       },
       "decimal": {
+        "pg": "numeric",
+        "column": "domain",
+        "subset": false,
         "base": [
           "numeric",
           "decimal"
@@ -1348,7 +1430,9 @@
         ]
       },
       "date": {
-        "sql": "portable_date",
+        "pg": "date",
+        "column": "checked",
+        "subset": true,
         "base": [
           "date"
         ],
@@ -1360,6 +1444,9 @@
         ]
       },
       "time": {
+        "pg": "time(6)",
+        "column": "domain",
+        "subset": false,
         "sql": "portable_time",
         "base": [
           "time",
@@ -1371,8 +1458,12 @@
         "beyond": []
       },
       "timezone": {
-        "sql": "portable_timezone",
-        "base": [],
+        "pg": "text",
+        "column": "checked",
+        "subset": true,
+        "base": [
+          "text"
+        ],
         "json": "string",
         "pattern": "^[A-Za-z0-9+_/-]+$",
         "order": "none",
@@ -1381,7 +1472,9 @@
         ]
       },
       "json": {
-        "sql": "portable_json",
+        "pg": "json",
+        "column": "checked",
+        "subset": false,
         "base": [
           "json",
           "jsonb"
@@ -1394,8 +1487,12 @@
         ]
       },
       "geojson": {
-        "sql": "portable_geojson",
+        "pg": "json",
+        "column": "checked",
+        "subset": false,
         "base": [
+          "json",
+          "jsonb",
           "geometry",
           "geography"
         ],

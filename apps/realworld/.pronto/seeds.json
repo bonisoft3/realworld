@@ -89,7 +89,7 @@
   "article_tag": [
     {
       "id": "e25a9e91-7fb5-4d19-ac07-a3be7c9e27ce",
-      "article_id": "67d7f91a-26c7-4bac-8166-e90e5fee59bc",
+      "article_id": "098fbc2e-a802-4459-ad75-ee51e5a1a256",
       "tag": "seed_tag_1"
     },
     {
@@ -254,21 +254,21 @@
       "id": "favorite_index_0001",
       "user_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
       "article_id": "67d7f91a-26c7-4bac-8166-e90e5fee59bc",
-      "active": "yes",
+      "active": true,
       "favorited_at": "2026-09-23T23:00:00Z"
     },
     {
       "id": "favorite_index_0002",
       "user_id": "06ab999a-d3bd-4a38-9679-c0e3bfde8293",
       "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
-      "active": "no",
+      "active": false,
       "favorited_at": "2026-09-23T22:00:00Z"
     },
     {
       "id": "favorite_index_0003",
       "user_id": "cfc548bf-df8e-424c-99a6-72ac95b2dcc4",
       "article_id": "baf30e7d-14e8-4205-a794-288834c0e9ba",
-      "active": "yes",
+      "active": true,
       "favorited_at": "2026-09-23T21:00:00Z"
     }
   ]

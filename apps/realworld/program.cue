@@ -1576,17 +1576,6 @@ loop: surface: checks: "home": {
 	note: "the capped, tie-broken stream, per-row sub-regions, and node identity across an arrival"
 }
 
-// No other rung writes a row and reads back what the pipelines made of it,
-// and both of their watermarks are int64 carriers.
-loop: surface: checks: "favorites": {
-	verb: "integrate"
-	priority: 1
-	cmds: [
-		"deno run --config tests/deno.json --no-lock --allow-env --allow-read --allow-run --allow-net --unsafely-ignore-certificate-errors=localhost tests/favorites.ts .",
-	]
-	note: "a favourite is counted and paired by the two pipelines with int64 watermarks, and its retraction moves the count's watermark forward"
-}
-
 loop: surface: checks: "editor": {
 	verb: "test"
 	cmds: [
@@ -1596,5 +1585,15 @@ loop: surface: checks: "editor": {
 }
 
 build: (pronto.#DefaultBuild & {"code": code, "loop": loop, "cluster": cluster}).out
+
+// No other rung writes a row and reads back what the pipelines made of it,
+// and both of their watermarks are int64 carriers.
+build: checks: "favorites": {
+	priority: 1
+	cmds: [
+		"deno run --config tests/deno.json --no-lock --allow-env --allow-read --allow-net --unsafely-ignore-certificate-errors=caddy tests/favorites.ts .",
+	]
+	note: "a favourite is counted and paired by the two pipelines with int64 watermarks, and its retraction moves the count's watermark forward"
+}
 
 out: pronto.#emit & {"code": code, "cluster": cluster, "terminal": terminal, "loop": loop, "build": build}

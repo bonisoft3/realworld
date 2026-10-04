@@ -10,17 +10,17 @@ say:
     rulemap:
       builtin:
         stop: false
-      favorites:
-        priority: 1
-        cmds:
-          - do: deno run --config tests/deno.json --no-lock --allow-env --allow-read --allow-run --allow-net --unsafely-ignore-certificate-errors=localhost tests/favorites.ts .
       replay:
         priority: 1
         cmds:
-          - do: 'use tools.nu [run-mise]; let pronto = "../../plugins/pronto"; run-mise exec -- deno run --config ($pronto | path join deno.json) --allow-read --allow-write --allow-run --allow-env ($pronto | path join check-replay.ts) .'
+          - do: mise exec -- docker compose -p realworld-replay --profile '*' -f .bayt/compose.replay.closure.yaml up bayt --abort-on-container-failure --exit-code-from bayt --build --remove-orphans --attach-dependencies
+      favorites:
+        priority: 1
+        cmds:
+          - do: mise exec -- docker compose -p (^mise exec -- printenv COMPOSE_PROJECT_NAME | complete | get stdout | str trim | str replace -r '^$' 'realworld') --profile '*' -f .bayt/compose.check-favorites.closure.yaml up bayt --abort-on-container-failure --exit-code-from bayt --build --remove-orphans --attach-dependencies
       visual:
         cmds:
-          - do: mise exec -- docker compose up -d --wait --build launch
+          - do: mise exec -- docker compose -p (^mise exec -- printenv COMPOSE_PROJECT_NAME | complete | get stdout | str trim | str replace -r '^$' 'realworld') up -d --wait --build launch
           - do: mise exec -- docker compose -p (^mise exec -- printenv COMPOSE_PROJECT_NAME | complete | get stdout | str trim | str replace -r '^$' 'realworld') --profile '*' -f .bayt/compose.integrate.closure.yaml up bayt --abort-on-container-failure --exit-code-from bayt --build --remove-orphans --attach-dependencies
   launch:
     rulemap:

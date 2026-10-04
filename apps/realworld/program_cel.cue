@@ -47,18 +47,18 @@ code: state: entities: {
 	}
 	Article: {
 		checks: {
-			title: "char_length(btrim(title)) > 0 AND char_length(title) <= 200"
+			title: "char_length(regexp_replace(title, '^[\\s\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+|[\\s\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+$', '', 'g')) > 0 AND char_length(title) <= 200"
 			description: "char_length(description) <= 300"
-			body: "char_length(btrim(body)) > 0"
+			body: "char_length(regexp_replace(body, '^[\\s\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+|[\\s\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+$', '', 'g')) > 0"
 			tags: "char_length(tags) <= 200"
 			cover_url: "char_length(cover_url) <= 2048"
 			cover_credit: "char_length(cover_credit) <= 120"
 			slug: "char_length(slug) > 0"
 		}
 		seed: [...{
-			title?: =~ "\\S" & strings.MaxRunes(200)
+			title?: =~ "[^\\s\\v\\x{85}\\x{a0}\\x{1680}\\x{2000}-\\x{200a}\\x{2028}\\x{2029}\\x{202f}\\x{205f}\\x{3000}]" & strings.MaxRunes(200)
 			description?: strings.MaxRunes(300)
-			body?: =~ "\\S"
+			body?: =~ "[^\\s\\v\\x{85}\\x{a0}\\x{1680}\\x{2000}-\\x{200a}\\x{2028}\\x{2029}\\x{202f}\\x{205f}\\x{3000}]"
 			tags?: strings.MaxRunes(200)
 			cover_url?: strings.MaxRunes(2048)
 			cover_credit?: strings.MaxRunes(120)
@@ -87,10 +87,10 @@ code: state: entities: {
 	}
 	Comment: {
 		checks: {
-			body: "char_length(btrim(body)) > 0 AND char_length(body) <= 2000"
+			body: "char_length(regexp_replace(body, '^[\\s\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+|[\\s\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+$', '', 'g')) > 0 AND char_length(body) <= 2000"
 		}
 		seed: [...{
-			body?: =~ "\\S" & strings.MaxRunes(2000)
+			body?: =~ "[^\\s\\v\\x{85}\\x{a0}\\x{1680}\\x{2000}-\\x{200a}\\x{2028}\\x{2029}\\x{202f}\\x{205f}\\x{3000}]" & strings.MaxRunes(2000)
 		}]
 		bounds: {
 			body: {sizeMin: 1, sizeMax: 2000}

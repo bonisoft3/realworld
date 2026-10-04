@@ -4,7 +4,6 @@
   "chrome_signin_guest": "Continue as guest",
   "chrome_signin_failed": "That did not go through. Try again.",
   "chrome_signout": "sign out",
-
   "brand_name": "Conduit",
   "search_placeholder": "Search Conduit",
   "search_button": "Search",
@@ -17,7 +16,6 @@
   "back_piece": "← Back to the piece",
   "read_community_cta": "Read the community →",
   "popular_tags_cta": "Popular tags →",
-
   "favorite_aria_off": "Favorite this piece",
   "favorite_aria_on": "Remove this favorite",
   "favorite_failed": "That favourite didn't go through — try again.",
@@ -27,7 +25,6 @@
   "save_label_on": "Saved",
   "save_aria_off": "Save this piece to read later",
   "save_aria_on": "Saved — take this off your reading list",
-
   "follow_button": "Follow",
   "following_button": "Following",
   "follow_failed": "That follow didn't take — try again.",
@@ -39,7 +36,6 @@
   "ceiling_search": "Showing the 20 newest. Search to find an older piece.",
   "ceiling_narrow": "Showing the 20 newest. Narrow with a search or another tag.",
   "gone_head": "That piece is gone.",
-
   "language_picker_label": "Language",
   "lang_en": "English",
   "lang_zh": "中文",
@@ -56,42 +52,33 @@
   "lang_ja": "日本語",
   "lang_sw": "Kiswahili",
   "lang_tr": "Türkçe",
-
   "nav_home": "Community",
   "home_tagline": "A place to read and write, in public.",
   "home_list_empty": "Nothing has been written here yet. Yours could be the first — New Article is in the bar above.",
   "popular_tags_label": "Popular tags",
   "tags_empty": "Tags appear as soon as a writer types one.",
-
   "nav_feed": "Your Feed",
   "feed_quiet_lede": "Your feed is quiet.",
   "feed_quiet_body": "It fills with the writers you follow. Read the community, find someone worth hearing from, and press Follow on their page.",
-
   "older_title": "Older writing",
   "older_gloss": "Everything published before the piece you were reading",
   "older_end_line": "You've reached the beginning.",
   "older_end_sub": "Nothing was published before this.",
   "back_newest_cta": "Back to the newest →",
-
   "feed_older_title": "Older in your feed",
   "feed_older_gloss": "The writers you follow, before the piece you were reading",
   "feed_older_end_line": "You've reached the beginning of your feed.",
   "feed_older_end_sub": "Nothing older from the writers you follow.",
   "back_feed_cta": "Back to Your Feed →",
-
   "nav_reading_list": "Saved",
   "reading_list_lede": "Yours alone. Saving is private — no count moves and nobody is told.",
   "reading_list_empty": "Nothing saved yet. Save sits beside the heart on every piece; what you put there waits here.",
   "reading_list_ceiling": "Showing the 20 newest. Older saves are further down the list than a list should go.",
-
   "no_favorites_yet": "Nothing favorited yet. A heart on any piece lands it here.",
-
   "tag_nothing": "Nothing is filed under this tag yet.",
   "tag_nothing_sub": "A tag exists because an article carries it — the first piece to wear this one starts the list.",
-
   "search_nothing": "Nothing matches your search.",
   "search_nothing_sub": "Try fewer words, or a tag.",
-
   "nav_editor": "New Article",
   "writing_as_label": "Writing as",
   "session_gone": "This session belongs to an account that is no longer here. Sign out and come back in.",
@@ -122,7 +109,6 @@
   "ready_tags": "A tag or two, so it can be found",
   "publish_button": "Publish",
   "published_note": "Published.",
-
   "settings_title": "Settings",
   "view_public_page": "View your public page",
   "display_name_label": "Display name",
@@ -138,7 +124,6 @@
   "saved_note": "Saved.",
   "propagates_note": "Every byline, comment and preview now reads your new name.",
   "signout_hint": "Sign out is in the bar above, beside your handle.",
-
   "gone_sub_article": "It may have been removed by its writer.",
   "favorite_sr_off": "Favorite this piece —",
   "favorite_sr_on": "Remove this favorite —",
@@ -156,16 +141,12 @@
   "no_comments_yet": "No one has said anything yet. Say the first thing.",
   "remove_comment_aria": "Remove this comment",
   "comment_delete_refused": "Only the person who wrote it can remove it.",
-
   "edit_article_title": "Edit",
   "gone_sub_edit": "It was deleted, so there is nothing left to revise.",
   "revising_label": "Revising · published",
   "slug_hint": "Change the title and its address changes with it.",
   "read_it_cta": "Read it →",
-  "reading_time": {
-    "one": "{reading_minutes} min read",
-    "other": "{reading_minutes} min read"
-  },
+  "reading_time": "{reading_minutes, plural, one {{reading_minutes} min read} other {{reading_minutes} min read}}",
   "saving_suffix": "· saving",
   "article_title_placeholder": "Article title",
   "about_line_placeholder": "What's this about? One line.",

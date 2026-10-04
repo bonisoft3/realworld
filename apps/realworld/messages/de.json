@@ -4,7 +4,6 @@
   "chrome_signin_guest": "Als Gast fortfahren",
   "chrome_signin_failed": "Das hat nicht geklappt. Versuch es noch einmal.",
   "chrome_signout": "abmelden",
-
   "brand_name": "Conduit",
   "search_placeholder": "Conduit durchsuchen",
   "search_button": "Suchen",
@@ -17,7 +16,6 @@
   "back_piece": "← Zurück zum Beitrag",
   "read_community_cta": "Die Community lesen →",
   "popular_tags_cta": "Beliebte Tags →",
-
   "favorite_aria_off": "Diesen Beitrag favorisieren",
   "favorite_aria_on": "Diesen Favoriten entfernen",
   "favorite_failed": "Der Favorit wurde nicht gespeichert — versuch es noch einmal.",
@@ -27,7 +25,6 @@
   "save_label_on": "Gemerkt",
   "save_aria_off": "Diesen Beitrag für später merken",
   "save_aria_on": "Gemerkt — von deiner Leseliste entfernen",
-
   "follow_button": "Folgen",
   "following_button": "Gefolgt",
   "follow_failed": "Das Folgen hat nicht geklappt — versuch es noch einmal.",
@@ -39,7 +36,6 @@
   "ceiling_search": "Die 20 neuesten werden angezeigt. Suche, um einen älteren Beitrag zu finden.",
   "ceiling_narrow": "Die 20 neuesten werden angezeigt. Grenze mit einer Suche oder einem anderen Tag ein.",
   "gone_head": "Dieser Beitrag ist verschwunden.",
-
   "language_picker_label": "Sprache",
   "lang_en": "English",
   "lang_zh": "中文",
@@ -56,42 +52,33 @@
   "lang_ja": "日本語",
   "lang_sw": "Kiswahili",
   "lang_tr": "Türkçe",
-
   "nav_home": "Community",
   "home_tagline": "Ein Ort, um öffentlich zu lesen und zu schreiben.",
   "home_list_empty": "Hier wurde noch nichts geschrieben. Deins könnte das erste sein — Neuer Artikel steht in der Leiste oben.",
   "popular_tags_label": "Beliebte Tags",
   "tags_empty": "Tags erscheinen, sobald jemand einen eingibt.",
-
   "nav_feed": "Dein Feed",
   "feed_quiet_lede": "Dein Feed ist ruhig.",
   "feed_quiet_body": "Er füllt sich mit den Autoren, denen du folgst. Lies die Community, finde jemanden, dem es sich zuzuhören lohnt, und drück Folgen auf der Seite dieser Person.",
-
   "older_title": "Ältere Beiträge",
   "older_gloss": "Alles, was vor dem Beitrag veröffentlicht wurde, den du gelesen hast",
   "older_end_line": "Du bist am Anfang angekommen.",
   "older_end_sub": "Davor wurde nichts veröffentlicht.",
   "back_newest_cta": "Zurück zu den neuesten →",
-
   "feed_older_title": "Älteres in deinem Feed",
   "feed_older_gloss": "Die Autoren, denen du folgst, vor dem Beitrag, den du gelesen hast",
   "feed_older_end_line": "Du bist am Anfang deines Feeds angekommen.",
   "feed_older_end_sub": "Nichts Älteres von den Autoren, denen du folgst.",
   "back_feed_cta": "Zurück zu deinem Feed →",
-
   "nav_reading_list": "Gemerkt",
   "reading_list_lede": "Nur für dich. Merken ist privat — kein Zähler bewegt sich, und niemand erfährt davon.",
   "reading_list_empty": "Noch nichts gemerkt. Merken sitzt neben dem Herz bei jedem Beitrag; was du dort ablegst, wartet hier auf dich.",
   "reading_list_ceiling": "Die 20 neuesten werden angezeigt. Ältere gemerkte Beiträge liegen weiter unten, als eine Liste reichen sollte.",
-
   "no_favorites_yet": "Noch keine Favoriten. Ein Herz auf einem Beitrag bringt ihn hierher.",
-
   "tag_nothing": "Unter diesem Tag ist noch nichts abgelegt.",
   "tag_nothing_sub": "Ein Tag existiert, weil ein Artikel ihn trägt — der erste Beitrag, der ihn trägt, eröffnet die Liste.",
-
   "search_nothing": "Nichts passt zu deiner Suche.",
   "search_nothing_sub": "Versuch es mit weniger Wörtern oder einem Tag.",
-
   "nav_editor": "Neuer Artikel",
   "writing_as_label": "Du schreibst als",
   "session_gone": "Diese Sitzung gehört zu einem Konto, das es nicht mehr gibt. Melde dich ab und wieder an.",
@@ -122,7 +109,6 @@
   "ready_tags": "Ein Tag oder zwei, damit es gefunden werden kann",
   "publish_button": "Veröffentlichen",
   "published_note": "Veröffentlicht.",
-
   "settings_title": "Einstellungen",
   "view_public_page": "Deine öffentliche Seite ansehen",
   "display_name_label": "Anzeigename",
@@ -138,7 +124,6 @@
   "saved_note": "Gespeichert.",
   "propagates_note": "Jede Signatur, jeder Kommentar und jede Vorschau zeigt jetzt deinen neuen Namen.",
   "signout_hint": "Abmelden findest du in der Leiste oben, neben deiner Kennung.",
-
   "gone_sub_article": "Es könnte von der Autorin oder dem Autor entfernt worden sein.",
   "favorite_sr_off": "Diesen Beitrag favorisieren —",
   "favorite_sr_on": "Diesen Favoriten entfernen —",
@@ -156,16 +141,12 @@
   "no_comments_yet": "Noch hat niemand etwas gesagt. Sei der oder die Erste.",
   "remove_comment_aria": "Diesen Kommentar entfernen",
   "comment_delete_refused": "Nur wer ihn geschrieben hat, kann ihn entfernen.",
-
   "edit_article_title": "Bearbeiten",
   "gone_sub_edit": "Er wurde gelöscht, also gibt es nichts mehr zu überarbeiten.",
   "revising_label": "In Überarbeitung · veröffentlicht",
   "slug_hint": "Ändere den Titel, und die Adresse ändert sich mit.",
   "read_it_cta": "Lesen →",
-  "reading_time": {
-    "one": "{reading_minutes} Minute Lesezeit",
-    "other": "{reading_minutes} Minuten Lesezeit"
-  },
+  "reading_time": "{reading_minutes, plural, one {{reading_minutes} Minute Lesezeit} other {{reading_minutes} Minuten Lesezeit}}",
   "saving_suffix": "· wird gespeichert",
   "article_title_placeholder": "Artikeltitel",
   "about_line_placeholder": "Worum geht's? Eine Zeile.",

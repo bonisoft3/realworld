@@ -52,7 +52,6 @@ body > nav > a:first-child:last-of-type::before { content: none; }
    asks for the handle beside sign out until the reader takes it, and a control
    that has scrolled off the end is not on screen. */
 body > nav .shell-me { flex: none;
-  position: sticky; inset-inline-end: 0; padding-inline-start: var(--sp-sm);
   background: var(--shell-bg); }
 body > nav .shell-who { text-decoration: none; }
 body > nav .shell-who .name { display: none; }
@@ -71,7 +70,6 @@ body > nav .shell-who .handle::first-letter { font-size: .9375rem; font-weight: 
 body > nav .shell-who:hover .handle { border-color: var(--secondary); }
 
 @media (min-width: 700px) {
-  body > nav .shell-who .name { display: block; }
   body > nav .shell-who .handle {
     width: auto; height: auto; max-width: 16ch; flex: 0 1 auto;
     border: none; background: none; border-radius: 0;
@@ -80,24 +78,22 @@ body > nav .shell-who:hover .handle { border-color: var(--secondary); }
   body > nav .shell-who .handle::first-letter { font-size: .9375rem; font-weight: inherit; }
 }
 
+@media (min-width: 960px) {
+  body > nav .shell-who .name { display: block; }
+}
+
 /* A phone's strip is tighter than a desk's. Sign out stays on it at every
    width: accept-signin-handle asks for the handle beside the way out until
    the reader takes it, so shrinking it is allowed and hiding it is not. */
 @media (max-width: 699px) {
-  /* At 400px four destinations plus the identity need 89px more than the
-     viewport gives, and the action comes to rest UNDER the pinned identity
-     (check-visual's no-interactive-overlap, on every route where nothing is
-     current and so nothing drops out). Gap, padding and type come down
-     together because no one of them is worth 89px on its own. */
-  body > nav { gap: var(--sp-sm); padding: 11px 12px; font-size: .875rem; }
+  /* Four destinations plus the identity fit without wrapping or horizontal
+     overflow across standard phone viewports down to 360px. */
+  body > nav { gap: 6px; padding: 10px 8px; font-size: .875rem; }
   body > nav .shell-signout { font-size: .8125rem; flex: none; }
-  body > nav > a:first-child { margin-inline-end: 4px; }
-  /* The action keeps its mark and loses its words: the strip has to fit at
-     400px on every route, including the parametrized ones where nothing is
-     current and so nothing drops out. Sized away rather than hidden, the same
-     way the handle's disc keeps one letter. */
-  body > nav > a:last-of-type { padding: 6px 8px; font-size: 0; }
+  body > nav > a:first-child { margin-inline-end: 0; }
+  body > nav > a:last-of-type { padding: 6px 8px; font-size: 0; margin-inline-start: 0; }
   body > nav > a:last-of-type::before { content: "\270e"; font-size: 1rem; }
+  body > nav .shell-me { gap: var(--sp-sm); padding-inline-start: 0; }
   /* On a phone the strip has no room to keep a route it is already on — the
      first route included, whose ground the screen's own masthead names anyway.
      Dropping it is what lets the rest fit without scrolling, which is what

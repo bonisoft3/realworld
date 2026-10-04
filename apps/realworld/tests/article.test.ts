@@ -150,8 +150,7 @@ Deno.test({
       m.one(".byline-row .date").getAttribute("datetime") === "2026-02-01T09:00:00.000000Z",
       `the machine-readable date reads ${m.one(".byline-row .date").getAttribute("datetime")}`,
     );
-    // data-msg-plural picks an arm from messages/en.json's reading_time map,
-    // which spells out "min read" — the count is never bare text.
+    // The reading_time ICU message formats the plural reading minutes — the count is never bare text.
     assert(textOf(m.one(".byline-row .read")) === "12 min read", `the reading time reads "${textOf(m.one(".byline-row .read"))}"`);
 
     // The cover is a sub-region filtered on {id} plus two operators the

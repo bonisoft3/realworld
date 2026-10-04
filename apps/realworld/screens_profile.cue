@@ -106,7 +106,7 @@ code: surface: screens: "profile": markup: #"""
             <bdi class="handle" data-text="{author.handle}"></bdi>
           </a>
           <time class="date role-meta-sm" datetime="{created_at}" data-text="{created_at}" data-text-format="datetime"></time>
-          <span class="read role-meta-sm" data-msg-plural="reading_minutes" data-text="{msg.reading_time}"></span>
+          <span class="read role-meta-sm" data-text="{msg.reading_time}"></span>
         </div>
         <div class="preview-open">
           <span class="thumb" data-live="article" data-filter="id=eq.{id}&cover_url=not.is.null&cover_url=neq.">

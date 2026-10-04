@@ -3,55 +3,241 @@ package realworld
 
 code: surface: screens: {
 	article: {
-		reads: [{entity: "Article"}, {entity: "ArticleStats"}, {entity: "ArticleTag"}, {entity: "Bookmark"}, {entity: "Comment"}, {entity: "Favorite"}, {entity: "Follow"}, {entity: "Me"}]
+		reads: [
+			{table: "article", kind: "live", nested: false, lists: [], route: "view", clauses: [{"col":"slug","op":"eq"}], embeds: [], orders: []},
+			{table: "article", kind: "live", nested: false, lists: [], route: "view", clauses: [{"col":"slug","op":"eq"}], embeds: ["app_user"], orders: []},
+			{table: "article", kind: "live", nested: true, lists: [1], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
+			{table: "me", kind: "live", nested: true, lists: [1], route: "view", clauses: [{"col":"id","op":"eq"}], embeds: [], orders: []},
+			{table: "follow", kind: "live", nested: true, lists: [1], route: "view", clauses: [{"col":"followed_id","op":"eq"}], embeds: [], orders: []},
+			{table: "favorite", kind: "live", nested: true, lists: [1], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [1], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [1], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "bookmark", kind: "live", nested: true, lists: [1], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "article_tag", kind: "live", nested: true, lists: [1], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
+			{table: "me", kind: "live", nested: true, lists: [1], route: "view", clauses: [{"col":"id","op":"eq"}], embeds: [], orders: []},
+			{table: "follow", kind: "live", nested: true, lists: [1], route: "view", clauses: [{"col":"followed_id","op":"eq"}], embeds: [], orders: []},
+			{table: "article", kind: "live", nested: true, lists: [1], route: "snapshot", clauses: [{"col":"author_id","op":"eq"},{"col":"created_at","op":"lt"}], embeds: [], limit: 3, orders: ["created_at"]},
+			{table: "comment", kind: "live", nested: true, lists: [1], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: ["app_user"], orders: ["created_at"]},
+			{table: "me", kind: "live", nested: true, lists: [1,13], route: "view", clauses: [{"col":"id","op":"eq"}], embeds: [], orders: []},
+		]
+		writes: [
+			{table: "follow", op: "create"},
+			{table: "follow", op: "delete", filter: "followed_id=eq.{author_id}"},
+			{table: "article", op: "delete"},
+			{table: "favorite", op: "upsert"},
+			{table: "favorite", op: "upsert"},
+			{table: "bookmark", op: "create"},
+			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
+			{table: "follow", op: "create"},
+			{table: "follow", op: "delete", filter: "followed_id=eq.{author_id}"},
+			{table: "comment", op: "create"},
+			{table: "comment", op: "delete"},
+		]
 		files: {handlers: [], adapters: []}
 	}
 	"edit-article": {
-		reads: [{entity: "Article"}]
+		reads: [
+			{table: "article", kind: "live", nested: false, lists: [], route: "view", clauses: [{"col":"id","op":"eq"}], embeds: [], orders: []},
+			{table: "article", kind: "live", nested: false, lists: [], route: "view", clauses: [{"col":"id","op":"eq"}], embeds: [], orders: []},
+		]
+		writes: [
+			{table: "article", op: "update"},
+		]
 		files: {handlers: [], adapters: []}
 	}
 	editor: {
-		reads: [{entity: "Article"}, {entity: "Me"}]
+		reads: [
+			{table: "me", kind: "live", nested: false, lists: [], route: "whole", clauses: [], embeds: [], orders: []},
+			{table: "article", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"author_id","op":"eq"}], embeds: [], orders: ["created_at"]},
+		]
+		writes: [
+			{table: "article", op: "create"},
+		]
 		files: {handlers: [], adapters: []}
 	}
 	feed: {
-		reads: [{entity: "Article"}, {entity: "ArticleStats"}, {entity: "ArticleTag"}, {entity: "Bookmark"}, {entity: "Favorite"}]
+		reads: [
+			{table: "article", kind: "live", nested: false, lists: [], route: "server", clauses: [], limit: 20, orders: ["created_at","id"]},
+			{table: "article", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
+			{table: "article_tag", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
+			{table: "favorite", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "bookmark", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+		]
+		writes: [
+			{table: "favorite", op: "upsert"},
+			{table: "favorite", op: "upsert"},
+			{table: "bookmark", op: "create"},
+			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
+		]
 		files: {handlers: [], adapters: []}
 	}
 	"feed-older": {
-		reads: [{entity: "Article"}, {entity: "ArticleStats"}, {entity: "ArticleTag"}, {entity: "Bookmark"}, {entity: "Favorite"}]
+		reads: [
+			{table: "article", kind: "live", nested: false, lists: [], route: "server", clauses: [{"col":"created_at","op":"lt"}], limit: 20, orders: ["created_at","id"]},
+			{table: "article", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
+			{table: "article_tag", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
+			{table: "favorite", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "bookmark", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+		]
+		writes: [
+			{table: "favorite", op: "upsert"},
+			{table: "favorite", op: "upsert"},
+			{table: "bookmark", op: "create"},
+			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
+		]
 		files: {handlers: [], adapters: []}
 	}
 	home: {
-		reads: [{entity: "Article"}, {entity: "ArticleStats"}, {entity: "ArticleTag"}, {entity: "Bookmark"}, {entity: "Favorite"}, {entity: "TagCount"}]
+		reads: [
+			{table: "article", kind: "live", nested: false, lists: [], route: "view", clauses: [], embeds: ["app_user"], limit: 20, orders: ["created_at","id"]},
+			{table: "article", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
+			{table: "article_tag", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
+			{table: "favorite", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "bookmark", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "tag_count", kind: "live", nested: false, lists: [], route: "snapshot", clauses: [{"col":"article_count","op":"gt"}], embeds: [], orders: ["article_count","id"]},
+		]
+		writes: [
+			{table: "favorite", op: "upsert"},
+			{table: "favorite", op: "upsert"},
+			{table: "bookmark", op: "create"},
+			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
+		]
 		files: {handlers: [], adapters: []}
 	}
 	older: {
-		reads: [{entity: "Article"}, {entity: "ArticleStats"}, {entity: "ArticleTag"}, {entity: "Bookmark"}, {entity: "Favorite"}]
+		reads: [
+			{table: "article", kind: "live", nested: false, lists: [], route: "snapshot", clauses: [{"col":"created_at","op":"lt"}], embeds: ["app_user"], limit: 20, orders: ["created_at","id"]},
+			{table: "article", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
+			{table: "article_tag", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
+			{table: "favorite", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "bookmark", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+		]
+		writes: [
+			{table: "favorite", op: "upsert"},
+			{table: "favorite", op: "upsert"},
+			{table: "bookmark", op: "create"},
+			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
+		]
 		files: {handlers: [], adapters: []}
 	}
 	profile: {
-		reads: [{entity: "AppUser"}, {entity: "Article"}, {entity: "ArticleStats"}, {entity: "ArticleTag"}, {entity: "Bookmark"}, {entity: "Favorite"}, {entity: "Follow"}, {entity: "Me"}]
+		reads: [
+			{table: "app_user", kind: "live", nested: false, lists: [], route: "view", clauses: [{"col":"handle","op":"eq"}], embeds: [], orders: []},
+			{table: "me", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"handle","op":"eq"}], embeds: [], orders: []},
+			{table: "follow", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"followed_id","op":"eq"}], embeds: [], orders: []},
+			{table: "article", kind: "live", nested: false, lists: [], route: "server", limit: 20, orders: ["created_at","id"]},
+			{table: "article", kind: "live", nested: true, lists: [3], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
+			{table: "article_tag", kind: "live", nested: true, lists: [3], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
+			{table: "favorite", kind: "live", nested: true, lists: [3], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [3], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [3], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "bookmark", kind: "live", nested: true, lists: [3], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+		]
+		writes: [
+			{table: "follow", op: "create"},
+			{table: "follow", op: "delete", filter: "followed_id=eq.{id}"},
+			{table: "favorite", op: "upsert"},
+			{table: "favorite", op: "upsert"},
+			{table: "bookmark", op: "create"},
+			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
+		]
 		files: {handlers: [], adapters: []}
 	}
 	"profile-favorites": {
-		reads: [{entity: "AppUser"}, {entity: "Article"}, {entity: "ArticleStats"}, {entity: "ArticleTag"}, {entity: "Bookmark"}, {entity: "Favorite"}, {entity: "FavoriteIndex"}, {entity: "Follow"}, {entity: "Me"}]
+		reads: [
+			{table: "app_user", kind: "live", nested: false, lists: [], route: "view", clauses: [{"col":"handle","op":"eq"}], embeds: [], orders: []},
+			{table: "me", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"handle","op":"eq"}], embeds: [], orders: []},
+			{table: "follow", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"followed_id","op":"eq"}], embeds: [], orders: []},
+			{table: "favorite_index", kind: "live", nested: false, lists: [], route: "server", limit: 20, orders: ["favorited_at"]},
+			{table: "article", kind: "live", nested: true, lists: [3], route: "view", clauses: [{"col":"id","op":"eq"}], embeds: ["app_user"], orders: []},
+			{table: "article", kind: "live", nested: true, lists: [3,4], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
+			{table: "article_tag", kind: "live", nested: true, lists: [3,4], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
+			{table: "favorite", kind: "live", nested: true, lists: [3,4], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [3,4], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [3,4], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "bookmark", kind: "live", nested: true, lists: [3,4], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+		]
+		writes: [
+			{table: "follow", op: "create"},
+			{table: "follow", op: "delete", filter: "followed_id=eq.{id}"},
+			{table: "favorite", op: "upsert"},
+			{table: "favorite", op: "upsert"},
+			{table: "bookmark", op: "create"},
+			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
+		]
 		files: {handlers: [], adapters: []}
 	}
 	"reading-list": {
-		reads: [{entity: "Article"}, {entity: "ArticleStats"}, {entity: "ArticleTag"}, {entity: "Bookmark"}, {entity: "Favorite"}]
+		reads: [
+			{table: "bookmark", kind: "live", nested: false, lists: [], route: "view", clauses: [], embeds: [], limit: 20, orders: ["created_at","id"]},
+			{table: "article", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"id","op":"eq"}], embeds: ["app_user"], orders: []},
+			{table: "article", kind: "live", nested: true, lists: [0,1], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
+			{table: "article_tag", kind: "live", nested: true, lists: [0,1], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
+			{table: "favorite", kind: "live", nested: true, lists: [0,1], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0,1], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0,1], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "bookmark", kind: "live", nested: true, lists: [0,1], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+		]
+		writes: [
+			{table: "favorite", op: "upsert"},
+			{table: "favorite", op: "upsert"},
+			{table: "bookmark", op: "create"},
+			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
+		]
 		files: {handlers: [], adapters: []}
 	}
 	search: {
-		reads: [{entity: "Article"}, {entity: "ArticleStats"}, {entity: "ArticleTag"}, {entity: "Bookmark"}, {entity: "Favorite"}]
+		reads: [
+			{table: "article", kind: "live", nested: false, lists: [], route: "server", embeds: ["app_user"], limit: 20, orders: ["created_at"]},
+			{table: "article", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
+			{table: "article_tag", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
+			{table: "favorite", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "bookmark", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+		]
+		writes: [
+			{table: "favorite", op: "upsert"},
+			{table: "favorite", op: "upsert"},
+			{table: "bookmark", op: "create"},
+			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
+		]
 		files: {handlers: [], adapters: []}
 	}
 	settings: {
-		reads: [{entity: "AppUser"}, {entity: "Me"}]
+		reads: [
+			{table: "me", kind: "live", nested: false, lists: [], route: "whole", clauses: [], embeds: [], orders: []},
+			{table: "app_user", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"id","op":"eq"}], embeds: [], orders: []},
+		]
+		writes: [
+			{table: "app_user", op: "update"},
+		]
 		files: {handlers: [], adapters: []}
 	}
 	tag: {
-		reads: [{entity: "Article"}, {entity: "ArticleStats"}, {entity: "ArticleTag"}, {entity: "Bookmark"}, {entity: "Favorite"}]
+		reads: [
+			{table: "article", kind: "live", nested: false, lists: [], route: "server", limit: 20, orders: ["created_at"]},
+			{table: "article", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
+			{table: "article_tag", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
+			{table: "favorite", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "article_stats", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+			{table: "bookmark", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: []},
+		]
+		writes: [
+			{table: "favorite", op: "upsert"},
+			{table: "favorite", op: "upsert"},
+			{table: "bookmark", op: "create"},
+			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
+		]
 		files: {handlers: [], adapters: []}
 	}
 }

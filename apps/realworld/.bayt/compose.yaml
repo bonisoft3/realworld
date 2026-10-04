@@ -3,6 +3,13 @@ include:
 - path: ./compose.bayt.yaml
   required: false
 services:
+  replay:
+    extends:
+      file: ./compose.replay.yaml
+      service: apps_realworld-replay
+    profiles:
+    - replay
+    scale: 1
   setup:
     extends:
       file: ./compose.setup.yaml
@@ -28,6 +35,13 @@ services:
       service: apps_realworld-integrate
     profiles:
     - integrate
+    scale: 1
+  check-favorites:
+    extends:
+      file: ./compose.check-favorites.yaml
+      service: apps_realworld-check-favorites
+    profiles:
+    - check-favorites
     scale: 1
   database:
     extends:

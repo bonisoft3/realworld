@@ -1,5 +1,7 @@
 # generated from bayt.cue — do not edit
 include:
+- path: ./compose.replay.yaml
+  required: false
 - path: ./compose.setup.yaml
   required: false
 - path: ./compose.build.yaml
@@ -7,6 +9,8 @@ include:
 - path: ./compose.launch.yaml
   required: false
 - path: ./compose.integrate.yaml
+  required: false
+- path: ./compose.check-favorites.yaml
   required: false
 - path: ./compose.database.yaml
   required: false
