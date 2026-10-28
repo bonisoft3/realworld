@@ -8,10 +8,13 @@ services:
       context: ..
       dockerfile: .bayt/Dockerfile.bundle
       target: bundle
+      tags:
+      - bayt-plugins_omnishell-bundle:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+      - bayt-plugins_omnishell-bundle:latest
       args:
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-    image: bayt-plugins_omnishell-bundle:${BAYT_IMAGE_TAG:-latest}
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-plugins_omnishell-bundle:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
     scale: 0
   plugins_omnishell-bundle_bayt:
     build:
@@ -23,17 +26,19 @@ services:
       target: bundle_bayt
       args:
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
     image: bayt-plugins_omnishell-bundle_bayt:latest
     scale: 0
   plugins_omnishell-bundle_srcs:
     build:
+      additional_contexts:
+        plugins_omnishell-setup_srcs: service:plugins_omnishell-setup_srcs
       context: ..
       dockerfile: .bayt/Dockerfile.bundle
       target: bundle_srcs
       args:
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
     image: bayt-plugins_omnishell-bundle_srcs:latest
     scale: 0
   plugins_omnishell-bundle_outs:
@@ -43,7 +48,7 @@ services:
       target: bundle_outs
       args:
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
       additional_contexts:
         plugins_omnishell-bundle: service:plugins_omnishell-bundle
     image: bayt-plugins_omnishell-bundle_outs:latest

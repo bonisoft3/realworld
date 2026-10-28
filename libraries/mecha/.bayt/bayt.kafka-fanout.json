@@ -29,7 +29,7 @@
     "preamble": [],
     "preambleCopyContexts": [],
     "from": {
-      "name": "redpandadata/connect:4.46.0@sha256:f84ebd666931dc667b8b33c70900ff49a34c73d1811b096f668e360d66a05d4c"
+      "name": "redpandadata/connect:4.114.0@sha256:481e8df48ed733f080623ae67f0dccc82d29ae509dfb3f957347a9e900e74910"
     },
     "copy": [
       {
@@ -91,7 +91,8 @@
           ".bayt/Dockerfile.kafka-fanout",
           ".bayt/bayt.kafka-fanout.json",
           ".bayt/Taskfile.yml",
-          ".bayt/Taskfile.bayt.yml"
+          ".bayt/Taskfile.bayt.yml",
+          ".bayt/process-compose.yaml"
         ],
         "exclude": []
       },

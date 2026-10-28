@@ -9,9 +9,12 @@ services:
       context: ..
       dockerfile: .bayt/Dockerfile.auth
       target: auth
+      tags:
+      - bayt-libraries_mecha-auth:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+      - bayt-libraries_mecha-auth:latest
       args:
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
     depends_on:
       libraries_mecha-database:
         condition: service_healthy
@@ -21,10 +24,12 @@ services:
     environment:
       DATABASE_URL: >-
         postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-mecha}
+      AUTH_STATEMENT_TIMEOUT_MS: "5000"
       PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:-mecha-dev-secret-please-override-32ch}
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
       WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-https://localhost:*}
-    image: bayt-libraries_mecha-auth:${BAYT_IMAGE_TAG:-latest}
+      OIDC_PROVIDERS: ""
+    image: bayt-libraries_mecha-auth:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
     networks:
       default:
         aliases:
@@ -40,7 +45,7 @@ services:
       target: auth_bayt
       args:
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
     image: bayt-libraries_mecha-auth_bayt:latest
     scale: 0
   libraries_mecha-auth_srcs:
@@ -52,6 +57,6 @@ services:
       target: auth_srcs
       args:
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
     image: bayt-libraries_mecha-auth_srcs:latest
     scale: 0

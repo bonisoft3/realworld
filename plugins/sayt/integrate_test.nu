@@ -1,5 +1,12 @@
 use std/assert
-use integrate.nu [resolve-plan strip-bake-flags wants-session exports-cache]
+use integrate.nu [resolve-plan strip-bake-flags wants-session exports-cache target-batches]
+
+def test_target_batches_bound_parallel_stacks_without_dropping_targets [] {
+	assert equal (target-batches [a b c d e] 2) [[a b] [c d] [e]]
+	assert equal (target-batches [a b c] 1) [[a] [b] [c]]
+	assert equal (target-batches [a b] 3) [[a b]]
+	assert error { target-batches [a] 0 }
+}
 
 # resolve-plan is pure — the axis grammar, verifiable without docker.
 
@@ -7,8 +14,7 @@ def test_default_is_compose_up [] {
 	let p = (resolve-plan {})
 	assert equal $p.build "compose"
 	assert equal $p.up true
-	assert equal $p.dind_run false
-	assert equal $p.dind_bridge false
+	assert equal $p.docker false
 }
 
 def test_bake_defaults_to_up [] {
@@ -35,22 +41,19 @@ def test_depot [] {
 	assert equal (resolve-plan {depot: true}).build "depot"
 }
 
-def test_dind_run_and_bridge_independent [] {
-	# runtime daemon (--dind) and build-RUN daemon (--dind-bridge) are separate.
-	let p = (resolve-plan {dind: true})
-	assert equal $p.dind_run true
-	assert equal $p.dind_bridge false
-	let q = (resolve-plan {dind_bridge: true})
-	assert equal $q.dind_run false
-	assert equal $q.dind_bridge true
+def test_with_docker_bridges_the_daemon [] {
+	# --with-docker hands a build RUN the host daemon, and nothing else.
+	let p = (resolve-plan {with_docker: true})
+	assert equal $p.docker true
+	assert equal $p.buildx false
 }
 
 def test_buildx_implies_bridge [] {
-	# --with-buildx pulls in --dind-bridge (builder ⇒ socat); reverse does not.
+	# --with-buildx pulls in --with-docker (builder ⇒ socat); reverse does not.
 	let p = (resolve-plan {with_buildx: true})
 	assert equal $p.buildx true
-	assert equal $p.dind_bridge true
-	assert equal (resolve-plan {dind_bridge: true}).buildx false
+	assert equal $p.docker true
+	assert equal (resolve-plan {with_docker: true}).buildx false
 }
 
 def test_capabilities_additive [] {
@@ -104,12 +107,13 @@ def test_only_ci_or_a_depot_token_exports_cache [] {
 }
 
 def main [] {
+	test_target_batches_bound_parallel_stacks_without_dropping_targets
 	test_default_is_compose_up
 	test_bake_defaults_to_up
 	test_bake_no_up_is_envelope
 	test_no_build
 	test_depot
-	test_dind_run_and_bridge_independent
+	test_with_docker_bridges_the_daemon
 	test_buildx_implies_bridge
 	test_capabilities_additive
 	test_build_axis_single_valued

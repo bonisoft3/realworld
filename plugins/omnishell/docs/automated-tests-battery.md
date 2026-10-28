@@ -32,8 +32,10 @@ draw:
 
 Inputs are drawn, never accepted-and-discarded. `plugins/pronto/bounds.ts`
 reads each column's CEL into a domain that names no language — `enumValues`,
-or `intMin`/`intMax`, `sizeMin`/`sizeMax`, `regex` — and a conjunct it does not
-recognise leaves the domain wider, never narrower; `derive-cel.ts` renders it
+or `intMin`/`intMax`, `sizeMin`/`sizeMax`, `regex`, and for a json column the
+shape of its value (`kind`, a record's `fields`, a list's `items` and
+`maxItems`) — and a conjunct it does not recognise leaves the domain wider,
+never narrower; `derive-cel.ts` renders it
 into `program_cel.cue`, `emit.cue` carries it into `shell/shell.yaml` beside
 the field, and `arbitrary.ts` builds a fast-check generator per column from
 that. So the terminal generates rows for a program whose constraint language it
@@ -42,6 +44,14 @@ seeded, so a counter-example replays, and the shrunk one is what the finding
 quotes. A handler runs once per call site the screens state — a chart's
 literal params are a third argument, so each distinct set is its own run — and
 a validation against the rows its declared edges reach.
+
+Call sites of one module with the same region share seeded input draws.
+Their RNG positions reconstruct shrink contexts when a predicate fails,
+without retaining those contexts for successful draws. Each call site still
+runs every draw in its own compartment with its own literal params. A region's draw cache is released
+after its last call site in that module; predicates receive frozen copies,
+so one call cannot alter another's inputs. Fast-check still shrinks failures
+and supplies replayable paths.
 
 `.say.yaml` runs `check battery --self-test` through `runtime/cli.ts` on the
 deno the tool stub pins, so the checker's own claims are graded on the same
@@ -68,7 +78,7 @@ to catch spends it in milliseconds.
 linkedom). `FuelMeter.spend` charges by category, defaulting to `fire` 10,
 `transition` 50, `mutation` 50, `wait` 1 per ms and `jessie` 1; `spendEffect`
 charges by [effect level](../REFERENCE.md#effects):
-`projection` 1, `ephemeral` 10, `compensable` 50, `replicated` 100, `exterior`
+`projection` 1, `ephemeral` 10, `compensable` 50, `replicated` 100, `external`
 250, and an unknown level costs a mutation. Over budget throws
 `FuelLimitExceededError` naming the last three actions. Posing
 (`test/storybook-battery.ts`) spends one `fire` per query and one `transition`

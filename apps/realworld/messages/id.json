@@ -1,6 +1,7 @@
 {
-  "chrome_signin_hint": "Satu sentuhan dengan kunci sandi Anda — baru di sini? satu akan dibuatkan untuk Anda.",
-  "chrome_signin": "Lanjutkan",
+  "chrome_signin_google": "Masuk dengan Google",
+  "chrome_signin_hint": "Cerita yang baik menyatukan kita. Baca, tulis, dan temukan komunitasmu.",
+  "chrome_signin": "Lanjutkan dengan kunci sandi",
   "chrome_signin_guest": "Lanjutkan sebagai tamu",
   "chrome_signin_failed": "Gagal. Coba lagi.",
   "chrome_signout": "keluar",

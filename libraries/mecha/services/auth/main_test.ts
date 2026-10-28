@@ -2,14 +2,16 @@
 // environment main.ts reads as the dev cluster sets it (cluster.cue). app_user is owned elsewhere (see main.ts); tests
 // create a minimal stand-in before running the service's own migration
 // against it.
+import { fileURLToPath } from "node:url";
 import {
   assert,
   assertEquals,
+  assertRejects,
   assertStringIncludes,
   assertThrows,
 } from "jsr:@std/assert@1.0.13";
 import { isoBase64URL, isoCBOR, isoUint8Array, toHash } from "@simplewebauthn/server/helpers";
-import { admittedOrigin, ceremonyOrigin, handler, issueUserToken, migrate, signJwt, sql, verifyJwt } from "./main.ts";
+import { admittedOrigin, ceremonyOrigin, handler, issueUserToken, links, migrate, signJwt, sql, verifyJwt } from "./main.ts";
 
 await sql`CREATE TABLE IF NOT EXISTS app_user (
   id uuid primary key,
@@ -22,6 +24,55 @@ await sql`CREATE TABLE IF NOT EXISTS article (
   id uuid primary key default gen_random_uuid(),
   scope_id text generated always as ('public:') stored not null
 )`;
+await sql`CREATE TABLE IF NOT EXISTS scoped_article (
+  id uuid primary key default gen_random_uuid(),
+  scope_id text not null default 'public:'
+)`;
+await sql`CREATE TABLE IF NOT EXISTS mutable_article (
+  id uuid primary key default gen_random_uuid(),
+  scope_id text not null
+)`;
+await sql`CREATE TABLE IF NOT EXISTS owned_article (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null,
+  scope_id text generated always as ('user:' || owner_id) stored not null
+)`;
+await sql`CREATE TABLE IF NOT EXISTS private_article (
+  id uuid primary key default gen_random_uuid(),
+  scope_id text generated always as ('user:private') stored not null
+)`;
+await sql`CREATE TABLE IF NOT EXISTS virtual_article (
+  id uuid primary key default gen_random_uuid(),
+  scope_id text generated always as ('public:') virtual not null
+)`;
+await sql`CREATE TABLE IF NOT EXISTS nullable_article (
+  id uuid primary key default gen_random_uuid(),
+  scope_id text generated always as ('public:') stored
+)`;
+await sql`CREATE TABLE IF NOT EXISTS partitioned_article (
+  id int,
+  owner_id uuid not null,
+  scope_id text generated always as ('public:') stored not null
+) PARTITION BY RANGE (id)`;
+await sql`CREATE TABLE IF NOT EXISTS partitioned_article_child (
+  id int,
+  owner_id uuid not null,
+  scope_id text generated always as ('user:' || owner_id) stored not null
+)`;
+await sql`DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_inherits
+    WHERE inhparent = 'partitioned_article'::regclass AND inhrelid = 'partitioned_article_child'::regclass) THEN
+    ALTER TABLE partitioned_article ATTACH PARTITION partitioned_article_child FOR VALUES FROM (0) TO (10);
+  END IF;
+END $$`;
+await sql`CREATE TABLE IF NOT EXISTS inherited_article (
+  id int,
+  owner_id uuid not null,
+  scope_id text generated always as ('public:') stored not null
+)`;
+await sql`CREATE TABLE IF NOT EXISTS inherited_article_child (
+  scope_id text generated always as ('user:' || owner_id) stored not null
+) INHERITS (inherited_article)`;
 // A per-row shape is answered as the subject, so the role the gate switches
 // to has to exist, and the fixture needs a policy for it to read through:
 // gk_doc is readable by its owner, gk_line is content of a doc.
@@ -35,7 +86,8 @@ await sql`CREATE TABLE IF NOT EXISTS gk_doc (
 )`;
 await sql`CREATE TABLE IF NOT EXISTS gk_line (
   id uuid primary key default gen_random_uuid(),
-  doc_id uuid not null references gk_doc(id)
+  doc_id uuid not null references gk_doc(id),
+  scope_id text generated always as ('public:') stored not null
 )`;
 await sql`ALTER TABLE gk_doc ENABLE ROW LEVEL SECURITY`;
 await sql`DROP POLICY IF EXISTS gk_doc_own ON gk_doc`;
@@ -47,6 +99,7 @@ await sql`INSERT INTO mecha.shape_key VALUES
   ON CONFLICT DO NOTHING`;
 await migrate();
 await sql`delete from webauthn_credential`;
+await sql`delete from identity_link`;
 await sql`delete from app_user`;
 
 function post(path: string, body: unknown, token?: string): Request {
@@ -267,14 +320,70 @@ Deno.test({
   name: "the shape token carries the subject's scopes, not the client's request",
   ...opts,
   async fn() {
-    const { res, uid } = await mint("article");
+    const { res, uid } = await mint("scoped_article");
     assertEquals(res.status, 200);
     const body = await res.json();
     // The same derivation the CRUD path reads, so the two cannot disagree.
     assertEquals(body.where, `scope_id IN ('public:','user:${uid}')`);
     const claims = await verifyJwt(body.token);
-    assertEquals(claims!.table, "article");
+    assertEquals(claims!.table, "scoped_article");
     assertEquals(claims!.where, body.where);
+  },
+});
+
+Deno.test({
+  name: "public stored-generated leaf scopes share one predicate while keeping distinct subjects",
+  ...opts,
+  async fn() {
+    const first = await mint("article");
+    const second = await mint("article");
+    assert(first.uid !== second.uid);
+    for (const minted of [first, second]) {
+      assertEquals(minted.res.status, 200);
+      const body = await minted.res.json();
+      assertEquals(body.where, "scope_id IN ('public:')");
+      const claims = await verifyJwt(body.token);
+      assertEquals(claims!.sub, minted.uid);
+      assertEquals(claims!.table, "article");
+      assertEquals(claims!.where, body.where);
+      const uri = `/v1/shape?table=article&where=${encodeURIComponent(body.where)}`;
+      assertEquals((await handler(shapeReq(body.token, uri))).status, 200);
+      const wider = `scope_id IN ('public:','user:${minted.uid}')`;
+      assertEquals((await handler(shapeReq(body.token, `/v1/shape?table=article&where=${encodeURIComponent(wider)}`))).status, 403);
+    }
+  },
+});
+
+Deno.test({
+  name: "defaults, mutable scopes, private generated scopes and virtual scopes retain full subject reach",
+  ...opts,
+  async fn() {
+    for (const table of ["scoped_article", "mutable_article", "owned_article", "private_article", "virtual_article"]) {
+      const minted = await mint(table);
+      assertEquals(minted.res.status, 200, table);
+      const body = await minted.res.json();
+      assertEquals(body.where, `scope_id IN ('public:','user:${minted.uid}')`, table);
+      assertEquals((await verifyJwt(body.token))!.where, body.where);
+    }
+    assertEquals((await mint("nullable_article")).res.status, 409);
+  },
+});
+
+Deno.test({
+  name: "public parent expressions cannot remove reachable private scopes stored by descendants",
+  ...opts,
+  async fn() {
+    for (const [table, insertInto] of [
+      ["partitioned_article", "partitioned_article"],
+      ["inherited_article", "inherited_article_child"],
+    ]) {
+      const { res, uid } = await mint(table);
+      assertEquals(res.status, 200);
+      await sql`INSERT INTO ${sql(insertInto)} (id, owner_id) VALUES (1, ${uid}::uuid)`;
+      const rows = await sql`SELECT scope_id FROM ${sql(table)} WHERE owner_id = ${uid}::uuid`;
+      assertEquals(rows.map((row) => row.scope_id), [`user:${uid}`]);
+      assertEquals((await res.json()).where, `scope_id IN ('public:','user:${uid}')`, table);
+    }
   },
 });
 
@@ -833,7 +942,7 @@ Deno.test("the dev door admits only the localhost relying party, at startup", as
   assertEquals(admittedOrigin("app.example", "https://app.example"), "https://app.example");
   assertThrows(() => admittedOrigin("app.example", "https://localhost:*"), Error, "WEBAUTHN_ORIGIN");
   const { success, stderr } = await new Deno.Command(Deno.execPath(), {
-    args: ["run", "-A", "--frozen", new URL("./main.ts", import.meta.url).pathname],
+    args: ["run", "-A", "--frozen", fileURLToPath(new URL("./main.ts", import.meta.url))],
     env: { WEBAUTHN_RP_ID: "app.example", WEBAUTHN_ORIGIN: "https://localhost:*" },
     stdout: "null",
     stderr: "piped",
@@ -850,7 +959,7 @@ Deno.test("an origin off the relying party's domain is refused at startup", asyn
   assertThrows(() => admittedOrigin("localhost", "https://app.example"), Error, "is not on WEBAUTHN_RP_ID");
   assertThrows(() => admittedOrigin("example.com", "https://badexample.com"), Error, "is not on WEBAUTHN_RP_ID");
   const { success, stderr } = await new Deno.Command(Deno.execPath(), {
-    args: ["run", "-A", "--frozen", new URL("./main.ts", import.meta.url).pathname],
+    args: ["run", "-A", "--frozen", fileURLToPath(new URL("./main.ts", import.meta.url))],
     env: { WEBAUTHN_RP_ID: "localhost", WEBAUTHN_ORIGIN: "https://app.example" },
     stdout: "null",
     stderr: "piped",
@@ -869,7 +978,7 @@ Deno.test("an origin no ceremony can have is refused at startup", async () => {
   }
   assertThrows(() => admittedOrigin("app.example", "http://app.example"), Error, "is not https");
   const { success, stderr } = await new Deno.Command(Deno.execPath(), {
-    args: ["run", "-A", "--frozen", new URL("./main.ts", import.meta.url).pathname],
+    args: ["run", "-A", "--frozen", fileURLToPath(new URL("./main.ts", import.meta.url))],
     env: { WEBAUTHN_RP_ID: "app.example", WEBAUTHN_ORIGIN: "https://app.example/" },
     stdout: "null",
     stderr: "piped",
@@ -883,6 +992,75 @@ Deno.test("a configured origin is exact, and only localhost stands for the dev d
   assertEquals(ceremonyOrigin("https://localhost:*", "localhost:54321"), "https://localhost:54321");
   assert(ceremonyOrigin("https://localhost:*", "evil.example:54321") !== "https://evil.example:54321");
   assert(ceremonyOrigin("https://localhost:*", null).endsWith("*"));
+});
+
+const alice = { provider: "google", issuer: "https://accounts.google.com", sub: "g-alice", name: "Alice", picture: null };
+
+Deno.test({
+  name: "a provider's subject is one person, however many sign-ins race to make it",
+  ...opts,
+  fn: async () => {
+    // Connections opened first: a sign-in on the one already open commits
+    // before the others have connected, and nothing races.
+    await Promise.all(Array.from({ length: 8 }, () => sql`select pg_sleep(0.05)`));
+    for (const sub of ["g-race-1", "g-race-2", "g-race-3"]) {
+      const racers = await Promise.all(Array.from({ length: 8 }, () => links.userFor({ ...alice, sub })));
+      assertEquals(new Set(racers.map((u) => u.id)).size, 1, sub);
+    }
+    const users = [await links.userFor(alice)];
+    const [link] = await sql`select user_id from identity_link where provider = 'google' and sub = 'g-alice'`;
+    assertEquals(link.user_id, users[0].id);
+    await links.userFor({ ...alice, name: "Alice B." });
+    assertEquals((await sql`select name from identity_link where sub = 'g-alice'`)[0].name, "Alice B.");
+    assertEquals(await links.handleOf("google", alice.issuer, users[0].id), users[0].handle);
+  },
+});
+
+Deno.test({
+  name: "a session is only a provider's while its link is there",
+  ...opts,
+  fn: async () => {
+    const guest = (await (await handler(post("/auth/guest", {}))).json()).user;
+    assertEquals(await links.handleOf("google", alice.issuer, guest.id), null);
+    const u = await links.userFor({ ...alice, sub: "g-revoked" });
+    await sql`delete from identity_link where sub = 'g-revoked'`;
+    assertEquals(await links.handleOf("google", alice.issuer, u.id), null);
+  },
+});
+
+Deno.test({
+  name: "legacy links require their original issuer before migration can admit sign-in",
+  ...opts,
+  fn: async () => {
+    // The shape its auth service made, with a row signed in through the broker.
+    await sql`drop table identity_link`;
+    await sql`create table identity_link (
+      provider text not null, sub text not null,
+      user_id uuid not null unique references app_user(id) on delete cascade,
+      created_at timestamptz not null default now(), primary key (provider, sub))`;
+    const guest = (await (await handler(post("/auth/guest", {}))).json()).user;
+    await sql`insert into identity_link (provider, sub, user_id) values ('google', 'pairwise-1', ${guest.id})`;
+    await assertRejects(() => migrate(), Error, "identity_link has unassigned issuers");
+    await sql`alter table identity_link add column issuer text`;
+    await sql`update identity_link set issuer = ${alice.issuer}`;
+    await migrate();
+    assertEquals((await links.userFor({ ...alice, sub: "pairwise-1", name: null, picture: null })).id, guest.id);
+    const replacement = await links.userFor({ ...alice, issuer: "https://broker.test", sub: "pairwise-1" });
+    assert(replacement.id !== guest.id);
+    assertEquals(await links.handleOf("google", "https://broker.test", guest.id), null);
+    assertEquals(await links.handleOf("google", alice.issuer, guest.id), guest.handle);
+  },
+});
+
+Deno.test("a provider named without its client is refused at startup", async () => {
+  const { success, stderr } = await new Deno.Command(Deno.execPath(), {
+    args: ["run", "-A", "--frozen", fileURLToPath(new URL("./main.ts", import.meta.url))],
+    env: { OIDC_PROVIDERS: "google" },
+    stdout: "null",
+    stderr: "piped",
+  }).output();
+  assert(!success);
+  assertStringIncludes(new TextDecoder().decode(stderr), "OIDC_GOOGLE_CLIENT_ID is required");
 });
 
 // Last, and it has to be: Deno runs tests in source order, and this closes the

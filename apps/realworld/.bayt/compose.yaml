@@ -1,108 +1,156 @@
 # generated from bayt.cue — do not edit
 include:
-- path: ./compose.bayt.yaml
+- path:
+  - ./compose.bayt.yaml
+  - ./compose.bayt.ports.yaml
   required: false
 services:
-  replay:
+  ci-replay:
     extends:
-      file: ./compose.replay.yaml
-      service: apps_realworld-replay
+      file: ./compose.ci-replay.yaml
+      service: realworld-ci-replay
     profiles:
-    - replay
-    scale: 1
+    - ci-replay
   setup:
     extends:
       file: ./compose.setup.yaml
-      service: apps_realworld-setup
+      service: realworld-setup
     profiles:
     - setup
+    scale: 1
+  lint:
+    extends:
+      file: ./compose.lint.yaml
+      service: realworld-lint
+    profiles:
+    - lint
+  generate:
+    extends:
+      file: ./compose.generate.yaml
+      service: realworld-generate
+    profiles:
+    - generate
   build:
     extends:
       file: ./compose.build.yaml
-      service: apps_realworld-build
+      service: realworld-build
     profiles:
     - build
+  test:
+    extends:
+      file: ./compose.test.yaml
+      service: realworld-test
+    profiles:
+    - test
   launch:
     extends:
       file: ./compose.launch.yaml
-      service: apps_realworld-launch
+      service: realworld-launch
     profiles:
     - launch
     scale: 1
   integrate:
     extends:
       file: ./compose.integrate.yaml
-      service: apps_realworld-integrate
+      service: realworld-integrate
     profiles:
     - integrate
     scale: 1
-  check-favorites:
+  ci-visual:
     extends:
-      file: ./compose.check-favorites.yaml
-      service: apps_realworld-check-favorites
+      file: ./compose.ci-visual.yaml
+      service: realworld-ci-visual
     profiles:
-    - check-favorites
+    - ci-visual
+    scale: 1
+  ci:
+    extends:
+      file: ./compose.ci.yaml
+      service: realworld-ci
+    profiles:
+    - ci
+    scale: 1
+  served:
+    extends:
+      file: ./compose.served.yaml
+      service: realworld-served
+    profiles:
+    - served
     scale: 1
   database:
     extends:
       file: ./compose.database.yaml
-      service: apps_realworld-database
+      service: realworld-database
     profiles:
     - database
-    scale: 1
-  crud:
-    extends:
-      file: ./compose.crud.yaml
-      service: apps_realworld-crud
-    profiles:
-    - crud
     scale: 1
   auth:
     extends:
       file: ./compose.auth.yaml
-      service: apps_realworld-auth
+      service: realworld-auth
     profiles:
     - auth
-    scale: 1
-  caddy:
-    extends:
-      file: ./compose.caddy.yaml
-      service: apps_realworld-caddy
-    profiles:
-    - caddy
-    scale: 1
-  electric:
-    extends:
-      file: ./compose.electric.yaml
-      service: apps_realworld-electric
-    profiles:
-    - electric
-    scale: 1
-  redis:
-    extends:
-      file: ./compose.redis.yaml
-      service: apps_realworld-redis
-    profiles:
-    - redis
     scale: 1
   mesh-events:
     extends:
       file: ./compose.mesh-events.yaml
-      service: apps_realworld-mesh-events
+      service: realworld-mesh-events
     profiles:
     - mesh-events
     scale: 1
   conduit:
     extends:
       file: ./compose.conduit.yaml
-      service: apps_realworld-conduit
+      service: realworld-conduit
     profiles:
     - conduit
+    scale: 1
+  check-favorites:
+    extends:
+      file: ./compose.check-favorites.yaml
+      service: realworld-check-favorites
+    profiles:
+    - check-favorites
+    scale: 1
+  ci-favorites:
+    extends:
+      file: ./compose.ci-favorites.yaml
+      service: realworld-ci-favorites
+    profiles:
+    - ci-favorites
+    scale: 1
+  caddy:
+    extends:
+      file: ./compose.caddy.yaml
+      service: realworld-caddy
+    profiles:
+    - caddy
+    scale: 1
+  crud:
+    extends:
+      file: ./compose.crud.yaml
+      service: realworld-crud
+    profiles:
+    - crud
+    scale: 1
+  electric:
+    extends:
+      file: ./compose.electric.yaml
+      service: realworld-electric
+    profiles:
+    - electric
+    scale: 1
+  redis:
+    extends:
+      file: ./compose.redis.yaml
+      service: realworld-redis
+    profiles:
+    - redis
     scale: 1
   transform:
     extends:
       file: ./compose.transform.yaml
-      service: apps_realworld-transform
+      service: realworld-transform
     profiles:
     - transform
     scale: 1

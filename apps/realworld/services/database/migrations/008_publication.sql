@@ -7,15 +7,46 @@ BEGIN;
 -- tier: container
 DO $$ DECLARE t text; BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'realworld_cdc') THEN
-    CREATE PUBLICATION realworld_cdc FOR TABLE app_user,article,article_tag,comment,favorite,bookmark,follow WITH (publish_generated_columns = stored);
+    CREATE PUBLICATION realworld_cdc FOR TABLE app_user,me,article,article_tag,comment,favorite,bookmark,follow,favorite_count,article_stats,tag_count,favorite_index;
   END IF;
-  FOREACH t IN ARRAY ARRAY['app_user','article','article_tag','comment','favorite','bookmark','follow'] LOOP
+  FOREACH t IN ARRAY ARRAY['app_user','me','article','article_tag','comment','favorite','bookmark','follow','favorite_count','article_stats','tag_count','favorite_index'] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_publication_tables
                    WHERE pubname = 'realworld_cdc' AND schemaname = 'public' AND tablename = t) THEN
       EXECUTE format('ALTER PUBLICATION realworld_cdc ADD TABLE %I', t);
     END IF;
   END LOOP;
 END $$;
+ALTER PUBLICATION realworld_cdc SET (publish_generated_columns = stored);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables
+                 WHERE pubname = 'realworld_cdc' AND schemaname = 'mecha' AND tablename = 'txn_trace') THEN
+    ALTER PUBLICATION realworld_cdc ADD TABLE mecha.txn_trace;
+  END IF;
+END $$;
+CREATE OR REPLACE TRIGGER mark_txn BEFORE INSERT OR UPDATE OR DELETE ON app_user
+  FOR EACH STATEMENT EXECUTE FUNCTION mecha.mark_txn();
+CREATE OR REPLACE TRIGGER mark_txn BEFORE INSERT OR UPDATE OR DELETE ON me
+  FOR EACH STATEMENT EXECUTE FUNCTION mecha.mark_txn();
+CREATE OR REPLACE TRIGGER mark_txn BEFORE INSERT OR UPDATE OR DELETE ON article
+  FOR EACH STATEMENT EXECUTE FUNCTION mecha.mark_txn();
+CREATE OR REPLACE TRIGGER mark_txn BEFORE INSERT OR UPDATE OR DELETE ON article_tag
+  FOR EACH STATEMENT EXECUTE FUNCTION mecha.mark_txn();
+CREATE OR REPLACE TRIGGER mark_txn BEFORE INSERT OR UPDATE OR DELETE ON comment
+  FOR EACH STATEMENT EXECUTE FUNCTION mecha.mark_txn();
+CREATE OR REPLACE TRIGGER mark_txn BEFORE INSERT OR UPDATE OR DELETE ON favorite
+  FOR EACH STATEMENT EXECUTE FUNCTION mecha.mark_txn();
+CREATE OR REPLACE TRIGGER mark_txn BEFORE INSERT OR UPDATE OR DELETE ON bookmark
+  FOR EACH STATEMENT EXECUTE FUNCTION mecha.mark_txn();
+CREATE OR REPLACE TRIGGER mark_txn BEFORE INSERT OR UPDATE OR DELETE ON follow
+  FOR EACH STATEMENT EXECUTE FUNCTION mecha.mark_txn();
+CREATE OR REPLACE TRIGGER mark_txn BEFORE INSERT OR UPDATE OR DELETE ON favorite_count
+  FOR EACH STATEMENT EXECUTE FUNCTION mecha.mark_txn();
+CREATE OR REPLACE TRIGGER mark_txn BEFORE INSERT OR UPDATE OR DELETE ON article_stats
+  FOR EACH STATEMENT EXECUTE FUNCTION mecha.mark_txn();
+CREATE OR REPLACE TRIGGER mark_txn BEFORE INSERT OR UPDATE OR DELETE ON tag_count
+  FOR EACH STATEMENT EXECUTE FUNCTION mecha.mark_txn();
+CREATE OR REPLACE TRIGGER mark_txn BEFORE INSERT OR UPDATE OR DELETE ON favorite_index
+  FOR EACH STATEMENT EXECUTE FUNCTION mecha.mark_txn();
 -- tier: any
 
 -- Electric's own publication, declared rather than left to it.
@@ -27,7 +58,7 @@ END $$;
 -- tier: container
 DO $$ DECLARE t text; BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'electric_publication_default') THEN
-    CREATE PUBLICATION electric_publication_default FOR TABLE app_user,me,article,article_tag,comment,favorite,bookmark,follow,favorite_count,article_stats,tag_count,favorite_index WITH (publish_generated_columns = stored);
+    CREATE PUBLICATION electric_publication_default FOR TABLE app_user,me,article,article_tag,comment,favorite,bookmark,follow,favorite_count,article_stats,tag_count,favorite_index;
   END IF;
   FOREACH t IN ARRAY ARRAY['app_user','me','article','article_tag','comment','favorite','bookmark','follow','favorite_count','article_stats','tag_count','favorite_index'] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_publication_tables
@@ -36,6 +67,7 @@ DO $$ DECLARE t text; BEGIN
     END IF;
   END LOOP;
 END $$;
+ALTER PUBLICATION electric_publication_default SET (publish_generated_columns = stored);
 
 ALTER TABLE app_user REPLICA IDENTITY FULL;
 ALTER TABLE me REPLICA IDENTITY FULL;

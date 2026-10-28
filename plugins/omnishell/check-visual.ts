@@ -101,10 +101,8 @@ export function parseViewports(spec?: string): Viewport[] {
   return resolved.length > 0 ? resolved : DEFAULT_VIEWPORTS
 }
 
-// Routes in flight per viewport. The two viewports already run as separate
-// contexts, so the browser holds up to twice this many live pages. Past four
-// the wall clock flattens: what the lint spends is round trips to one
-// browser, not CPU it could spread wider.
+// Cap live pages across the browser; multiplying this by viewport count
+// makes readiness deadlines depend on how many viewport sizes were requested.
 const LANES = 4
 
 // A screen is ready to measure when it stops changing. This long without a
@@ -231,11 +229,40 @@ function crudReader(base: string, token: string | undefined): Reader {
 }
 
 /** PostgREST nests a select the way the filter nests the path, at any depth:
- * `article_tag.tag` selects `article_tag(tag)`, `a.b.name` selects `a(b(name))`. */
-export function embedSelect(column: string): string {
-  const path = column.split(".")
-  const leaf = path.pop() as string
-  return path.reduceRight((inner, rel) => `${rel}(${inner})`, leaf)
+ * `article_tag.tag` selects `article_tag(tag)`, `a.b.name` selects `a(b(name))`.
+ * Any dotted column in `ctxFilter` is added as an `!inner` embed so PostgREST
+ * joins and filters by that resource instead of rejecting with PGRST108. */
+export function embedSelect(column: string, ctxFilter = ""): string {
+  type Node = { inner: boolean; leaves: Set<string>; children: Map<string, Node> }
+  const node = (): Node => ({ inner: false, leaves: new Set(), children: new Map() })
+  const root = node()
+  const add = (col: string, inner: boolean) => {
+    const path = col.split(".")
+    const leaf = path.pop() as string
+    let cur = root
+    for (const rel of path) {
+      let child = cur.children.get(rel)
+      if (!child) {
+        child = node()
+        cur.children.set(rel, child)
+      }
+      if (inner) child.inner = true
+      cur = child
+    }
+    cur.leaves.add(leaf)
+  }
+  add(column, false)
+  for (const clause of ctxFilter.split("&")) {
+    const eq = clause.indexOf("=")
+    if (eq <= 0) continue
+    const col = clause.slice(0, eq)
+    if (col.includes(".")) add(col, true)
+  }
+  const render = (n: Node): string => [
+    ...n.leaves,
+    ...[...n.children].map(([rel, c]) => `${rel}${c.inner ? "!inner" : ""}(${render(c)})`),
+  ].join(",")
+  return render(root)
 }
 
 /** One hop of an embed walk: the first row of a to-many relation, or a to-one
@@ -304,14 +331,33 @@ export async function resolveParams(
     params.set(plan.route, held)
   }
   const hole = (plan: ParamPlan) => unresolved.push({ route: plan.route, param: plan.param })
+  const pinnedContext = (plan: ParamPlan): string => {
+    if (!plan.filter) return ""
+    const held = params.get(plan.route) ?? {}
+    const clauses: string[] = []
+    for (const part of plan.filter.split("&")) {
+      if (!part || part.startsWith("limit=") || part.startsWith("offset=")) continue
+      if (part.includes(`{param.${plan.param}}`)) continue
+      const filled = part.replace(/\{param\.(\w+)\}/g, (m, p) => (p in held ? encodeURIComponent(held[p]) : m))
+      if (!/\{/.test(filled)) clauses.push(filled)
+    }
+    return clauses.join("&")
+  }
   for (const plan of plans) {
     const table = plan.table
+    const ctxFilter = pinnedContext(plan)
     if (onDevice(plan, tiers)) {
       // The seeded values, and for a cursor the one whose own predicate admits
       // the most other rows: the interpreter's parseFilter orders the rows, so
       // the lint never carries a comparison of its own that could disagree
       // with it. Any read a value answers by itself takes the first.
-      const rows = tiers.seed[table] ?? []
+      const allRows = tiers.seed[table] ?? []
+      let rows = allRows
+      if (ctxFilter) {
+        const ctxPreds = parseFilter(ctxFilter) as ((row: Row) => boolean)[] | null
+        if (ctxPreds === null) { hole(plan); continue }
+        rows = allRows.filter((r) => ctxPreds.every((p) => p(r)))
+      }
       const values = rows
         .map((r) => r[plan.column] as number | string | null | undefined)
         .filter((v): v is number | string => v !== undefined && v !== null)
@@ -336,9 +382,9 @@ export async function resolveParams(
       else hole(plan)
       continue
     }
-    const select = embedSelect(plan.column)
+    const select = embedSelect(plan.column, ctxFilter)
     const order = plan.op === "lt" ? `&order=${plan.column}.desc` : plan.op === "gt" ? `&order=${plan.column}.asc` : ""
-    const rows = await api(`${table}?select=${select}${order}&limit=1`)
+    const rows = await api(`${table}?select=${select}${ctxFilter ? `&${ctxFilter}` : ""}${order}&limit=1`)
     const row = rows[0]
     if (!row) { hole(plan); continue }
     const raw = embedValue(row, plan.column)
@@ -355,28 +401,154 @@ export async function resolveParams(
  * Never wait for networkidle: Electric holds its shape connections open, so
  * that state never arrives and the wait consumes the whole timeout.
  */
+// How long a screen may take to settle, which its deployment bounds: the
+// guest it mints and the reads it makes each answer inside their door's
+// bound, so a wait shorter than theirs fails a page the cluster serves.
+function settleTimeout(): number {
+  const ms = Number(Deno.env.get("SETTLE_TIMEOUT_MS"))
+  if (!(ms > 0)) throw new Error(`SETTLE_TIMEOUT_MS must be a positive number of milliseconds, got ${Deno.env.get("SETTLE_TIMEOUT_MS")}`)
+  return ms
+}
+
 async function openRoute(
   page: PageLike,
   base: string,
   url: string,
-): Promise<{ state: string; settled: boolean }> {
+): Promise<{ state: string; moving: string | null }> {
   // A route is a real path, so this asks the door for it the way a reader does
   // — the proxy's try_files is what hands back the entry document, and a URL
   // the route table does not answer stays a 404 here rather than a screen that
-  // silently never settles.
-  await page.goto(`${base}${url}`, { waitUntil: "domcontentloaded" })
+  // silently never settles. ?clock=manual holds machine after: timers in
+  // pending so posed states do not transition out from under the linter.
+  const clockUrl = `${url}${url.includes("?") ? "&" : "?"}clock=manual&epoch=2026-01-01T00:00:00Z`
+  await page.goto(`${base}${clockUrl}`, { waitUntil: "domcontentloaded" })
   const state = await page
     .waitForFunction(
       () => {
-        const el = document.querySelector("#app .shell-screen:not([hidden]) .screen")
+        // The shell's own screen, never a served document's it has not yet
+        // replaced: that one is painted but not yet the app.
+        const el = document.querySelector("#app .shell-screen:not([hidden]):not([data-served]) .screen")
         const s = el?.getAttribute("data-state")
         return s && s !== "loading" ? s : null
       },
       undefined,
-      { timeout: 20_000 },
+      { timeout: settleTimeout() },
     )
     .then((h) => h.jsonValue() as Promise<string>)
-  return { state, settled: await settle(page) }
+  return { state, moving: await motion(page) }
+}
+
+/**
+ * Coalesces synchronous `page.evaluate(fn, arg)` checks dispatched in the same
+ * microtask tick (`Promise.all([...])`) into a single CDP `Runtime.evaluate`
+ * round-trip.
+ */
+function batchEvaluates(page: PageLike): PageLike {
+  let queue: Array<{ fn: unknown; arg: unknown; resolve: (v: unknown) => void; reject: (e: unknown) => void }> = []
+  let scheduled = false
+  return {
+    goto: (url, opts) => page.goto(url, opts),
+    waitForFunction: (fn, arg, opts) => page.waitForFunction(fn, arg, opts),
+    close: () => page.close(),
+    evaluate(fn: unknown, arg?: unknown): Promise<unknown> {
+      if (typeof fn !== "function") return page.evaluate(fn, arg)
+      return new Promise((resolve, reject) => {
+        queue.push({ fn, arg, resolve, reject })
+        if (!scheduled) {
+          scheduled = true
+          queueMicrotask(async () => {
+            const batch = queue
+            queue = []
+            scheduled = false
+            if (batch.length === 1) {
+              try {
+                batch[0].resolve(await page.evaluate(batch[0].fn, batch[0].arg))
+              } catch (e) {
+                batch[0].reject(e)
+              }
+              return
+            }
+            const expr = `Promise.all([${
+              batch.map(({ fn: f, arg: a }) => `(${String(f)})(${a === undefined ? "" : JSON.stringify(a)})`).join(",")
+            }])`
+            try {
+              const results = (await page.evaluate(expr)) as unknown[]
+              batch.forEach((item, i) => item.resolve(results[i]))
+            } catch (e) {
+              batch.forEach((item) => item.reject(e))
+            }
+          })
+        }
+      })
+    },
+  }
+}
+
+// A screen that locks vertical scrolling (overflow-y: hidden|clip on html,
+// body, or [data-screen]) is a viewport-fitted board rather than a scrolling
+// document: the document itself must not exceed the viewport height, and every
+// visible interactive control outside a scrollable container must sit within
+// 0..innerHeight.
+export async function checkVerticalFit(page: { evaluate(fn: unknown, arg?: unknown): Promise<unknown> }): Promise<VisualBug[]> {
+  return (await page.evaluate(() => {
+    const bugs: Array<{ rule: string; description: string; severity: "critical" | "major" | "minor"; element?: string }> = []
+    const screenEl = document.querySelector<HTMLElement>("[data-screen]")
+    const locked = [document.documentElement, document.body, screenEl]
+      .filter((el): el is HTMLElement => el !== null)
+      .some((el) => {
+        const y = getComputedStyle(el).overflowY
+        return y === "hidden" || y === "clip"
+      })
+    if (!locked) return bugs
+
+    const viewportH = window.innerHeight
+    const docHeight = (document.scrollingElement ?? document.documentElement).scrollHeight
+    if (docHeight > viewportH + 1) {
+      bugs.push({
+        rule: "vertical-overflow",
+        description: `Document height (${docHeight}px) exceeds locked viewport (${viewportH}px) by ${docHeight - viewportH}px`,
+        severity: "critical",
+      })
+    }
+
+    const clippedAway = (el: Element): boolean => {
+      for (let a: Element | null = el; a; a = a.parentElement) {
+        const box = a.getBoundingClientRect()
+        if (box.width > 1 && box.height > 1) continue
+        const s = getComputedStyle(a)
+        if (s.overflow !== "visible" || s.clipPath !== "none") return true
+      }
+      return false
+    }
+    const inScrollableY = (el: Element): boolean => {
+      for (let a = el.parentElement; a && a !== document.body && a !== document.documentElement; a = a.parentElement) {
+        const y = getComputedStyle(a).overflowY
+        if ((y === "auto" || y === "scroll") && a.scrollHeight > a.clientHeight + 1) return true
+      }
+      return false
+    }
+    const name = (el: Element) =>
+      el.getAttribute("data-testid") || el.getAttribute("aria-label") ||
+      el.textContent?.trim().slice(0, 30) || el.tagName.toLowerCase()
+
+    for (const el of document.querySelectorAll('button, a[href], input, textarea, select, [role="button"], [tabindex="0"]')) {
+      const htmlEl = el as HTMLElement
+      if (!htmlEl.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, contentVisibilityAuto: true })) continue
+      if (htmlEl.closest('[inert],[aria-hidden="true"]') || clippedAway(htmlEl) || inScrollableY(htmlEl)) continue
+      const rect = htmlEl.getBoundingClientRect()
+      if (rect.width * rect.height === 0) continue
+      if (rect.top < -1 || rect.bottom > viewportH + 1) {
+        const id = name(htmlEl)
+        bugs.push({
+          rule: "vertical-overflow",
+          description: `"${id}" overflows locked viewport vertically (${Math.round(rect.top)}..${Math.round(rect.bottom)} against 0..${viewportH})`,
+          severity: "critical",
+          element: id,
+        })
+      }
+    }
+    return bugs
+  })) as VisualBug[]
 }
 
 /**
@@ -404,22 +576,42 @@ export async function settle(
   // than to stay under it. No production caller passes either.
   opts: { capMs?: number; stableMs?: number } = {},
 ): Promise<boolean> {
+  return (await motion(page, opts)) === null
+}
+
+/**
+ * `settle`'s wait, answering what was still moving when the cap came: the last
+ * mutated node, moved box, loading image, running animation or entering
+ * screen, so a report names its cause. Null when the screen went quiet.
+ */
+export async function motion(
+  page: PageLike,
+  opts: { capMs?: number; stableMs?: number } = {},
+): Promise<string | null> {
   const { capMs = SETTLE_CAP_MS, stableMs = SETTLE_STABLE_MS } = opts
   return await page.evaluate(
     ({ stableMs, capMs }: { stableMs: number; capMs: number }) =>
-      new Promise<boolean>((resolve) => {
+      new Promise<string | null>((resolve) => {
+        const named = (node: Node | null | undefined): string => {
+          const el = (node?.nodeType === 1 ? node : node?.parentElement) as Element | null | undefined
+          if (!el) return "?"
+          const cls = [...el.classList].slice(0, 2).map((c) => `.${c}`).join("")
+          return `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}${cls}`
+        }
+        let cause = "the first sample"
         let done = false
         const finish = (quiet: boolean) => {
           if (done) return
           done = true
           observer.disconnect()
-          resolve(quiet)
+          resolve(quiet ? null : cause)
         }
         const cap = setTimeout(() => finish(false), capMs)
 
-        let mutated = true
-        const observer = new MutationObserver(() => {
-          mutated = true
+        let mutated: string | null = "the document"
+        const observer = new MutationObserver((records) => {
+          const r = records[records.length - 1]
+          mutated = `${r.type}${r.attributeName ? ` ${r.attributeName}` : ""} on ${named(r.target)}`
         })
         observer.observe(document.documentElement, {
           attributes: true,
@@ -428,37 +620,65 @@ export async function settle(
           subtree: true,
         })
 
-        const fingerprint = () => {
-          let h = 0
-          for (const el of document.querySelectorAll("*")) {
+        const boxes = () =>
+          [...document.querySelectorAll("*")].map((el) => {
             const r = el.getBoundingClientRect()
-            const s = `${r.x},${r.y},${r.width},${r.height}`
-            for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0
-          }
-          return h
-        }
+            return `${r.x},${r.y},${r.width},${r.height}`
+          })
         // Read fresh each sample: an image the second shape inserts is not in
         // any list taken earlier. `complete` covers errored images too, where
         // awaiting decode() would wait on a promise that never settles.
-        const loading = () => [...document.images].some((img) => !img.complete)
+        const loading = () => [...document.images].find((img) => !img.complete)
         // A fade moves no box and mutates no node, and a screen read inside one
         // is a screen at some opacity between the two it will have. The finite
         // ones are waited out, by the rule checkContrast states.
         const fading = () =>
-          document.getAnimations().some((a) =>
+          document.getAnimations().find((a) =>
             a.timeline instanceof DocumentTimeline && a.playState === "running" && a.playbackRate !== 0 &&
             a.effect?.getTiming().iterations !== Infinity
           )
-        const entering = () => document.querySelector(".shell-screen[data-entering]") !== null
+        const entering = () => document.querySelector(".shell-screen[data-entering]")
+        const busyRegions = () =>
+          (window as unknown as { __prontoBusy?: () => { regions?: number } }).__prontoBusy?.().regions ?? 0
 
-        let previous = fingerprint()
+        let previous = boxes()
         let stableSince = performance.now()
         const sample = () => {
           if (done) return
           const now = performance.now()
-          const current = fingerprint()
-          if (mutated || current !== previous || loading() || fading() || entering()) {
-            mutated = false
+          const current = boxes()
+          const all = document.querySelectorAll("*")
+          const moved = current.findIndex((b, i) => b !== previous[i])
+          const image = loading()
+          const animation = fading()
+          const screen = entering()
+          const busy = busyRegions()
+          const why = mutated ??
+            (moved >= 0 || current.length !== previous.length
+              ? `a box moved: ${moved >= 0 ? named(all[moved]) : "the element count changed"}`
+              : busy > 0
+              ? `${busy} region(s) still hydrating or reducing`
+              : image
+              ? `an image still loading: ${image.currentSrc || image.src}`
+              : animation
+              ? (() => {
+                const effect = animation.effect as KeyframeEffect | null
+                const kind = "transitionProperty" in animation
+                  ? `transition of ${(animation as CSSTransition).transitionProperty}`
+                  : "animationName" in animation
+                  ? `animation ${(animation as CSSAnimation).animationName}`
+                  : "script animation"
+                const timing = effect?.getComputedTiming()
+                return `a ${kind} running on ${named(effect?.target)}${effect?.pseudoElement ?? ""}, at ${
+                  Math.round(Number(animation.currentTime))
+                }ms of ${Math.round(Number(timing?.endTime))}ms`
+              })()
+              : screen
+              ? `a screen entering: ${named(screen)}`
+              : null)
+          if (why) {
+            cause = why
+            mutated = null
             previous = current
             stableSince = now
           } else if (now - stableSince >= stableMs) {
@@ -470,7 +690,7 @@ export async function settle(
         setTimeout(sample, 50)
       }),
     { stableMs, capMs },
-  ) as boolean
+  ) as string | null
 }
 
 async function main(appDir: string, viewports: Viewport[] = DEFAULT_VIEWPORTS): Promise<number> {
@@ -502,14 +722,14 @@ async function main(appDir: string, viewports: Viewport[] = DEFAULT_VIEWPORTS): 
   // param nothing plans for is that hole one step earlier.
   for (const hole of unplanned) {
     findings.push({
-      severity: "major",
+      severity: "critical",
       path: hole.route,
       message: `no read filters on :${hole.param}, so no fixture can be resolved and this route went unlinted. Give the screen a region whose data-filter pins the param.`,
     })
   }
   for (const hole of unresolved) {
     findings.push({
-      severity: "major",
+      severity: "critical",
       path: hole.route,
       message: `no fixture value for :${hole.param} — this route went unlinted. Seed a row the param's read can match.`,
     })
@@ -610,7 +830,7 @@ async function main(appDir: string, viewports: Viewport[] = DEFAULT_VIEWPORTS): 
       return
     }
     try {
-      const { state, settled } = await openRoute(page, base, url)
+      const { state, moving } = await openRoute(page, base, url)
       if (state === "gone") {
         out.push({
           severity: "major",
@@ -619,38 +839,41 @@ async function main(appDir: string, viewports: Viewport[] = DEFAULT_VIEWPORTS): 
         })
         return
       }
-      if (!settled) {
+      if (moving !== null) {
         out.push({
           severity: "major",
           path: url,
-          message: `${where}: still moving after ${SETTLE_CAP_MS}ms, so everything below measured a moving screen.`,
+          message: `${where}: still moving after ${SETTLE_CAP_MS}ms (${moving}), so everything below measured a moving screen.`,
         })
       }
       const p = page as never
+      const b = batchEvaluates(page) as never
       // theme-stability is absent by design: it toggles a `.dark` class,
       // and pronto themes through prefers-color-scheme plus a `-dark`
       // state suffix, so the toggle changes no computed colour and the
       // check passes without measuring.
       const bugs: VisualBug[] = (
         await Promise.all([
-          checkInteractiveOverlap(p),
-          checkHorizontalOverflow(p),
-          checkClippedContent(p),
-          checkFocusableInvisible(p),
-          checkConstrainedImages(p),
-          checkViewportBounds(p),
-          checkTouchTargets(p, { minSize: floors.touch }),
-          checkFocusOrder(p),
-          checkClippedControls(p),
-          checkAlignmentDrift(p),
-          checkGridBaseline(p),
-          checkWhiteSpace(p),
-          checkCLS(p),
+          checkInteractiveOverlap(b),
+          checkHorizontalOverflow(b),
+          checkVerticalFit(b),
+          checkClippedContent(b),
+          checkFocusableInvisible(b),
+          checkConstrainedImages(b),
+          checkViewportBounds(b),
+          checkTouchTargets(b, { minSize: floors.touch }),
+          checkFocusOrder(b),
+          checkClippedControls(b),
+          checkAlignmentDrift(b),
+          checkGridBaseline(b),
+          checkWhiteSpace(b),
+          checkCLS(b),
         ])
       ).flat()
       // After the parallel batch: checkContrast says why.
       bugs.push(...await checkContrast(p))
       bugs.push(...analyzeConsole(console_, { ignore: IGNORE }))
+      let consoleCursor = console_.messages.length
       // The sampler above and this settled read are one scan over one projection,
       // taken at two times: it catches braces painted during hydration, this
       // catches braces still standing. Neither can tell a leak from an app that
@@ -694,50 +917,128 @@ async function main(appDir: string, viewports: Viewport[] = DEFAULT_VIEWPORTS): 
             const parsedMachine: Machine = JSON.parse(reg.machine)
             const emptyObj = reg.emptyRow ? JSON.parse(reg.emptyRow) : {}
             if (emptyObj.id === "") delete emptyObj.id
-            if (!baseRows[reg.table]) {
-              baseRows[reg.table] = {
-                ...(tiers.seed[reg.table]?.[0] ?? {}),
-                ...emptyObj,
-              }
-            } else {
-              Object.assign(baseRows[reg.table], emptyObj)
+            const prev = baseRows[reg.table] ?? { ...(tiers.seed[reg.table]?.[0] ?? {}) }
+            for (const [k, v] of Object.entries(emptyObj)) {
+              if (v !== "" || !(k in prev)) prev[k] = v
             }
+            baseRows[reg.table] = prev
             const infos = extractRegions(parsedMachine, reg.table)
             allRegionInfos.push(...infos)
           }
           const frames = generateCoveringArrayFrames(allRegionInfos, baseRows)
+          const contrastChecked = new Set<string>()
           for (const f of frames) {
-            const posed = await page.evaluate(
-              async (tables: Record<string, Record<string, unknown>>) => {
-                const pose = (window as unknown as { __prontoPose?: (t: string, r: Record<string, unknown>) => Promise<void> }).__prontoPose
-                if (typeof pose !== "function") return false
-                for (const [table, row] of Object.entries(tables)) {
-                  await pose(table, row)
+            const settled = (await page.evaluate(
+              async ({
+                tables,
+                capMs,
+              }: {
+                tables: Record<string, Record<string, unknown>>
+                capMs: number
+              }) => {
+                const w = window as unknown as {
+                  __prontoPose?: (t: string, r: Record<string, unknown>) => Promise<void>
+                  __prontoBusy?: () => { regions: number; waits: number }
                 }
-                return true
+                if (typeof w.__prontoPose !== "function") return { posed: false, quiet: true }
+                let mutated = false
+                const observer = new MutationObserver(() => {
+                  mutated = true
+                })
+                observer.observe(document.documentElement, {
+                  attributes: true,
+                  characterData: true,
+                  childList: true,
+                  subtree: true,
+                })
+                try {
+                  for (const [table, row] of Object.entries(tables)) {
+                    await w.__prontoPose(table, row)
+                  }
+                  const fastForward = () => {
+                    for (const a of document.getAnimations()) {
+                      if (
+                        a.timeline instanceof DocumentTimeline &&
+                        a.playState === "running" &&
+                        a.playbackRate !== 0 &&
+                        a.effect?.getTiming().iterations !== Infinity
+                      ) {
+                        const target = (a.effect as KeyframeEffect | null)?.target as Element | null
+                        const drivesHandler =
+                          target?.closest?.("[data-on-animationend],[data-machine*='animationend']") !== null
+                        if ("transitionProperty" in a || drivesHandler) a.cancel()
+                        else {
+                          try {
+                            a.finish()
+                          } catch {
+                            a.cancel()
+                          }
+                        }
+                      }
+                    }
+                  }
+                  const deadline = performance.now() + capMs
+                  let calmFrames = 0
+                  while (performance.now() < deadline) {
+                    fastForward()
+                    if ((w.__prontoBusy?.().regions ?? 0) === 0 && !mutated) {
+                      calmFrames += 1
+                      if (calmFrames >= 2) break
+                    } else {
+                      calmFrames = 0
+                    }
+                    mutated = false
+                    await new Promise((r) => requestAnimationFrame(() => r(undefined)))
+                  }
+                  fastForward()
+                } finally {
+                  observer.disconnect()
+                }
+                const busy = (w.__prontoBusy?.().regions ?? 0) > 0
+                const loading = [...document.images].some((img) => !img.complete)
+                const entering = document.querySelector(".shell-screen[data-entering]") !== null
+                return { posed: true, quiet: !busy && !loading && !entering }
               },
-              f.tables ?? { [regions[0].table]: f.row },
-            )
-            if (!posed) continue
-            await settle(page, { capMs: 800, stableMs: 60 })
+              { tables: f.tables ?? { [regions[0].table]: f.row }, capMs: SETTLE_CAP_MS },
+            )) as { posed: boolean; quiet: boolean }
+            if (!settled.posed) continue
+            const moving = settled.quiet ? null : await motion(page)
+            if (moving !== null) {
+              out.push({
+                severity: "major",
+                path: url,
+                message: `${where} [${f.name}:${f.state}]: still moving after ${SETTLE_CAP_MS}ms (${moving}), so everything below measured a moving screen.`,
+              })
+            }
 
             const frameBugs: VisualBug[] = (
               await Promise.all([
-                checkInteractiveOverlap(p),
-                checkHorizontalOverflow(p),
-                checkClippedContent(p),
-                checkFocusableInvisible(p),
-                checkConstrainedImages(p),
-                checkViewportBounds(p),
-                checkTouchTargets(p, { minSize: floors.touch }),
-                checkFocusOrder(p),
-                checkClippedControls(p),
-                checkAlignmentDrift(p),
-                checkGridBaseline(p),
-                checkWhiteSpace(p),
+                checkInteractiveOverlap(b),
+                checkHorizontalOverflow(b),
+                checkVerticalFit(b),
+                checkClippedContent(b),
+                checkFocusableInvisible(b),
+                checkConstrainedImages(b),
+                checkViewportBounds(b),
+                checkTouchTargets(b, { minSize: floors.touch }),
+                checkFocusOrder(b),
+                checkClippedControls(b),
+                checkAlignmentDrift(b),
+                checkGridBaseline(b),
+                checkWhiteSpace(b),
               ])
             ).flat()
-            frameBugs.push(...await checkContrast(p))
+            // Geometry checks run on every pairwise interaction; checkContrast
+            // flips color-scheme and rasterizes via CDP, so it runs once per
+            // distinct (field, state) invariant on each route and viewport.
+            const invariantKeys = Object.entries(f.visualInvariants).map(([k, v]) => `${k}=${v}`)
+            if (invariantKeys.some((k) => !contrastChecked.has(k))) {
+              for (const k of invariantKeys) contrastChecked.add(k)
+              frameBugs.push(...await checkContrast(p))
+            }
+            const frameConsole = console_.messages.slice(consoleCursor)
+            consoleCursor = console_.messages.length
+            frameBugs.push(...analyzeConsole({ messages: frameConsole, dispose: () => {} }, { ignore: IGNORE }))
 
             for (const b of frameBugs) {
               out.push({
@@ -750,10 +1051,13 @@ async function main(appDir: string, viewports: Viewport[] = DEFAULT_VIEWPORTS): 
         }
       }
     } catch (err) {
+      // What the page logged is the only account of a screen that never left
+      // loading.
+      const logged = console_.messages.map((m) => `${m.type}: ${m.text}`).join(" | ")
       out.push({
         severity: "critical",
         path: url,
-        message: `${where}: could not be linted — ${err instanceof Error ? err.message : String(err)}`,
+        message: `${where}: could not be linted — ${err instanceof Error ? err.message : String(err)}${logged ? ` (console: ${logged})` : ""}`,
       })
     } finally {
       console_.dispose()
@@ -779,40 +1083,35 @@ async function main(appDir: string, viewports: Viewport[] = DEFAULT_VIEWPORTS): 
   // service worker's script fetch.
   const browser = await chromium.launch({ args: ["--ignore-certificate-errors"] })
   try {
-    // Never rejects: a board that fails records why and lets its sibling
-    // finish, rather than reaching the browser.close() below while the other
-    // board still has pages open on it.
-    await Promise.all(
-      boards.map(async ({ viewport, failure, jobs }) => {
-        const context = await browser.newContext({
-          viewport: { width: viewport.width, height: viewport.height },
-        })
-        try {
-          // The shell reads its session only behind `auth.required`, which a
-          // browser-only app never declares, so it is written only where minted.
-          if (session !== undefined) {
-            await context.addInitScript((s) => sessionStorage.setItem("pronto-token", JSON.stringify(s)), session)
-          }
-          let next = 0
-          const lane = async () => {
-            for (;;) {
-              const job = jobs[next++]
-              if (!job) return
-              await lintRoute(context, viewport, job.route, job.out)
-            }
-          }
-          await Promise.all(Array.from({ length: Math.min(LANES, jobs.length) }, lane))
-        } catch (err) {
-          failure.push({
-            severity: "critical",
-            path: "shell/shell.yaml",
-            message: `${viewport.name}: the viewport went unlinted — ${err instanceof Error ? err.message : String(err)}`,
-          })
-        } finally {
-          await context.close().catch(() => {})
+    for (const { viewport, failure, jobs } of boards) {
+      const context = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height },
+      })
+      try {
+        // The shell reads its session only behind `auth.required`, which a
+        // browser-only app never declares, so it is written only where minted.
+        if (session !== undefined) {
+          await context.addInitScript((s) => sessionStorage.setItem("pronto-token", JSON.stringify(s)), session)
         }
-      }),
-    )
+        let next = 0
+        const lane = async () => {
+          for (;;) {
+            const job = jobs[next++]
+            if (!job) return
+            await lintRoute(context, viewport, job.route, job.out)
+          }
+        }
+        await Promise.all(Array.from({ length: Math.min(LANES, jobs.length) }, lane))
+      } catch (err) {
+        failure.push({
+          severity: "critical",
+          path: "shell/shell.yaml",
+          message: `${viewport.name}: the viewport went unlinted — ${err instanceof Error ? err.message : String(err)}`,
+        })
+      } finally {
+        await context.close().catch(() => {})
+      }
+    }
   } finally {
     await browser.close()
   }
@@ -821,6 +1120,9 @@ async function main(appDir: string, viewports: Viewport[] = DEFAULT_VIEWPORTS): 
   console.log(JSON.stringify(findings, null, 2))
   const critical = findings.filter((f) => f.severity === "critical")
   if (critical.length) {
+    // Restated last: a runner's log keeps its tail, and the report above
+    // runs to megabytes a builder clips.
+    for (const f of critical) console.error(`critical ${f.path}: ${f.message}`)
     console.error(`\ncheck-visual: ${critical.length} critical finding(s); ${findings.length - critical.length} advisory.`)
     return 1
   }
@@ -928,6 +1230,16 @@ function selfTest() {
     [{ route: "/profile/:handle", param: "handle" }],
     "a param nothing filters on is reported, not dropped",
   )
+  const namedReadPlan = paramPlans(
+    [{ path: "/study/:id" }],
+    { "/study/:id": `<div data-live="study_session" data-read-deck="deck?id=eq.{param.id}"></div>` },
+  )
+  eq(
+    namedReadPlan.plans,
+    [plan("/study/:id", { param: "id", table: "deck", column: "id", op: "eq" })],
+    "a param pinned via data-read-* is planned from that named read's table",
+  )
+  eq(namedReadPlan.unplanned, [], "a param planned via data-read-* is not unplanned")
   eq(fillRoute("/article/:slug", { slug: "a b" }), "/article/a%20b", "fillRoute encodes")
   eq(embedSelect("slug"), "slug", "plain column selects itself")
   eq(embedSelect("article_tag.tag"), "article_tag(tag)", "one hop")
@@ -935,6 +1247,11 @@ function selfTest() {
   // resolves the fixture to "[object Object]", which fills a route that then
   // lints an empty screen — clean, and measuring nothing.
   eq(embedSelect("note_label.label.name"), "note_label(label(name))", "two hops")
+  eq(
+    embedSelect("team.slug", "player.slug=eq.everson"),
+    "team(slug),player!inner(slug)",
+    "dotted context filter embeds inner resource",
+  )
   eq(embedValue({ slug: "s" }, "slug"), "s", "plain value")
   eq(embedValue({ article_tag: [{ tag: "t" }] }, "article_tag.tag"), "t", "through a to-many hop")
   eq(
@@ -952,13 +1269,32 @@ function selfTest() {
   eq(parseViewports().length, 4, "default has 4 viewports")
   eq(parseViewports("baseline").length, 3, "baseline has 3 viewports")
   eq(parseViewports("phone,desktop").map((v) => v.name), ["phone", "desktop"], "comma-separated")
-  console.log("check-visual: self-test ok")
+
+  const batchExprs: string[] = []
+  const batched = batchEvaluates({
+    goto: () => Promise.resolve(null),
+    waitForFunction: () => Promise.resolve({ jsonValue: () => Promise.resolve(null) }),
+    close: () => Promise.resolve(),
+    evaluate: (fn: unknown) => {
+      batchExprs.push(String(fn))
+      return Promise.resolve([10, 20])
+    },
+  })
+  return Promise.all([
+    batched.evaluate((x: number) => x + 1, 9),
+    batched.evaluate((y = 20) => y),
+  ]).then((res) => {
+    eq(res, [10, 20], "batchEvaluates resolves each caller in order")
+    eq(batchExprs.length, 1, "batchEvaluates coalesces synchronous calls into one round-trip")
+    eq(batchExprs[0].includes("undefined"), false, "batchEvaluates omits undefined argument")
+    console.log("check-visual: self-test ok")
+  })
 }
 
 if (import.meta.main) {
   const args = [...Deno.args]
   if (args.includes("--self-test")) {
-    selfTest()
+    await selfTest()
     Deno.exit(0)
   }
 

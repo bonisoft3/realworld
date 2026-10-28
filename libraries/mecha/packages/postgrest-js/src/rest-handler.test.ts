@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import { createRestHandler, applyScopeSession } from './rest-handler.js'
+import { writeWhere } from './rest-read.js'
 
 describe('createRestHandler', () => {
   let db: PGlite
@@ -78,6 +79,29 @@ describe('createRestHandler', () => {
     expect(body[0]).not.toHaveProperty('message')
   })
 
+  it('handles GET and PATCH with or=(…): the ticker watermark guard', async () => {
+    const read = await handler(new Request('http://localhost/hello?or=(id.eq.1,message.is.null)&select=id', { method: 'GET' }))
+    expect(read.status).toBe(200)
+    expect(await read.json()).toEqual([{ id: '1' }])
+    const none = await handler(new Request('http://localhost/hello?or=(id.eq.none,message.is.null)&select=id', { method: 'GET' }))
+    expect(await none.json()).toEqual([])
+    const nested = await handler(new Request('http://localhost/hello?or=(id.eq.1,and(message.is.null))', { method: 'GET' }))
+    expect(nested.status).toBe(400)
+    const patch = await handler(new Request('http://localhost/hello?id=eq.1&or=(message.is.null,message.lt.zzz)', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+      body: JSON.stringify({ message: 'guarded' }),
+    }))
+    expect(patch.status).toBe(200)
+    expect((await patch.json())[0].message).toBe('guarded')
+    const held = await handler(new Request('http://localhost/hello?id=eq.1&or=(message.is.null,message.lt.a)', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+      body: JSON.stringify({ message: 'overwritten' }),
+    }))
+    expect(await held.json()).toEqual([])
+  })
+
   it('handles PATCH (update)', async () => {
     const req = new Request('http://localhost/hello?id=eq.1', {
       method: 'PATCH',
@@ -104,6 +128,33 @@ describe('createRestHandler', () => {
 
     const rows = await db.query(`SELECT * FROM "hello" WHERE "id" = 'del-1'`)
     expect(rows.rows).toHaveLength(0)
+  })
+
+  // The client confirms a write by the transaction that made it, and counts
+  // what it changed from the representation: a delete of a row already gone
+  // changed nothing, so it has nothing to confirm.
+  it('names the transaction of a write, and only of a write', async () => {
+    const post = await handler(new Request('http://localhost/hello', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+      body: JSON.stringify({ id: 'tx-1', message: 'named' }),
+    }))
+    const xmin = await db.query<{ xmin: string }>(`SELECT xmin::text AS xmin FROM "hello" WHERE "id" = 'tx-1'`)
+    expect(post.headers.get('x-txid')).toBe(xmin.rows[0].xmin)
+
+    const read = await handler(new Request('http://localhost/hello?id=eq.tx-1', { method: 'GET' }))
+    expect(read.headers.get('x-txid')).toBeNull()
+
+    const remove = () => handler(new Request('http://localhost/hello?id=eq.tx-1', {
+      method: 'DELETE',
+      headers: { 'Prefer': 'return=representation' },
+    }))
+    const removed = await remove()
+    expect(removed.status).toBe(200)
+    expect(await removed.json()).toEqual([{ id: 'tx-1', message: 'named' }])
+    expect(Number(removed.headers.get('x-txid'))).toBeGreaterThan(Number(xmin.rows[0].xmin))
+    const again = await remove()
+    expect(await again.json()).toEqual([])
   })
 
   it('returns 404 for unknown table', async () => {
@@ -136,6 +187,17 @@ describe('createRestHandler', () => {
     const res = await handler(req)
     const body = await res.json()
     expect(body).toHaveLength(1)
+  })
+
+  it('preserves SQL LIKE semantics for exact, single-character, wildcard, and NULL values', async () => {
+    await db.query(`INSERT INTO "hello" ("id", "message") VALUES ('like-1', 'alpha_beta'), ('like-2', 'alphaXbeta')`)
+    const exact = await (await handler(new Request('http://localhost/hello?message=like.alphaXbeta'))).json()
+    expect(exact).toEqual([{ id: 'like-2', message: 'alphaXbeta' }])
+    const underscore = await (await handler(new Request('http://localhost/hello?message=like.alpha_beta&order=id.asc'))).json()
+    expect(underscore.map((r: { id: string }) => r.id)).toEqual(['like-1', 'like-2'])
+    await db.exec(`CREATE TABLE "notes" ("id" TEXT PRIMARY KEY, "note" TEXT); INSERT INTO "notes" VALUES ('n1', 'hello'), ('n2', NULL);`)
+    const wildcard = await (await handler(new Request('http://localhost/notes?note=like.*'))).json()
+    expect(wildcard).toEqual([{ id: 'n1', note: 'hello' }])
   })
 
   // Upsert (merge-duplicates)
@@ -222,6 +284,90 @@ describe('createRestHandler', () => {
     const res = await handler(req)
     expect(res.status).toBe(201)
   })
+
+  it('compiles wildcard-only like and ilike filters as IS NOT NULL without bound pattern parameters', async () => {
+    const params: unknown[] = []
+    const where = writeWhere(new URLSearchParams('message=ilike.**&id=like.*'), params)
+    expect(where).toBe(' WHERE "message" IS NOT NULL AND "id" IS NOT NULL')
+    expect(params).toEqual([])
+
+    const res = await handler(new Request('http://localhost/hello?id=eq.ord-1&message=ilike.**'))
+    expect(await res.json()).toEqual([{ id: 'ord-1', message: 'aaa' }])
+  })
+})
+
+describe('scalar aggregate reads', () => {
+  let db: PGlite
+  let handler: (req: Request) => Promise<Response>
+  const read = (select: string, filter = '') => handler(new Request(
+    `http://localhost/appearances?select=${encodeURIComponent(select)}${filter}`,
+    { headers: { Prefer: 'count=exact' } },
+  ))
+
+  beforeAll(async () => {
+    db = await PGlite.create()
+    await db.exec(`
+      CREATE TABLE owners (id text PRIMARY KEY, name text NOT NULL);
+      CREATE TABLE appearances (id integer PRIMARY KEY, owner_id text REFERENCES owners, minutes integer, included boolean NOT NULL);
+      INSERT INTO owners VALUES ('a', 'Alpha'), ('b', 'Beta'), ('c', 'Gamma');
+      INSERT INTO appearances VALUES
+        (1, 'a', 10, true), (2, 'a', NULL, true), (3, 'a', 0, true), (4, 'a', 900, false),
+        (5, 'b', 30, true), (6, 'b', 40, true), (7, 'c', NULL, true);
+    `)
+    handler = createRestHandler(db)
+  })
+
+  afterAll(async () => {
+    await db.close()
+  })
+
+  it('filters source rows before calculating grouped totals and both kinds of count', async () => {
+    const response = await read('id:owner_id,total:minutes.sum(),minutes.count(),rows:count(),minutes.avg(),minutes.min(),minutes.max()', '&owner_id=eq.a&included=is.true')
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual([{ id: 'a', total: 10, count: 2, rows: 3, avg: 5, min: 0, max: 10 }])
+  })
+
+  it('distinguishes row count from non-null column count using aliases', async () => {
+    const response = await read('id:owner_id,total:minutes.sum(),present:minutes.count(),rows:count()', '&owner_id=eq.a&included=is.true')
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual([{ id: 'a', total: 10, present: 2, rows: 3 }])
+  })
+
+  it('groups by every selected scalar column and paginates the resulting groups', async () => {
+    const response = await read('id:owner_id,included,total:minutes.sum(),count()', '&included=is.true&order=owner_id.asc&limit=1&offset=1')
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Content-Range')).toBe('1-1/3')
+    expect(await response.json()).toEqual([{ id: 'b', included: true, total: 70, count: 2 }])
+  })
+
+  it('preserves SQL null aggregates, zero totals and empty ungrouped counts', async () => {
+    const empty = await read('total:minutes.sum(),count()', '&owner_id=eq.missing')
+    expect(await empty.json()).toEqual([{ total: null, count: 0 }])
+    const zero = await read('minutes.sum(),minutes.avg(),minutes.min(),minutes.max(),count()', '&minutes=eq.0')
+    expect(await zero.json()).toEqual([{ sum: 0, avg: 0, min: 0, max: 0, count: 1 }])
+    const nulls = await read('total:minutes.sum(),average:minutes.avg(),present:minutes.count(),rows:count()', '&owner_id=eq.c')
+    expect(await nulls.json()).toEqual([{ total: null, average: null, present: 0, rows: 1 }])
+    const emptyGroups = await read('id:owner_id,total:minutes.sum(),count()', '&owner_id=eq.missing')
+    expect(await emptyGroups.json()).toEqual([])
+  })
+
+  it.each([
+    'minutes.sum();DROP TABLE appearances', 'bad"alias:minutes.sum()', 'minutes.stddev()',
+    '*.sum()', '*,minutes.sum()', 'minutes.sum(),owner:owner_id(name)', 'owner:owner_id(count())',
+    'minutes.sum(),minutes.sum()',
+  ])('rejects unsupported or unsafe aggregate selection %s', async (select) => {
+    expect((await read(select)).status).toBe(400)
+  })
+
+  it('rejects aggregate ordering instead of compiling a nonexistent source column', async () => {
+    expect((await read('id:owner_id,total:minutes.sum()', '&order=total.desc')).status).toBe(400)
+  })
+
+  it('retains scalar aliases, wildcard rows, to-one embedding and embedded filters', async () => {
+    const response = await read('*,owner:owner_id(name)', '&id=eq.1&owner.name=eq.Alpha')
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual([{ id: 1, owner_id: 'a', minutes: 10, included: true, owner: { name: 'Alpha' } }])
+  })
 })
 
 describe('scope session', () => {
@@ -239,8 +385,8 @@ describe('scope session', () => {
       ALTER TABLE "posting" ENABLE ROW LEVEL SECURITY;
       ALTER TABLE "posting" FORCE ROW LEVEL SECURITY;
       CREATE POLICY tenancy ON "posting" AS RESTRICTIVE FOR ALL
-        USING (scope_id = ANY(current_scopes()))
-        WITH CHECK (scope_id = ANY(current_scopes()));
+        USING (scope_id = ANY((SELECT current_scopes())::text[]))
+        WITH CHECK (scope_id = ANY((SELECT current_scopes())::text[]));
       CREATE POLICY wide ON "posting" FOR ALL USING (true) WITH CHECK (true);
       CREATE ROLE app_user NOLOGIN;
       GRANT USAGE ON SCHEMA public TO app_user;
@@ -310,6 +456,20 @@ describe('scope session', () => {
     const after = await db.query<{ id: string }>('SELECT id FROM posting')
     expect(after.rows.map((r) => r.id)).toEqual(['b'])
     await db.exec('RESET ROLE;')
+  })
+
+  // One connection serving many subjects (a Durable Object's) reads `auth_uid()`
+  // from claims; set for the session, the last request's subject would answer
+  // for every request after it.
+  it('gives each request its own claims and leaves the session\'s alone', async () => {
+    await db.exec(`SELECT set_config('request.jwt.claims', '{"sub":"session"}', false)`)
+    const sub = (s: string) => createRestHandler(db, { scopes: () => ['household:h1'], claims: () => ({ sub: s }) })
+    await db.exec(`CREATE FUNCTION whoami() RETURNS text LANGUAGE sql STABLE AS $$ SELECT current_setting('request.jwt.claims', true)::json->>'sub' $$;
+      CREATE VIEW me WITH (security_invoker = true) AS SELECT whoami() AS sub; GRANT SELECT ON me TO app_user;`)
+    const [a, b] = await Promise.all([sub('alice')(new Request('http://localhost/me')), sub('bob')(new Request('http://localhost/me'))])
+    expect(await a.json()).toEqual([{ sub: 'alice' }])
+    expect(await b.json()).toEqual([{ sub: 'bob' }])
+    expect((await db.query<{ s: string }>('SELECT whoami() AS s')).rows[0].s).toBe('session')
   })
 
   it('does not carry a previous subject\'s scopes across a change', async () => {

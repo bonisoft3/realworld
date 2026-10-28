@@ -7,31 +7,31 @@
     "ports": [],
     "volumes": [],
     "depends_on": {
-      "apps_realworld-caddy": {
+      "realworld-caddy": {
         "condition": "service_healthy"
       },
-      "apps_realworld-database": {
+      "realworld-database": {
         "condition": "service_healthy"
       },
-      "apps_realworld-crud": {
+      "realworld-crud": {
         "condition": "service_healthy"
       },
-      "apps_realworld-electric": {
+      "realworld-electric": {
         "condition": "service_healthy"
       },
-      "apps_realworld-redis": {
+      "realworld-redis": {
         "condition": "service_healthy"
       },
-      "apps_realworld-mesh-events": {
+      "realworld-mesh-events": {
         "condition": "service_healthy"
       },
-      "apps_realworld-conduit": {
+      "realworld-conduit": {
         "condition": "service_healthy"
       },
-      "apps_realworld-transform": {
+      "realworld-transform": {
         "condition": "service_started"
       },
-      "apps_realworld-auth": {
+      "realworld-auth": {
         "condition": "service_started"
       }
     },
@@ -76,8 +76,8 @@
     ]
   },
   "name": "launch",
-  "project": "apps_realworld",
-  "dir": "apps/realworld",
+  "project": "realworld",
+  "dir": ".",
   "activate": "",
   "skaffold": {
     "profiles": {
@@ -133,8 +133,8 @@
   "synthetics": {
     "bayt": {
       "name": "launch_bayt",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "activate": "",
       "srcs": {
         "globs": [],
@@ -147,7 +147,13 @@
           ".bayt/bayt.launch.json",
           ".bayt/Taskfile.yml",
           ".bayt/Taskfile.bayt.yml",
-          ".bayt/compose.launch.closure.yaml"
+          ".bayt/compose.launch.closure.yaml",
+          ".bayt/process-compose.yaml",
+          ".bayt/compose.*.yaml",
+          ".bayt/Dockerfile.*",
+          ".bayt/bayt.*.json",
+          ".bayt/Taskfile.*.yaml",
+          "monorepo/${MONOREPO_COMPOSE_MODE:-docker-image}.yaml"
         ],
         "exclude": []
       },
@@ -163,26 +169,23 @@
         "similar": false
       },
       "upClosure": [
-        "apps/realworld/.bayt/compose.launch.yaml",
-        "apps/realworld/.bayt/compose.caddy.yaml",
-        "apps/realworld/.bayt/compose.database.yaml",
-        "libraries/mecha/.bayt/compose.database-image.yaml",
-        "apps/realworld/.bayt/compose.crud.yaml",
-        "apps/realworld/.bayt/compose.electric.yaml",
-        "apps/realworld/.bayt/compose.redis.yaml",
-        "apps/realworld/.bayt/compose.mesh-events.yaml",
-        "libraries/mecha/.bayt/compose.mesh-image.yaml",
-        "apps/realworld/.bayt/compose.conduit.yaml",
-        "libraries/mecha/.bayt/compose.conduit-image.yaml",
-        "apps/realworld/.bayt/compose.transform.yaml",
-        "apps/realworld/.bayt/compose.auth.yaml",
-        "libraries/mecha/.bayt/compose.auth-image.yaml"
+        "./.bayt/compose.launch.yaml",
+        "./.bayt/compose.caddy.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml",
+        "./.bayt/compose.served.yaml",
+        "./.bayt/compose.electric.yaml",
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.mesh-events.yaml",
+        "./.bayt/compose.conduit.yaml",
+        "./.bayt/compose.transform.yaml",
+        "./.bayt/compose.auth.yaml"
       ]
     },
     "outs": {
       "name": "launch_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "activate": "",
       "srcs": {
         "globs": [],
@@ -204,20 +207,17 @@
         "similar": false
       },
       "upClosure": [
-        "apps/realworld/.bayt/compose.launch.yaml",
-        "apps/realworld/.bayt/compose.caddy.yaml",
-        "apps/realworld/.bayt/compose.database.yaml",
-        "libraries/mecha/.bayt/compose.database-image.yaml",
-        "apps/realworld/.bayt/compose.crud.yaml",
-        "apps/realworld/.bayt/compose.electric.yaml",
-        "apps/realworld/.bayt/compose.redis.yaml",
-        "apps/realworld/.bayt/compose.mesh-events.yaml",
-        "libraries/mecha/.bayt/compose.mesh-image.yaml",
-        "apps/realworld/.bayt/compose.conduit.yaml",
-        "libraries/mecha/.bayt/compose.conduit-image.yaml",
-        "apps/realworld/.bayt/compose.transform.yaml",
-        "apps/realworld/.bayt/compose.auth.yaml",
-        "libraries/mecha/.bayt/compose.auth-image.yaml"
+        "./.bayt/compose.launch.yaml",
+        "./.bayt/compose.caddy.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml",
+        "./.bayt/compose.served.yaml",
+        "./.bayt/compose.electric.yaml",
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.mesh-events.yaml",
+        "./.bayt/compose.conduit.yaml",
+        "./.bayt/compose.transform.yaml",
+        "./.bayt/compose.auth.yaml"
       ]
     }
   },
@@ -258,26 +258,23 @@
   ],
   "transitiveCrossDeps": [],
   "upClosure": [
-    "apps/realworld/.bayt/compose.launch.yaml",
-    "apps/realworld/.bayt/compose.caddy.yaml",
-    "apps/realworld/.bayt/compose.database.yaml",
-    "libraries/mecha/.bayt/compose.database-image.yaml",
-    "apps/realworld/.bayt/compose.crud.yaml",
-    "apps/realworld/.bayt/compose.electric.yaml",
-    "apps/realworld/.bayt/compose.redis.yaml",
-    "apps/realworld/.bayt/compose.mesh-events.yaml",
-    "libraries/mecha/.bayt/compose.mesh-image.yaml",
-    "apps/realworld/.bayt/compose.conduit.yaml",
-    "libraries/mecha/.bayt/compose.conduit-image.yaml",
-    "apps/realworld/.bayt/compose.transform.yaml",
-    "apps/realworld/.bayt/compose.auth.yaml",
-    "libraries/mecha/.bayt/compose.auth-image.yaml"
+    "./.bayt/compose.launch.yaml",
+    "./.bayt/compose.caddy.yaml",
+    "./.bayt/compose.crud.yaml",
+    "./.bayt/compose.database.yaml",
+    "./.bayt/compose.served.yaml",
+    "./.bayt/compose.electric.yaml",
+    "./.bayt/compose.redis.yaml",
+    "./.bayt/compose.mesh-events.yaml",
+    "./.bayt/compose.conduit.yaml",
+    "./.bayt/compose.transform.yaml",
+    "./.bayt/compose.auth.yaml"
   ],
   "chainedDeps": [
     {
       "name": "caddy_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []
@@ -285,8 +282,8 @@
     },
     {
       "name": "database_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []
@@ -294,8 +291,8 @@
     },
     {
       "name": "crud_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []
@@ -303,8 +300,8 @@
     },
     {
       "name": "electric_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []
@@ -312,8 +309,8 @@
     },
     {
       "name": "redis_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []
@@ -321,8 +318,8 @@
     },
     {
       "name": "mesh-events_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []
@@ -330,8 +327,8 @@
     },
     {
       "name": "conduit_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []
@@ -339,8 +336,8 @@
     },
     {
       "name": "transform_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []
@@ -348,8 +345,8 @@
     },
     {
       "name": "auth_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []

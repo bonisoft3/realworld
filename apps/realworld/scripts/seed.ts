@@ -9,7 +9,9 @@
 // /crud writes as that person under RLS. Nothing touches Postgres directly, so
 // a seed that works here is proof the write paths work.
 
-const BASE = Deno.args[0] ?? "https://localhost:8443";
+import { baseUrl } from "../../../plugins/omnishell/base-url.ts";
+
+const BASE = Deno.args[0] ?? await baseUrl(".");
 
 type Person = { token: string; id: string; handle: string };
 

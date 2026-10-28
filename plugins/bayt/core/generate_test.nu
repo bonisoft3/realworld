@@ -4,14 +4,16 @@
 # Run with: nu generate_test.nu (from this directory).
 
 use std/assert
-use ./generate.nu [repo-of, scan-dir, _inject-runtime, relative-flat, scan-projects, clear-bayt-dir, find-workspace-root, root-for, partition-scan, topo-schedule, check-dirs]
+use ./generate.nu [repo-of, scan-dir, _inject-runtime, relative-flat, scan-projects, clear-bayt-dir, find-workspace-root, workspace-module, root-for, partition-scan, topo-schedule, check-dirs, custom-outputs, pass1]
 
 def main [] {
 	print "Running generate.nu tests...\n"
+	test_custom_outputs
 
 	test_repo_of_strips_a_plain_tag
 	test_repo_of_keeps_a_ref_that_has_none
 	test_repo_of_survives_a_templated_tag
+	test_repo_of_survives_a_nested_default
 	test_repo_of_keeps_a_registry_port
 	test_repo_of_ignores_a_slash_inside_a_template
 	test_scan_dir_answers_the_scan_s_spelling
@@ -24,21 +26,26 @@ def main [] {
 	test_scan_honours_git_excludes_in_a_work_tree
 	test_inject_runtime_rewrites_the_published_image
 	test_inject_runtime_climbs_out_of_a_nested_project
-	test_inject_runtime_is_a_noop_without_the_env
+	test_inject_runtime_defaults_to_the_image_without_the_env
 	test_inject_runtime_keeps_service_order
 	test_clear_keeps_the_env_file
 	test_scan_places_a_nested_rooted_project_where_it_sits
 	test_scan_reads_a_rooted_project_from_its_bayt_cue
 	test_root_walk_stops_at_cue_mod
+	test_module_is_the_published_one
+	test_module_walk_stops_at_the_workspace_root
 	test_a_rooted_project_containing_here_is_the_root
+	test_root_for_handles_windows_paths
 	test_a_plain_project_runs_from_the_cue_mod_root
 	test_a_rooted_cue_mod_root_is_rooted
 	test_a_dir_where_the_project_sits_passes
 	test_a_dir_elsewhere_fails_naming_both
 	test_partition_keeps_a_nested_root_s_subtree_to_it
+	test_partition_handles_windows_paths
 	test_partition_marks_a_nested_root_in_the_index
 	test_a_ref_to_a_nested_root_is_refused
 	test_partition_passes_only_outermost_roots
+	test_pass1_reads_sibling_bayt_json
 
 	print "\nAll generate.nu tests passed!"
 }
@@ -61,6 +68,12 @@ def test_repo_of_keeps_a_ref_that_has_none [] {
 # in `:${BAYT_IMAGE_TAG`.
 def test_repo_of_survives_a_templated_tag [] {
 	check "templated tag" "${ORG:-o}.registry.example/${PROJ:-p}/bayt-x:${BAYT_IMAGE_TAG:-latest}" "${ORG:-o}.registry.example/${PROJ:-p}/bayt-x"
+}
+
+# A local image's tag defaults to the compose project, a default nested inside
+# the first: the cut must skip both.
+def test_repo_of_survives_a_nested_default [] {
+	check "nested default" "bayt-x:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}" "bayt-x"
 }
 
 # Cutting at the FIRST colon instead takes the registry's port for a tag.
@@ -120,12 +133,14 @@ def test_inject_runtime_climbs_out_of_a_nested_project [] {
 	assert equal $got.services.a.build.additional_contexts.bayt "../../../plugins/bayt/runtime"
 }
 
-# Unset is the published path: a consumer outside this repo has no local
-# runtime tree to point at.
-def test_inject_runtime_is_a_noop_without_the_env [] {
-	print "test an unset BAYT_RUNTIME_DIR leaves the image ref alone..."
+# Unset is the published path, overridable at compose time: a rooted
+# project's composes serve its own repository, which has no runtime tree,
+# and the monorepo, whose .bayt/.env names one through BAYT_RUNTIME.
+def test_inject_runtime_defaults_to_the_image_without_the_env [] {
+	print "test an unset BAYT_RUNTIME_DIR keeps the image as BAYT_RUNTIME's default..."
 	let got = (with-env {BAYT_RUNTIME_DIR: ""} { _inject-runtime (_svc $IMG) "." })
-	assert equal $got.services.a.build.additional_contexts.bayt $IMG
+	assert equal $got.services.a.build.additional_contexts.bayt $"${BAYT_RUNTIME:-($IMG)}"
+	assert equal $got.services.a.build.additional_contexts.other "service:x"
 }
 
 # On Windows compose spells the flattened contexts with backslashes, and the
@@ -274,6 +289,18 @@ def test_partition_marks_a_nested_root_in_the_index [] {
 	assert equal $got.index {root: ".", ws: {rooted: apps/ws}}
 }
 
+def test_partition_handles_windows_paths [] {
+	print "test partition-scan handles windows paths..."
+	let scanned = [
+		{path: 'D:\w\bayt.cue', name: "root", dir_rel: ".", targets: {}, rooted: false}
+		{path: 'D:\w\apps\ws\bayt.cue', name: "ws", dir_rel: "apps/ws", targets: {}, rooted: true}
+		{path: 'D:\w\apps\ws\svc\bayt.cue', name: "svc", dir_rel: "svc", targets: {}, rooted: false}
+	]
+	let got = (partition-scan $scanned)
+	assert equal ($got.local | get name) [root]
+	assert equal ($got.nested | get dir_rel) [apps/ws]
+}
+
 # A project rooted at itself has no siblings: its manifests state dir ".",
 # its own root, which a dependent here would read as this root.
 def test_a_ref_to_a_nested_root_is_refused [] {
@@ -305,6 +332,39 @@ def test_root_walk_stops_at_cue_mod [] {
 	assert equal $got $dir
 }
 
+# A project's ports are salted with the module it is published under, so its
+# mirror, whose root module that is, generates the same ones; a major bump is
+# no new project.
+def test_module_is_the_published_one [] {
+	print "test the port module is the mirror's, else the workspace's..."
+	let dir = (mktemp -d)
+	mkdir ($dir | path join cue.mod) ($dir | path join apps/m/.mirror/cue.mod) ($dir | path join apps/m/sub) ($dir | path join apps/plain)
+	'module: "example.org"\n' | save ($dir | path join cue.mod module.cue)
+	'module: "github.com/acme/m@v2"\n' | save ($dir | path join apps/m/.mirror/cue.mod module.cue)
+	let mirrored = (workspace-module ($dir | path join apps/m/sub))
+	let plain = (workspace-module ($dir | path join apps/plain))
+	rm -rf $dir
+	assert equal $mirrored "github.com/acme/m"
+	assert equal $plain "example.org"
+}
+
+# The walk compared an expanded directory to an unexpanded root, so a relative
+# or symlinked path (macOS's /var is /private/var) never met the root and took
+# an enclosing checkout's mirror module, moving every default port.
+def test_module_walk_stops_at_the_workspace_root [] {
+	print "test the module walk stops at the workspace root..."
+	let outer = (mktemp -d)
+	let ws = ($outer | path join ws)
+	mkdir ($outer | path join .mirror/cue.mod) ($ws | path join cue.mod) ($ws | path join apps/plain)
+	'module: "github.com/enclosing/x"\n' | save ($outer | path join .mirror/cue.mod module.cue)
+	'module: "example.org"\n' | save ($ws | path join cue.mod module.cue)
+	let relative = (do { cd $ws; workspace-module "apps/plain" })
+	let absolute = (workspace-module ($ws | path join apps/plain))
+	rm -rf $outer
+	assert equal $relative "example.org"
+	assert equal $absolute "example.org"
+}
+
 # Run from inside a project rooted at itself, under an outer cue.mod, the run
 # is that project's own root.
 def test_a_rooted_project_containing_here_is_the_root [] {
@@ -312,6 +372,19 @@ def test_a_rooted_project_containing_here_is_the_root [] {
 	let scanned = [(_row root "." false) (_row ws apps/ws true) (_row inner apps/ws/inner true)]
 	assert equal (root-for $scanned /w /w/apps/ws/src) {root: /w/apps/ws, rooted: true}
 	assert equal (root-for $scanned /w /w/apps/ws/inner) {root: /w/apps/ws/inner, rooted: true}
+}
+
+def test_root_for_handles_windows_paths [] {
+	print "test root-for handles windows paths..."
+	let scanned = [
+		{path: 'D:\w\apps\ws\bayt.cue', name: "ws", dir_rel: "apps/ws", targets: {}, rooted: true}
+	]
+	assert equal (root-for $scanned 'D:\w' 'D:\w\apps\ws\src') {root: 'D:/w/apps/ws', rooted: true}
+	assert equal (root-for $scanned 'D:\w' 'D:\w\apps\ws') {root: 'D:/w/apps/ws', rooted: true}
+	let scanned_posix = [
+		{path: 'D:/w/apps/ws/bayt.cue', name: "ws", dir_rel: "apps/ws", targets: {}, rooted: true}
+	]
+	assert equal (root-for $scanned_posix 'D:\w' 'D:\w\apps\ws\src') {root: 'D:/w/apps/ws', rooted: true}
 }
 
 def test_a_plain_project_runs_from_the_cue_mod_root [] {
@@ -338,4 +411,50 @@ def test_a_dir_elsewhere_fails_naming_both [] {
 	print "test a declared dir elsewhere fails, naming both..."
 	let got = (try { check-dirs [(_row sub apps/ws/sub false sub)] /w; "passed" } catch {|e| $e.rendered | ansi strip })
 	assert str contains $got "sub declares dir apps/ws/sub but its bayt.cue sits at sub"
+}
+
+
+def test_custom_outputs [] {
+	let bundle = {
+		manifest: {files: {build: {}}}
+		taskfile: {files: {build: {}}}
+		docker: {dockerfiles: {}, compose: {files: {}}}
+		skaffold: {files: {}}
+		vscode: {files: {}}
+		passthrough: {files: [
+			{name: "say.yaml", data: {say: {lint: {do: "task lint"}}}}
+			{name: "settings.json", data: {enabled: true}}
+			{name: "message.txt", data: "exact bytes"}
+		]}
+	}
+	let emitted = custom-outputs $bundle
+	assert equal ($emitted.0.body | from yaml) $bundle.passthrough.files.0.data
+	assert equal ($emitted.1.body | from json) {enabled: true}
+	assert equal $emitted.2.body "exact bytes"
+	for name in ["../say.yaml" "/say.yaml" "Taskfile.build.yaml" "compose.yaml" "depot.yaml"] {
+		let rejected = try {
+			custom-outputs ($bundle | update passthrough.files [{name: $name, data: {}}])
+			false
+		} catch { true }
+		assert $rejected $"accepted ($name)"
+	}
+	let repeated = try {
+		custom-outputs ($bundle | update passthrough.files [$bundle.passthrough.files.0 $bundle.passthrough.files.0])
+		false
+	} catch { true }
+	assert $repeated "accepted duplicate custom filenames"
+	print "  PASS custom outputs preserve data and reject path escapes and collisions"
+}
+
+def test_pass1_reads_sibling_bayt_json [] {
+	print "test pass1 reads sibling bayt.json directly..."
+	let dir = (mktemp -d)
+	{targets: {test: {cmd: "echo ok"}}} | to json | save ($dir | path join "bayt.json")
+	'@extern(embed)
+package fixture
+data: _ @embed(file="bayt.json")
+' | save ($dir | path join "bayt.cue")
+	let got = (pass1 ($dir | path join "bayt.cue"))
+	rm -rf $dir
+	assert equal $got {test: {cmd: "echo ok"}}
 }

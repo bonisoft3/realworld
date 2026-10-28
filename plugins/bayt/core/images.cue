@@ -12,10 +12,10 @@
 //
 //   targets: "build":   dockerfile: nubox       // leap, includes lazybox
 //   targets: "release": dockerfile: busybox     // musl runtime
-//   targets: "dindbox": dockerfile: bayt.dindbox // docker:cli + socat
+//   targets: "ci":      dockerfile: bayt.bkid  // docker:cli + socat
 //
-// docker-in-docker targets pair `dindbox` (the image preset) with
-// `sayt.dindboxInject` (the inject helper) — the preset provides the
+// bkid targets (sayt.ci) pair `bkid` (the image preset) with
+// `sayt.inject` (the inject helper) — the preset provides the
 // FROM base + socat binary; the inject body does the in-sandbox env
 // extraction, file placement, and unix-socket forwarding.
 package bayt
@@ -23,7 +23,10 @@ package bayt
 // One-way edge: core may import a distro library, never the reverse.
 // A distro fragment imports only stdlib, which is what keeps this
 // acyclic — do not add a core import to distros/ to reach #mount.
-import "bonisoft.org/plugins/bayt/distros/zypper"
+import (
+	"bonisoft.org/plugins/bayt/distros/zypper"
+	"encoding/toml"
+)
 
 // _lazyboxOverlay — defaultPreamble fragment that COPYs lazybox into
 // the image and prepends its bin dirs to PATH. Shared by nubox (full
@@ -31,7 +34,7 @@ import "bonisoft.org/plugins/bayt/distros/zypper"
 // version bump here flows to both presets without drift.
 _lazyboxOverlay: {
 	"lazybox-copy": {priority: -10, line: "COPY --from=\(lock.images.lazybox) /lazybox/ /root/.local/share/lazybox/"}
-	"path-env":     {priority:  -9, line: "ENV PATH=/root/.local/bin:/root/.local/share/lazybox/bin:$PATH"}
+	"path-env": {priority: -9, line: "ENV PATH=/root/.local/bin:/root/.local/share/lazybox/bin:$PATH"}
 }
 
 // nubox — leap-based, includes lazybox + mise + nushell. Use for
@@ -41,6 +44,8 @@ _lazyboxOverlay: {
 //
 // Installs GNU findutils + which (absent in leap 16.0's slim base);
 // gradle's gradlew probes for both at startup and dies otherwise.
+// libatomic1 likewise: node 26's linux binary links it, so a mise-installed
+// node fails its own `node -v` install check without it.
 nubox: {
 	// `from` is bound to the leaf disjunct, so `bayt.nubox & {from: ref: ...}`
 	// fails CUE evaluation. Chained-FROM consumers don't compose the
@@ -49,15 +54,24 @@ nubox: {
 		name: *lock.images.leap | string
 	})
 	defaultPreamble: _lazyboxOverlay & {
-		"mise-trusted":  {priority: -8, line: "ENV MISE_TRUSTED_CONFIG_PATHS=/monorepo"}
+		// Leap's OpenSSL configuration loads its distro-specific JITTER
+		// provider; Lazybox's static curl must use its own library defaults.
+		"static-curl-config": {priority: -8, line: """
+			RUN mv /root/.local/share/lazybox/libexec/static-curl /root/.local/share/lazybox/libexec/static-curl.bin
+			COPY --chmod=0755 <<'STATIC_CURL' /root/.local/share/lazybox/libexec/static-curl
+			#!/bin/sh
+			OPENSSL_CONF="${OPENSSL_CONF:-/dev/null}" exec "$(dirname "$0")/static-curl.bin" "$@"
+			STATIC_CURL
+			"""}
+		"mise-trusted": {priority: -8, line: "ENV MISE_TRUSTED_CONFIG_PATHS=/monorepo"}
 		"gnu-shell-utils": {priority: -7} & (zypper.#install & {
-			pkgs: ["findutils=4.10.0-160000.2.2", "which=2.23-160000.2.2", "git-core=2.51.0-160000.1.2"]
+			pkgs: ["findutils=4.10.0-160000.2.2", "which=2.23-160000.2.2", "git-core=2.51.0-160000.1.2", "libatomic1=15.3.0+git11272-160000.1.1"]
 		}).out
 	}
 }
 
-// dindbox — lean docker:cli + socat binary. No entrypoint script.
-// Pair with `sayt.dindboxInject` on the consuming
+// bkid — lean docker:cli + socat binary. No entrypoint script.
+// Pair with `sayt.inject` on the consuming
 // ci target: that helper mounts host-supplied compose secrets
 // (docker_host, buildx_builder, buildx_instance, docker_config) and
 // emits the in-sandbox setup body (env extraction, file placement,
@@ -66,7 +80,7 @@ nubox: {
 // socat binary ships in the image because some clients (testcontainers)
 // bypass $DOCKER_HOST and look for /var/run/docker.sock — the
 // in-sandbox socat creates that bridge at RUN time.
-dindbox: {
+bkid: {
 	from: close({
 		name: *lock.images.docker | string
 	})
@@ -77,18 +91,23 @@ dindbox: {
 		"socat": {priority: -10, copy: {
 			from: {name: lock.images.alpine_socat}
 			srcs: ["/usr/bin/socat1"]
-			dst:  "/usr/local/bin/socat"
+			dst: "/usr/local/bin/socat"
 		}}
 		"socat-libs": {priority: -9, copy: {
 			from: {name: lock.images.alpine_socat}
 			srcs: ["/usr/lib/libreadline.so.8", "/usr/lib/libncursesw.so.6"]
-			dst:  "/usr/lib/"
+			dst: "/usr/lib/"
 		}}
-		"depot": {priority: -8, copy: {
-			from: {name: lock.images.depot_cli}
-			srcs: ["/usr/bin/depot"]
-			dst:  "/usr/local/bin/depot"
-		}}
+		"lazybox-copy": {priority: -11, line: _lazyboxOverlay["lazybox-copy"].line}
+		"path-env": {priority: -8, line: "ENV PATH=$PATH:/root/.local/bin:/root/.local/share/lazybox/bin"}
+		"toolchain-config": {priority: -7, line: """
+			COPY <<'BKID_MISE' /opt/bkid/mise.toml
+			\(toml.Marshal(_bkidMise))BKID_MISE
+			COPY <<'BKID_LOCK' /opt/bkid/mise.lock
+			\(toml.Marshal({tools: {for name, tool in lock.tools {"github:\(name)": [tool]}}}))BKID_LOCK
+			"""}
+		"toolchain-install": {priority: -6, line: #"RUN cd /opt/bkid && mise trust -y && mise install && mise exec -- sh -c 'cp "$(mise which task)" /usr/local/bin/task && cp "$(mise which depot)" /usr/local/bin/depot'"#}
+
 	}
 }
 

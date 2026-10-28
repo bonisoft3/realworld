@@ -226,6 +226,60 @@ noop: #cmd & {
 	][0]
 }
 
+// #userIdentity defines a structured user/group identity for container
+// execution and file ownership.
+//
+// It couples symbolic names (for /etc/passwd and USER directives) with the
+// numeric UID/GID required for BuildKit --link cache-independent COPY --chown.
+#userIdentity: {
+	name:   string & !=""
+	uid:    int & >=0
+	gid:    int & >=0
+	group?: string
+	chown:  "\(uid):\(gid)"
+	user:   "\(uid):\(gid)"
+}
+
+// #nonroot represents the canonical unprivileged nonroot identity commonly
+// used in distroless and wolfi minimal containers (UID/GID 65532:65532).
+#nonroot: #userIdentity & {
+	name:  "nonroot"
+	group: "nonroot"
+	uid:   65532
+	gid:   65532
+}
+
+// #vscodeUser represents the canonical non-root user (UID/GID 1000:1000)
+// used in VS Code Dev Containers, Codespaces, and single-user container setups.
+#vscodeUser: #userIdentity & {
+	name:  "vscode"
+	group: "vscode"
+	uid:   1000
+	gid:   1000
+}
+
+// #users exposes universal container user identities.
+#users: {
+	root: {
+		name:  "root"
+		group: "root"
+		uid:   0
+		gid:   0
+		chown: "0:0"
+		user:  "0:0"
+	}
+	nobody: {
+		name:  "nobody"
+		group: "nobody"
+		uid:   65534
+		gid:   65534
+		chown: "65534:65534"
+		user:  "65534:65534"
+	}
+	vscode:  #vscodeUser
+	nonroot: #nonroot
+}
+
 #dockerfile: D={
 	// _project — injected by #target so the `from: ref: ":<target>"`
 	// shorthand can resolve same-project refs without the user passing
@@ -238,10 +292,13 @@ noop: #cmd & {
 	//                                 the archive). List the src in
 	//                                 target srcs too: the fingerprint
 	//                                 hashes worktree files via srcs.
-	//   remote: {url, sha256, dest} — BuildKit downloads, verifies, and
+	//   remote: {url, checksum (or sha256), dest} — BuildKit downloads, verifies, and
 	//                                 layer-caches by the digest; no
 	//                                 curl/CA tooling in the stage.
 	//                                 Extracts only with unpack: true.
+	//   multi-arch: {platforms, dest} — BuildKit downloads per-arch tarballs into
+	//                                 `FROM scratch` stages and selects $TARGETARCH,
+	//                                 avoiding cross-build emulation.
 	// Closed disjunction: mixing forms or omitting the remote checksum
 	// fails unification.
 	#add: close({
@@ -249,8 +306,26 @@ noop: #cmd & {
 		dest:    string
 		unpack?: bool
 	}) | close({
+		url:      string & =~"^https://"
+		dest:     string
+		unpack?:  bool
+		checksum: string & =~"^sha256:[0-9a-f]{64}$"
+	}) | close({
 		url:     string & =~"^https://"
+		dest:    string
+		unpack?: bool
 		sha256:  string & =~"^[0-9a-f]{64}$"
+	}) | close({
+		platforms: {
+			[Arch=string]: close({
+				url:      string & =~"^https://"
+				checksum: string & =~"^sha256:[0-9a-f]{64}$"
+			}) | close({
+				url:    string & =~"^https://"
+				sha256: string & =~"^[0-9a-f]{64}$"
+			})
+		}
+		src?:    string
 		dest:    string
 		unpack?: bool
 	})
@@ -268,7 +343,7 @@ noop: #cmd & {
 	//   global  → shared   every project, concurrent
 	//
 	// `global` is the only concurrent arm and carries a precondition: the
-	// store must verify its own content (mise, go, pnpm, gradle do). One
+	// store must verify its own content (mise, go, pnpm do). One
 	// that doesn't takes `project` — four parallel apt installs against a
 	// concurrent mount fail three times out of four, while a lock at global
 	// scope would serialize every install in the monorepo.
@@ -393,7 +468,7 @@ noop: #cmd & {
 	//   preamble        — project-leaf-additive plain list of raw lines,
 	//                     appended after the framework's contribution.
 	//   defaultPreamble — framework/preset's #MapAsList, keyed so
-	//                     multiple stacks (image preset + dind overlay
+	//                     multiple stacks (image preset + bkid overlay
 	//                     + project add-on) compose by key rather than
 	//                     positional list-unification (which is
 	//                     length-strict and rejects extension).
@@ -464,6 +539,11 @@ noop: #cmd & {
 	// Lines emitted after the cmd RUN, before EXPOSE.
 	epilogue: [...string]
 
+	// Container runtime user, emitted as USER in the Dockerfile after
+	// epilogue and before ENTRYPOINT/CMD.
+	// Accepts a raw string (e.g. "nobody", "10001:10001") or a #userIdentity.
+	user?: string | #userIdentity
+
 	// Structured COPY directives. Maps directly to Dockerfile COPY
 	// grammar; emitted after the preamble and `add`, before the dep and
 	// source COPYs.
@@ -500,7 +580,7 @@ noop: #cmd & {
 		srcs:    [...string]
 		dst:     string
 		chmod?:  string
-		chown?:  string
+		chown?:  string | #userIdentity
 		link:    *true  | bool
 		parents: *false | bool
 		exclude: [...string]
@@ -644,7 +724,7 @@ noop: #cmd & {
 	container_name?: string
 	restart?:        string
 	working_dir?:    string
-	user?:           string
+	user?:           string | #userIdentity
 	ulimits?: [string]: int | {soft: int, hard: int}
 	// shm_size: a size string ("2gb") or a byte count.
 	shm_size?:    string | int
@@ -904,15 +984,18 @@ noop: #cmd & {
 		if X._type == "gha" {[
 			// Same branch dimension as the registry arm below: without it every
 			// branch reads and writes one key, so a PR's writes land on main's.
-			"type=gha,scope=\(X._scope)-${CACHE_SCOPE:-unscoped}-\(X._seg)",
-			"type=gha,scope=\(X._scope)-${CACHE_SCOPE_FALLBACK:-unscoped}-\(X._seg)",
+			// version=2 selects the Twirp cache service at ACTIONS_RESULTS_URL;
+			// without it or ACTIONS_CACHE_SERVICE_V2 in the sandbox, buildx
+			// speaks v1 REST to the v2 endpoint.
+			"type=gha,version=2,scope=\(X._scope)-${CACHE_SCOPE:-unscoped}-\(X._seg)",
+			"type=gha,version=2,scope=\(X._scope)-${CACHE_SCOPE_FALLBACK:-unscoped}-\(X._seg)",
 		]},
 		if X._type == "registry" {[
 			// CACHE_SCOPE — branch + builder identity (engine, frontend,
 			// platform) of whichever builder runs THIS bake, composed
-			// host-side by sayt (dind.nu for local builders, the sayt/depot
+			// host-side by sayt (docker-bridge.nu for local builders, the sayt/depot
 			// action for depot) and interpolated here by compose. bayt only
-			// transports it into dindbox sandboxes via the env-sourced
+			// transports it into bkid sandboxes via the env-sourced
 			// cache_scope secret — never derive it in-sandbox.
 			// CACHE_SCOPE_FALLBACK is the same identity at main: branches
 			// read their own scope first, then main's, so PRs never pollute
@@ -927,7 +1010,7 @@ noop: #cmd & {
 		if len(X.c.to) > 0 {X.c.to},
 		if X._type == "none" {[]},
 		if X._type == "gha" {[
-			"type=gha,mode=\(X.mode),scope=\(X._scope)-${CACHE_SCOPE:-unscoped}-\(X._seg)",
+			"type=gha,version=2,mode=\(X.mode),scope=\(X._scope)-${CACHE_SCOPE:-unscoped}-\(X._seg)",
 		]},
 		if X._type == "registry" {[
 			// zstd pays on the import side: a cache blob is written once and
@@ -987,6 +1070,10 @@ _cacheScopeMax: _cacheTagBudget - (_cacheTagHash + 2)
 	out:   (#cacheTagFit & {in: X.in, max: _cacheTagBudget - len((#cacheTagScope & {in: X.scope}).out)}).out
 }
 
+#generatedFiles: {
+	[=~"^[A-Za-z0-9_-][A-Za-z0-9_.-]*\\.(yaml|yml|json|toml|cue|txt)$"]: _
+}
+
 // =============================================================================
 // #target — the build unit.
 //
@@ -997,6 +1084,7 @@ _cacheScopeMax: _cacheTagBudget - (_cacheTagHash + 2)
 #target: {
 	// Bound by the enclosing #project.targets map key.
 	name: string
+	files?: #generatedFiles
 
 	// Injected by #project — the project's name and dir. Emitters
 	// read these on cross-project dep refs (when dep.project differs
@@ -1189,6 +1277,7 @@ _cacheScopeMax: _cacheTagBudget - (_cacheTagHash + 2)
 _reservedNamePattern: "^bayt$|_(srcs|outs|bayt)$"
 
 #project: P={
+	files?: #generatedFiles
 	// "." roots the project at its own directory, wherever it sits: an
 	// installed app, or a mirror's root, has no sibling projects, and bayt
 	// computes its paths from there in every checkout.
@@ -1197,11 +1286,18 @@ _reservedNamePattern: "^bayt$|_(srcs|outs|bayt)$"
 	// `name` is its identity, the key dependents address it by, and
 	// defaults from `dir` via slash→underscore (with the empty-dir
 	// workspace-root case mapping to "workspaceroot", matching what
-	// generate-bayt.nu prints). Override only when the project's
+	// generate.nu prints). Override only when the project's
 	// conventional name diverges from its directory. A project
 	// rooted at itself has no dir to name it after, so it states its name.
 	dir:  string
 	name: string
+	// Where the project's files sit under /monorepo in its images, when
+	// that is decided at build time rather than by `dir`: a compose
+	// interpolation, passed to every stage as the BAYT_DIR build arg. A
+	// project whose repository is laid out two ways (its own, and a
+	// workspace's) states which one an image takes from the environment
+	// its compose runs in.
+	imageDir?: string
 	if dir == "" {name: *"workspaceroot" | string}
 	if dir != "" && dir != "." {name: *strings.Replace(dir, "/", "_", -1) | string}
 
@@ -1209,8 +1305,20 @@ _reservedNamePattern: "^bayt$|_(srcs|outs|bayt)$"
 	// created, and never changes, like a proto field's tag. Opt-in: a
 	// dependent keys the project's Taskfile include as `<name>-<discriminator>`
 	// instead of its bare name, so the key cannot collide with a local
-	// target's. A collision without one fails as a CUE conflict.
+	// target's. A collision without one fails as a CUE conflict. It also
+	// salts the project's default host ports, the fix for two projects whose
+	// ports collide.
 	discriminator?: =~"^[a-z0-9]{4}$"
+
+	// The consuming repo's CUE module path, injected by #render: projects of
+	// one name in two repos default to different host ports.
+	_module: *"" | string
+	// What a default host port is hashed from (process_compose.cue).
+	_portIdentity: strings.Join([
+		if _module != "" {_module},
+		name,
+		if discriminator != _|_ {discriminator},
+	], "/")
 
 	// Toolchain activator; prefixes every emitted command. Emitters read
 	// it from here; targets don't carry it unless they need to override.

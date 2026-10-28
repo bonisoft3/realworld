@@ -52,9 +52,127 @@ Deno.test("the tag allowlist is the platform's, and a renderer cannot widen it",
   // Each of these is absent from TAGS for its own stated reason; a renderer
   // reaching for one is a bug in the renderer, so it is loud rather than
   // quietly dropped.
-  for (const tag of ["script", "style", "iframe", "object", "embed", "form", "input", "link", "meta", "svg"]) {
+  for (const tag of ["script", "style", "iframe", "object", "embed", "form", "input", "link", "meta"]) {
     await refuses([{ tag }], `<${tag}> is not a prose element`);
   }
+});
+
+Deno.test("chart SVG builds in its namespace while the SVG surface stays narrow", async () => {
+  const { buildNodes } = await import("./render.js");
+  const { target } = dom();
+  buildNodes([{
+    tag: "svg", attrs: { viewBox: "0 0 100 60", role: "group", "aria-label": "Ratings" },
+    children: [
+      { tag: "title", children: ["Ratings"] },
+      { tag: "line", attrs: { x1: 0, y1: 50, x2: 100, y2: 50, class: "team-chart__axis" } },
+      { tag: "a", attrs: { href: "/jogo/123", tabindex: 0, "aria-label": "Match 1, rating 7" },
+        children: [{ tag: "circle", attrs: { cx: 40, cy: 20, r: 4, title: "7" } }] },
+      { tag: "text", attrs: { x: 2, y: 58, "text-anchor": "start" }, children: ["2026"] },
+    ],
+  }], target);
+  const svg = target.querySelector("svg");
+  assert(svg.namespaceURI === "http://www.w3.org/2000/svg", "svg root uses the SVG namespace");
+  assert(svg.querySelector("line").namespaceURI === svg.namespaceURI, "SVG children use the SVG namespace recursively");
+  assert(svg.querySelector("a").getAttribute("href") === "/jogo/123", "a local SVG point link survives");
+  assert(svg.querySelector("a").getAttribute("tabindex") === "0", "SVG point link is keyboardable");
+
+  for (const tag of ["script", "foreignObject", "image", "use", "animate"]) {
+    await refuses([{ tag: "svg", children: [{ tag }] }], `<${tag}> is outside the chart SVG vocabulary`);
+  }
+  await refuses([{ tag: "svg", attrs: { onclick: "alert(1)" } }], "SVG event attributes are script");
+  await refuses([{ tag: "svg", attrs: { style: "background:url(https://e.example)" } }], "SVG inline styles are refused");
+  await refuses([{ tag: "svg", attrs: { fill: "url(https://e.example/p.svg#paint)" } }], "SVG paint references are not a fetch surface");
+  await refuses([{ tag: "svg", attrs: { "data-live": "forged" } }], "SVG cannot forge terminal bindings");
+
+  const { target: hostileTarget } = dom();
+  buildNodes([{ tag: "svg", children: [{ tag: "a", attrs: { href: "javascript:alert(1)" }, children: ["match"] }] }], hostileTarget);
+  assert(hostileTarget.querySelector("svg a").getAttribute("href") === null, "SVG links use the URL-scheme check");
+  assert(hostileTarget.querySelector("svg a").textContent === "match", "unsafe SVG URLs do not erase point labels");
+});
+
+Deno.test("chart fill is literal six-digit hex paint on paths and rects only", async () => {
+  const { buildNodes } = await import("./render.js");
+  const { target } = dom();
+  buildNodes([{ tag: "svg", children: [
+    { tag: "rect", attrs: { x: 0, y: 0, width: 4, height: 4, fill: "#8a2be2" } },
+    { tag: "path", attrs: { d: "M0,0 L4,4", fill: "#8A2BE2" } },
+  ] }], target);
+  assert(target.querySelector("rect").getAttribute("fill") === "#8a2be2", "a lowercase hex fill is kept");
+  assert(target.querySelector("path").getAttribute("fill") === "#8A2BE2", "an uppercase hex fill is kept");
+  for (const fill of ["url(#x)", "url(https://e.example/p.svg#paint)", "red", "#abc", "", "#8a2be2 ", "currentColor"]) {
+    await refuses([{ tag: "svg", children: [{ tag: "rect", attrs: { fill } }] }], `fill ${JSON.stringify(fill)} is not hex paint`);
+    await refuses([{ tag: "svg", children: [{ tag: "path", attrs: { fill } }] }], `fill ${JSON.stringify(fill)} is not hex paint`);
+  }
+  await refuses([{ tag: "svg", children: [{ tag: "circle", attrs: { fill: "#8a2be2" } }] }], "fill is a path and rect attribute");
+});
+
+Deno.test("chart gradients and stroke paint stay local and hex-bounded", async () => {
+  const { buildNodes } = await import("./render.js");
+  const { target } = dom();
+  buildNodes([{
+    tag: "svg",
+    attrs: { viewBox: "0 0 100 40", preserveAspectRatio: "none" },
+    children: [
+      {
+        tag: "defs",
+        children: [{
+          tag: "linearGradient",
+          attrs: { id: "grade-grad", gradientUnits: "userSpaceOnUse", x1: 0, y1: 0, x2: 100, y2: 0 },
+          children: [
+            { tag: "stop", attrs: { offset: "0%", "stop-color": "#22c55e", "stop-opacity": 1 } },
+            { tag: "stop", attrs: { offset: "100%", "stop-color": "#ef4444" } },
+          ],
+        }],
+      },
+      { tag: "g", attrs: { transform: "translate(0, 4)" }, children: [
+        { tag: "path", attrs: { d: "M0,30 L100,10", stroke: "url(#grade-grad)", "stroke-width": 2 } },
+        { tag: "circle", attrs: { cx: 50, cy: 20, r: 3, stroke: "#0f172a", "stroke-width": 2 } },
+      ] },
+    ],
+  }], target);
+  const grad = target.querySelector("linearGradient");
+  assert(grad !== null && grad.namespaceURI === "http://www.w3.org/2000/svg", "linearGradient builds in SVG namespace");
+  assert(grad.getAttribute("gradientUnits") === "userSpaceOnUse", "gradientUnits attribute preserved");
+  assert(target.querySelector("path").getAttribute("stroke") === `url(#${grad.id})`, "stroke names its scoped gradient");
+  await refuses(
+    [{ tag: "svg", children: [{ tag: "path", attrs: { d: "M0,0", stroke: "url(https://e.example/p.svg#g)" } }] }],
+    "external url() stroke is refused",
+  );
+  await refuses(
+    [{ tag: "svg", children: [{ tag: "defs", children: [{ tag: "linearGradient", attrs: { id: "bad id" } }] }] }],
+    "malformed linearGradient id is refused",
+  );
+  await refuses(
+    [{ tag: "svg", children: [{ tag: "defs", children: [{ tag: "stop", attrs: { "stop-color": "red" } }] }] }],
+    "non-hex stop-color is refused",
+  );
+});
+
+Deno.test("repeated charts own their gradients and cannot reference another chart's paint", async () => {
+  const { buildNodes } = await import("./render.js");
+  const { document, target } = dom();
+  const chart = (color) => ({
+    tag: "svg",
+    children: [
+      { tag: "path", attrs: { stroke: "url(#series)" } },
+      { tag: "defs", children: [{
+        tag: "linearGradient", attrs: { id: "series" },
+        children: [{ tag: "stop", attrs: { "stop-color": color } }],
+      }] },
+    ],
+  });
+  buildNodes([chart("#ff0000"), chart("#0000ff")], target);
+  const ids = [...target.querySelectorAll("linearGradient")].map((g) => g.id);
+  assert(new Set(ids).size === 2, "repeated charts have distinct paint servers");
+  for (const svg of target.children) {
+    const id = svg.querySelector("path").getAttribute("stroke").slice(5, -1);
+    assert(document.getElementById(id) === svg.querySelector("linearGradient"), "paint resolves within its chart");
+  }
+  await refuses([{ tag: "svg", children: [{ tag: "path", attrs: { stroke: "url(#series)" } }] }], "undeclared paint refused");
+  await refuses([{ tag: "svg", children: [
+    { tag: "linearGradient", attrs: { id: "series" } },
+    { tag: "linearGradient", attrs: { id: "series" } },
+  ] }], "duplicate gradient names refused");
 });
 
 Deno.test("attributes outside the allowlist are refused, data-* especially", async () => {
@@ -119,6 +237,30 @@ Deno.test("the scheme check is enforced by the builder, not trusted to the rende
   assert(JSON.stringify(hrefs) === JSON.stringify(["https://e.example/a?b=1#c", "/local"]), `allowed urls kept, got ${hrefs}`);
   assert(safeUrl("mailto:a@b.example") === "mailto:a@b.example", "mailto passes");
   assert(safeUrl("javascript:alert(1)") === null, "javascript: refused");
+});
+
+Deno.test("CSV data URLs require an HTML download anchor and never widen navigable schemes", async () => {
+  const { buildNodes, safeUrl } = await import("./render.js");
+  const href = "data:text/csv;charset=utf-8,%EF%BB%BFName%2CGoals%0D%0APlayer%2C2%0D%0A";
+  const { target } = dom();
+  buildNodes([{ tag: "a", attrs: { href, download: "players.csv" }, children: ["Export"] }], target);
+  assert(target.querySelector("a").getAttribute("href") === href, "a typed CSV download retains its data URL");
+  assert(target.querySelector("a").getAttribute("download") === "players.csv", "the filename remains attached");
+  assert(safeUrl(href) === null, "CSV is still refused by the general navigation policy");
+  for (const attrs of [{ href }, { href, download: undefined }, { href, download: null },
+    { href: "data:text/html;charset=utf-8,%3Cscript%3Ealert(1)%3C%2Fscript%3E", download: "players.csv" },
+    { href: "data:text/csv;charset=utf-8;base64,YQ==", download: "players.csv" },
+    { href: "data:text/csv;charset=utf-8,%ZZ", download: "players.csv" },
+    { href: "data:text/csv;charset=utf-8,raw\ncontrol", download: "players.csv" },
+    { href: "java\nscript:alert(1)", download: "players.csv" }]) {
+    const { target } = dom();
+    buildNodes([{ tag: "a", attrs }], target);
+    assert(target.querySelector("a").getAttribute("href") === null, `download does not admit ${JSON.stringify(attrs)}`);
+  }
+  const image = dom().target;
+  buildNodes([{ tag: "img", attrs: { src: href, alt: "csv" } }], image);
+  assert(image.querySelector("img").getAttribute("src") === null, "CSV data cannot reach image URLs");
+  await refuses([{ tag: "svg", children: [{ tag: "a", attrs: { href, download: "players.csv" } }] }], "SVG download attributes");
 });
 
 Deno.test("a link opening a new context cannot leak its opener", async () => {
@@ -239,7 +381,7 @@ Deno.test({
 
     // Silently losing to a built-in is the failure worth refusing: the screen
     // would keep rendering, just never with the module the app shipped.
-    for (const name of ["datetime", "plain"]) {
+    for (const name of ["datetime", "date", "time", "plain"]) {
       let threw = null;
       await interpretScreen(document.getElementById("shell"), "https://app.example/", {
         screen: "a",

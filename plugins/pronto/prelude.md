@@ -23,9 +23,8 @@ They name storage guarantees and are monotonic in expense, so a brief picks the 
 
 - **tab** — survives navigation. Client-held; nothing else can reach it.
 - **device** — survives a restart. Client-held.
-- **server** — survives device loss; forms write through PostgREST. Like
-  `live` and `offline`, it reaches the client through an ElectricSQL shape, and
-  only [the CDC publication](#liveness-and-delivery) sets it apart.
+- **server** — survives device loss; queries fetch filtered and joined results
+  through PostgREST on request, without subscribing to remote changes.
 - **live** — ...and the client sees changes without asking.
 - **offline** — ...and it works with no network. For briefs that ask for
   offline capture or multi-device use.
@@ -41,22 +40,20 @@ enough to make that trivial.
 
 ## Liveness and delivery
 
-The store is the platform's, and nothing above it may poll or fetch: at
-cluster tier every table syncs into the shell as an Electric-shaped
-TanStack DB collection (mecha's published client,
-`libraries/mecha/packages/client`), regions render reactively from
-collections, and server-computed reads (fts, embeds) re-run when a table
-in their dependency set changes — the collections are the change signal,
-never a clock. Writes are durable offline transactions: optimistic,
-queued through an outbox, retried until delivered, and confirmed against
-the sync stream by the write's transaction id (every table carries an
-emitted `txid` column for exactly this). Delivery is at-least-once end to
-end — WAL to bus to pipelines, and WAL to shapes to screens — so every
-consumer, browser included, must be idempotent; client-minted keys and
-the proxy's duplicate-absorbing posture make retries safe. The CDC
-publication covers server-durability tables only, so a pipeline must write a
-sink that is not `server`, or it feeds its own input; nothing refuses one that
-does.
+The store owns fetching and subscriptions; application handlers do neither.
+`server` reads fetch on request. `live` reads maintain a demanded local view or
+refetch a server result when authorized dependency notifications arrive.
+Those notifications retain no table snapshot and use no polling. `offline`
+keeps its local collection behavior. A completed local command requests a
+fresh server result after delivery.
+
+Writes use durable offline transactions: optimistic, queued through an outbox,
+retried until delivered, and confirmed against the sync stream by transaction
+id. Delivery is at-least-once, so consumers must be idempotent. The CDC
+publication retains server-durability tables and also carries authoritative
+live/offline form inputs, excluding known derived outputs from that additional
+set. Choosing browser freshness therefore does not remove input data from the
+statistics lake. See [[docs/lattice#The durability ladder]].
 
 ## Screens and the shell
 
@@ -132,17 +129,30 @@ module's `auth` block): one-tap passkey ceremonies with a server-generated
 display handle — users never type identifiers, passwords, or emails. The
 terminal always offers guest sign-in beside the passkey: one click, no
 ceremony, origin-independent, minting the same generated identity; the
-passkey remains the durable identity. Briefs speak of people and names; they
-never design login screens. An app whose program demands an auth mode the
-terminal does not offer fails to compile.
+passkey remains the durable identity. An app may also offer the providers the
+terminal lists (`auth.providers`, Google first): a way in at the gate and in a
+guest's strip, run by the cluster's auth service by redirect, so no provider
+script runs in the app's pages. A person signed in through a provider and one
+holding a passkey are two people. Briefs speak of people and names; they never
+design login screens. An app whose program demands an auth mode or a provider
+the terminal does not offer fails to compile. Sign-in is never a hatch's.
 
 ## Escape hatches
 
 Ranked: pre-compiled WASM behind a CUE contract, then a vendored unit at the
-terminal tier (a component or a worker, with declared isolation and
-capabilities), then a container (with a declared shim at the browser tier),
+terminal tier (a realm or an agent, with declared isolation and
+ports), then a container (with a declared shim at the browser tier),
 then an external API endpoint. Every escape is a
 box in ir.html; an app with none says so in its Decisions section.
+
+JavaScript an app serves is Jessie the cage runs, a declared unit's or
+host-DOM hatch's file, or the terminal's own; `check-facts` warns on anything
+else, naming the file, and the warning becomes an error once no app has one.
+An agent unit without a memo is a presenter: its worker paints and raises
+nothing, under a policy that refuses every connection but blob: and data:.
+A kinetic engine is Jessie too: a module graph of relative static imports,
+linked at build time and imported by the cage, endowed with nothing
+([[../omnishell/docs/kinetic#A Jessie engine|the kinetic host]]).
 
 ## The virtual team
 

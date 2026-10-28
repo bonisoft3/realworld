@@ -1,4 +1,5 @@
 import { createCollection, IR } from "@tanstack/db"
+import { ShapeStream } from "@electric-sql/client"
 import type { Collection, LoadSubsetOptions } from "@tanstack/db"
 import { electricCollectionOptions } from "@tanstack/electric-db-collection"
 import { BroadcastChannelLeader, NonRetriableError, startOfflineExecutor, WebLocksLeader } from "@tanstack/offline-transactions"
@@ -19,9 +20,7 @@ import { createStorageAdapter } from "./storage.js"
  * Writes: durable offline transactions (IndexedDB outbox, leader election,
  * retry-until-delivered) whose mutation functions POST/PATCH/DELETE against
  * PostgREST and then confirm against the shape stream before completing:
- * inserts and updates await the write's txid (the `txid` column every mecha
- * table carries, returned via Prefer: return=representation); deletes confirm
- * against the delete operation itself (see confirmDelete).
+ * every write awaits the transaction that made it (see confirmWrite).
  *
  * Retries are idempotent end to end: keys are client-minted, mecha's proxy
  * injects `resolution=ignore-duplicates` on POST, PATCH/DELETE are naturally
@@ -127,8 +126,7 @@ function shapeAuthority(authUrl: string, token: (() => string | null) | undefine
   const inflight = new Map<string, Promise<Held>>()
   const nameOf = (table: string, key?: RowKey) => (key ? `${table}|${key.column}=${key.value}` : table)
 
-  async function mint(table: string, key?: RowKey): Promise<Held> {
-    const session = token?.()
+  async function mint(table: string, key: RowKey | undefined, session: string | null | undefined, name: string): Promise<Held> {
     const res = await fetcher(`${authUrl}/shape`, {
       method: "POST",
       headers: {
@@ -146,19 +144,20 @@ function shapeAuthority(authUrl: string, token: (() => string | null) | undefine
       where: body.where,
       expiresAt: Date.now() + body.expires_in * 1000,
     }
-    held.set(nameOf(table, key), rec)
+    held.set(name, rec)
     return rec
   }
 
   // One mint per shape in flight. Without this the `where` and the header --
   // two lazy values resolved for the same request -- each start their own.
   function current(table: string, key?: RowKey): Promise<Held> {
-    const name = nameOf(table, key)
+    const session = token?.()
+    const name = JSON.stringify([session, nameOf(table, key)])
     const rec = held.get(name)
     if (rec && rec.expiresAt - Date.now() > SHAPE_TOKEN_SKEW_MS) return Promise.resolve(rec)
     let p = inflight.get(name)
     if (!p) {
-      p = mint(table, key).finally(() => inflight.delete(name))
+      p = mint(table, key, session, name).finally(() => inflight.delete(name))
       inflight.set(name, p)
     }
     return p
@@ -168,7 +167,7 @@ function shapeAuthority(authUrl: string, token: (() => string | null) | undefine
     authorization: (table: string, key?: RowKey) => async () => `Bearer ${(await current(table, key)).token}`,
     where: (table: string, key?: RowKey) => async () => (await current(table, key)).where,
     /** Drops a held token, so the next request mints. */
-    forget: (table: string, key?: RowKey) => void held.delete(nameOf(table, key)),
+    forget: (table: string, key?: RowKey) => void held.delete(JSON.stringify([token?.(), nameOf(table, key)])),
   }
 }
 
@@ -203,9 +202,31 @@ export interface MechaClient {
   /** `${tableId}:${key}` → phase while a write is in flight; cleared on delivery. */
   syncPhase(tableId: string, key: string): SyncPhase | undefined
   subscribeSyncPhases(listener: () => void): () => void
+  /**
+   * Authorized dependency changes, without retaining a table snapshot. A
+   * listener is handed the changed rows, normalized as a collection holds
+   * them, so a read can tell whether a change could move it; it is handed
+   * nothing when which rows moved is unknown: the first caught-up position,
+   * every shape reset, a late subscriber catching up. Grant families retain
+   * their existing authorized union; local tables watch their local
+   * collection. Dispose subscriptions before changing accounts; once a grant
+   * family has been used, an account change needs a new client.
+   */
+  subscribeInvalidation(tableId: string, listener: InvalidationListener): () => void
 }
 
-const DELETE_CONFIRM_TIMEOUT_MS = 30_000
+/** A row a dependency change named: its value after the change, before it, or
+ * both, in the shape a collection's change set carries. */
+export interface InvalidationChange {
+  type: "insert" | "update" | "delete"
+  key: string
+  value?: Record<string, unknown>
+  previousValue?: Record<string, unknown>
+}
+/** Changed rows, or undefined when which rows changed is not known. */
+export type InvalidationListener = (changes?: readonly InvalidationChange[]) => void
+
+const CONFIRM_TIMEOUT_MS = 30_000
 
 /**
  * A collection opens its Electric shape on its first subscriber and closes it
@@ -329,6 +350,46 @@ function parenthesizedLoad(opts: LoadSubsetOptions): LoadSubsetOptions {
   }
 }
 
+/** Predicates one snapshot carries at most: they travel in its URL. */
+const SUBSET_BATCH = 64
+
+/**
+ * The subsets asked for in one turn of the event loop, each a bare `where`,
+ * loaded as one snapshot of their union. A snapshot pauses the shape's stream
+ * until its rows arrive, and a screen drawing a region per row asks for one
+ * subset per row of the same shape, all at once: twenty snapshots of one shape
+ * against Postgres together, and under load the last of them past 30 s
+ * (Electric's "held the pause lock for 30s"). A subset with a limit or a
+ * cursor is its own.
+ */
+export function coalescedLoad(load: (opts: LoadSubsetOptions) => true | Promise<void>) {
+  type Waiting = { where: IR.BasicExpression<boolean>; resolve: () => void; reject: (e: unknown) => void }
+  let batch: Waiting[] | null = null
+  const flush = () => {
+    const waiting = batch!
+    batch = null
+    for (let at = 0; at < waiting.length; at += SUBSET_BATCH) {
+      const part = waiting.slice(at, at + SUBSET_BATCH)
+      const where = part.length === 1 ? part[0].where : new IR.Func("or", part.map((w) => w.where)) as IR.BasicExpression<boolean>
+      Promise.resolve()
+        .then(() => load({ where }))
+        .then(() => { for (const w of part) w.resolve() }, (e) => { for (const w of part) w.reject(e) })
+    }
+  }
+  return (opts: LoadSubsetOptions): true | Promise<void> => {
+    // Without a limit an order selects nothing: the union's rows are the same.
+    if (opts.where === undefined || opts.limit !== undefined || opts.cursor !== undefined) return load(opts)
+    const where = opts.where
+    return new Promise<void>((resolve, reject) => {
+      if (batch === null) {
+        batch = []
+        setTimeout(flush, 0)
+      }
+      batch.push({ where, resolve, reject })
+    })
+  }
+}
+
 export function createMechaClient(config: MechaClientConfig): MechaClient {
   let bound: Types | undefined
   const typeTable = (): Types => {
@@ -401,6 +462,17 @@ export function createMechaClient(config: MechaClientConfig): MechaClient {
   }
 
   const gcTime = config.shapeIdleMs ?? SHAPE_IDLE_MS
+  const identity = () => config.subject ? config.subject() : config.token?.()
+  // Unions and their nested shapes outlive readers; their account cannot be
+  // rebound safely while retained rows or optimistic writes still use them.
+  let familyAccount: { subject: ReturnType<typeof identity> } | undefined
+  function checkFamilyAccount(bind = false) {
+    const subject = identity()
+    if (familyAccount !== undefined && familyAccount.subject !== subject) {
+      throw new Error("grant family outlived its account; create a new client after changing accounts")
+    }
+    if (bind && familyAccount === undefined) familyAccount = { subject }
+  }
   // One Electric shape as a collection. Its `where` and its header are the
   // authority's, resolved together per request from one token.
   function shape(t: Table, key?: RowKey) {
@@ -474,7 +546,7 @@ export function createMechaClient(config: MechaClientConfig): MechaClient {
       if (!onDemand || load === undefined) return result
       return {
         ...(result as object),
-        loadSubset: (opts: LoadSubsetOptions) => {
+        loadSubset: coalescedLoad((opts: LoadSubsetOptions) => {
           const loaded = load(parenthesizedLoad(opts))
           if (loaded === true) return true
           return loaded.catch((error) => {
@@ -484,7 +556,7 @@ export function createMechaClient(config: MechaClientConfig): MechaClient {
             for (const fn of failureListeners) fn(error)
             throw error
           })
-        },
+        }),
       }
     }
     return createCollection({
@@ -587,6 +659,7 @@ export function createMechaClient(config: MechaClientConfig): MechaClient {
     }
     // Opened by the first reader that has a subject.
     const acquire = () => {
+      checkFamilyAccount(config.subject?.() != null)
       readers++
       if (grants !== null) return
       const me = config.subject?.()
@@ -663,7 +736,6 @@ export function createMechaClient(config: MechaClientConfig): MechaClient {
     throw new Error(message)
   }
 
-  /** Await the write's txid in the shape stream (inserts and updates). */
   function platformTxid(value: unknown): number {
     if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") {
       throw new Error(`txid is not an integer: ${String(value)}`)
@@ -675,31 +747,86 @@ export function createMechaClient(config: MechaClientConfig): MechaClient {
     return Number(parsed)
   }
 
-  async function confirmTxid(collectionId: string, rows: any[]): Promise<void> {
-    const txid = rows?.[0]?.txid
-    if (txid === undefined || txid === null) return // ignore-duplicates replay: nothing new to await
-    await (collections[collectionId] as any).utils.awaitTxId(platformTxid(txid))
-  }
-
   /**
-   * Await the key's delete operation in the shape stream. A DELETE response
-   * can only carry the row's previous txid, so deletes confirm by matching
-   * the operation itself (the package's awaitMatch util).
+   * Confirms a write by its transaction's visibility, the same way for every
+   * write. The server names the transaction in the response (`x-txid`, set by
+   * the pre-request hook in the write's own transaction), and the collection
+   * resolves once its stream carries a change from that transaction or a
+   * snapshot already holding it (electric-db-collection's awaitTxId).
+   *
+   * A write that changed no rows has no change for any stream to carry, so it
+   * has nothing to confirm and resolves at once. That is what makes a replay
+   * safe: the outbox replays, after a reload, a write an earlier page applied
+   * but left before its stream confirmed, and the replay meets its own effect
+   * — an insert its row (ignore-duplicates), a delete its row gone. Awaiting a
+   * change there would wait on a stream that opened after the original
+   * committed, time out, retry forever, and hold every later write behind it,
+   * since the outbox runs one transaction at a time.
+   *
+   * Except where this reader still holds the row it named: an update or a
+   * delete that changed nothing while the synced collection has the key is
+   * the server refusing it (a row policy that shows the row but forbids the
+   * change), and is refused here too, so the optimistic state rolls back. A
+   * key the collection lacks is a row already gone.
+   *
+   * Which rows changed is the response's representation, so every write asks
+   * for one.
    */
-  async function confirmDelete(collectionId: string, keyColumn: string, key: string): Promise<void> {
-    const utils = (collections[collectionId] as any).utils
-    await utils.awaitMatch(
-      (message: any) =>
-        message?.headers?.operation === "delete" &&
-        String(message?.value?.[keyColumn] ?? message?.key ?? "") === String(key),
-      DELETE_CONFIRM_TIMEOUT_MS,
-    )
+  async function confirmWrite(collectionId: string, res: Response, what: string, key?: unknown): Promise<void> {
+    const changed = await res.json()
+    if (!Array.isArray(changed)) throw new Error(`${what} returned a non-array representation`)
+    if (changed.length === 0) {
+      // The synced rows, not the optimistic view this write already changed;
+      // @tanstack/db 0.8.0 has no public accessor for them.
+      if (key !== undefined && (collections[collectionId] as any)._state.syncedData.has(key)) {
+        throw new NonRetriableError(`${what} changed no rows: the server refused ${String(key)}, which this reader still holds`)
+      }
+      return
+    }
+    const txid = res.headers.get("x-txid")
+    if (txid === null) throw new Error(`${what} changed rows but its response names no transaction (x-txid)`)
+    await (collections[collectionId] as any).utils.awaitTxId(platformTxid(txid), CONFIRM_TIMEOUT_MS)
   }
 
   // Static per-table mutation function names: outbox replay after a reload
   // looks handlers up by name, so the registry must be derivable from config
   // alone.
   const mutationFns: Record<string, any> = {}
+  // Outbox replay has no screen-owned subscriber; its acknowledgement keeps
+  // the changes-only shape alive for the network request and its txid.
+  const mutationLease = async (tableId: string) => {
+    const collection = collections[tableId]
+    if (collection.status === "error") {
+      throw new Error(`collection ${tableId} cannot acknowledge a mutation while its changefeed is in error`)
+    }
+    let stopReady = () => {}
+    let stopError = () => {}
+    let readinessError: Error | undefined
+    const ready = collection.isReady()
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => {
+        stopReady = collection.once("status:ready", () => resolve())
+        stopError = collection.once("status:error", () => {
+          readinessError = new Error(`collection ${tableId} failed while preparing mutation acknowledgement`)
+          resolve()
+        })
+      })
+    let subscription: ReturnType<typeof collection.subscribeChanges> | undefined
+    try {
+      subscription = collection.subscribeChanges(() => {}, { includeInitialState: false })
+      await ready
+      if (readinessError !== undefined) throw readinessError
+      stopReady()
+      stopError()
+      const active = subscription
+      return () => active.unsubscribe()
+    } catch (error) {
+      stopReady()
+      stopError()
+      subscription?.unsubscribe()
+      throw error
+    }
+  }
   // PostgREST rejects generated and trigger-managed columns on write.
   const cleanRow = (row: any) => {
     if (!row || typeof row !== "object") return row
@@ -715,42 +842,53 @@ export function createMechaClient(config: MechaClientConfig): MechaClient {
     // Local tiers take no mutation handlers — see `durability`.
     if (isLocal(t)) continue
     mutationFns[`insert:${t.id}`] = async ({ transaction, idempotencyKey }: any) => {
-      const row = transaction.mutations[0].modified
-      const res = await doFetch(`${crudUrl}/${t.table}`, {
-        method: "POST",
-        headers: headers({ Prefer: "return=representation", "Idempotency-Key": idempotencyKey }),
-        body: JSON.stringify(cleanRow(row)),
-      })
-      await requireOk(res, `insert ${t.table}`)
-      const returned = await res.json()
-      if (!Array.isArray(returned)) throw new Error(`insert ${t.table} returned a non-array representation`)
-      await confirmTxid(t.id, returned.map((item) => normalizeRow(t.fields, item, "postgres")))
-      setPhase(`${t.id}:${row[t.key]}`, null)
+      const release = await mutationLease(t.id)
+      try {
+        const row = transaction.mutations[0].modified
+        const res = await doFetch(`${crudUrl}/${t.table}`, {
+          method: "POST",
+          headers: headers({ Prefer: "return=representation", "Idempotency-Key": idempotencyKey }),
+          body: JSON.stringify(cleanRow(row)),
+        })
+        await requireOk(res, `insert ${t.table}`)
+        await confirmWrite(t.id, res, `insert ${t.table}`)
+        setPhase(`${t.id}:${row[t.key]}`, null)
+      } finally {
+        release()
+      }
     }
     mutationFns[`update:${t.id}`] = async ({ transaction }: any) => {
-      const m = transaction.mutations[0]
-      const key = m.key ?? m.original?.[t.key]
-      const res = await doFetch(`${crudUrl}/${t.table}?${t.key}=eq.${encodeURIComponent(key)}`, {
-        method: "PATCH",
-        headers: headers({ Prefer: "return=representation" }),
-        body: JSON.stringify(cleanRow(m.changes)),
-      })
-      await requireOk(res, `update ${t.table}`)
-      const returned = await res.json()
-      if (!Array.isArray(returned)) throw new Error(`update ${t.table} returned a non-array representation`)
-      await confirmTxid(t.id, returned.map((item) => normalizeRow(t.fields, item, "postgres")))
-      setPhase(`${t.id}:${key}`, null)
+      const release = await mutationLease(t.id)
+      try {
+        const m = transaction.mutations[0]
+        const key = m.key ?? m.original?.[t.key]
+        const res = await doFetch(`${crudUrl}/${t.table}?${t.key}=eq.${encodeURIComponent(key)}`, {
+          method: "PATCH",
+          headers: headers({ Prefer: "return=representation" }),
+          body: JSON.stringify(cleanRow(m.changes)),
+        })
+        await requireOk(res, `update ${t.table}`)
+        await confirmWrite(t.id, res, `update ${t.table}`, key)
+        setPhase(`${t.id}:${key}`, null)
+      } finally {
+        release()
+      }
     }
     mutationFns[`delete:${t.id}`] = async ({ transaction }: any) => {
-      const m = transaction.mutations[0]
-      const key = m.key ?? m.original?.[t.key]
-      const res = await doFetch(`${crudUrl}/${t.table}?${t.key}=eq.${encodeURIComponent(key)}`, {
-        method: "DELETE",
-        headers: headers(),
-      })
-      await requireOk(res, `delete ${t.table}`)
-      await confirmDelete(t.id, t.key, key)
-      setPhase(`${t.id}:${key}`, null)
+      const release = await mutationLease(t.id)
+      try {
+        const m = transaction.mutations[0]
+        const key = m.key ?? m.original?.[t.key]
+        const res = await doFetch(`${crudUrl}/${t.table}?${t.key}=eq.${encodeURIComponent(key)}`, {
+          method: "DELETE",
+          headers: headers({ Prefer: "return=representation" }),
+        })
+        await requireOk(res, `delete ${t.table}`)
+        await confirmWrite(t.id, res, `delete ${t.table}`, key)
+        setPhase(`${t.id}:${key}`, null)
+      } finally {
+        release()
+      }
     }
   }
 
@@ -761,9 +899,14 @@ export function createMechaClient(config: MechaClientConfig): MechaClient {
     storage: createStorageAdapter(),
     jitter: true,
     leaderElection: leader,
+    // A queued write replays only under the subject that made it: another
+    // account's, or one made before its database was recreated, is refused by
+    // row security, and replaying it as this reader's would be wrong anyway.
+    // A write queued before subjects were recorded names none, and is dropped.
     beforeRetry: (txs: any[]) => {
       const cutoff = Date.now() - maxAge
-      return txs.filter((tx) => tx.createdAt.getTime() > cutoff)
+      const subject = identity() ?? null
+      return txs.filter((tx) => tx.createdAt.getTime() > cutoff && tx.metadata?.subject === subject)
     },
   })
 
@@ -794,13 +937,135 @@ export function createMechaClient(config: MechaClientConfig): MechaClient {
     for (const phaseKey of phaseKeys) setPhase(phaseKey, "queued")
     // autoCommit off: mutate() would otherwise self-commit and race the
     // explicit commit below into "no longer pending".
-    const tx = executor.createOfflineTransaction({ mutationFnName, autoCommit: false })
+    const tx = executor.createOfflineTransaction({ mutationFnName, autoCommit: false, metadata: { subject: identity() ?? null } })
     tx.mutate(mutate)
     return tx.commit().then(() => undefined)
   }
 
+  type Invalidation = { listeners: Set<InvalidationListener>; stop: () => void; ready: boolean; checkScope: () => void }
+  const invalidations = new Map<string, Invalidation>()
+  function subscribeInvalidation(tableId: string, listener: InvalidationListener): () => void {
+    const t = byId.get(tableId)
+    if (t === undefined) throw new Error(`unknown table id: ${tableId}`)
+    if (reachable.has(tableId)) checkFamilyAccount(true)
+    let state = invalidations.get(tableId)
+    if (state === undefined) {
+      const subject = identity()
+      const checkScope = () => {
+        if (identity() !== subject) throw new Error(`invalidation subscription for ${t.table} outlived its account`)
+      }
+      state = { listeners: new Set(), stop: () => {}, ready: false, checkScope }
+      invalidations.set(tableId, state)
+      const active = state
+      const publish = (changes?: readonly InvalidationChange[]) => {
+        checkScope()
+        for (const fn of active.listeners) fn(changes)
+      }
+      if (isLocal(t) || reachable.has(tableId)) {
+        // Grant families need their authorized per-row shape union. They
+        // remain eager independently of server-read invalidation.
+        const subscription = collections[tableId].subscribeChanges(
+          (changes) => publish(changes as unknown as InvalidationChange[]),
+          { includeInitialState: false },
+        )
+        let stopped = false
+        collections[tableId].onFirstReady(() => {
+          if (stopped) return
+          active.ready = true
+          publish()
+        })
+        active.stop = () => {
+          stopped = true
+          subscription.unsubscribe()
+        }
+      } else {
+        const controller = new AbortController()
+        const scoped = (value: () => Promise<string>) => async () => {
+          checkScope()
+          const result = await value()
+          checkScope()
+          return result
+        }
+        const stream = new ShapeStream({
+          url: `${electricUrl}/v1/shape`,
+          log: "changes_only",
+          offset: "now",
+          // Whole rows, so a read's predicate can be tested on any change:
+          // without them an update names only the columns it changed and a
+          // delete only the key.
+          params: { table: t.table, where: scoped(shapes.where(t.table)) as any, replica: "full" },
+          headers: { Authorization: scoped(shapes.authorization(t.table)) },
+          fetchClient: config.fetcher,
+          parser: parserOf(t),
+          signal: controller.signal,
+          onError: (error: any) => {
+            if (error?.status === 401 && identity() === subject) {
+              shapes.forget(t.table)
+              return {}
+            }
+          },
+        })
+        const unsubscribe = stream.subscribe((messages) => {
+          if (controller.signal.aborted) return
+          const changes: InvalidationChange[] = []
+          let unknown = false
+          for (const message of messages) {
+            const headers = message.headers as { control?: string; operation?: InvalidationChange["type"] }
+            if (headers.control === "must-refetch") active.ready = false
+            if (headers.operation !== undefined) {
+              const { key, value, old_value } = message as unknown as {
+                key: string; value: Record<string, unknown>; old_value?: Record<string, unknown>
+              }
+              const row = normalizeRow(t.fields, value, "electric")
+              changes.push(
+                headers.operation === "insert" ? { type: "insert", key, value: row }
+                : headers.operation === "delete" ? { type: "delete", key, previousValue: row }
+                : { type: "update", key, value: row, previousValue: normalizeRow(t.fields, { ...value, ...old_value }, "electric") },
+              )
+            }
+            if (headers.control === "up-to-date" && !active.ready) {
+              active.ready = true
+              unknown = true
+            }
+          }
+          if (unknown) publish()
+          else if (changes.length > 0) publish(changes)
+        }, (error) => {
+          if (controller.signal.aborted) return
+          active.stop()
+          invalidations.delete(tableId)
+          queueMicrotask(() => { throw error })
+        })
+        active.stop = () => {
+          controller.abort()
+          unsubscribe()
+        }
+      }
+    }
+    state.checkScope()
+    // A listener can be reused by callers; each subscription still owns one
+    // reference, so stopping one must not detach another.
+    const active = state
+    const notify: InvalidationListener = (changes) => listener(changes)
+    active.listeners.add(notify)
+    if (active.ready) queueMicrotask(() => {
+      if (active.listeners.has(notify)) {
+        active.checkScope()
+        notify()
+      }
+    })
+    return () => {
+      active.listeners.delete(notify)
+      if (active.listeners.size === 0 && invalidations.get(tableId) === active) {
+        invalidations.delete(tableId)
+        active.stop()
+      }
+    }
+  }
+
   return {
     collections,
+    subscribeInvalidation,
     ready: executor.waitForInit().then(() => undefined),
     insert(tableId, rows) {
       const t = byId.get(tableId)

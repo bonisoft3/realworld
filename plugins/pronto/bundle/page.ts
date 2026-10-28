@@ -2,22 +2,23 @@
 // files served from it through a fetch shim, and mecha's browser platform
 // booted in the tab behind the same shim. `omnishell/` and `mecha-browser/`
 // resolve through the map the bundler writes from the roots it is given.
-import { PGlite } from '@electric-sql/pglite'
 import { decodeBase64 } from '@std/encoding/base64'
 import { createCluster, type Cluster } from 'mecha-browser/cluster.ts'
+import type { Drain } from 'mecha-browser/drains.ts'
+import { createPageDatabase, type DatabaseAssets } from './database.ts'
 // @ts-ignore untyped interpreter module
 import { createShell } from 'omnishell/shell.js'
+// @ts-ignore untyped interpreter module
+import { ensureSes } from 'omnishell/jessie.js'
+import { installSes } from 'pronto-bundle-ses'
 
 interface Payload {
   files: Record<string, string>
   /** Absent for an app with no server entity, which boots no cluster. */
-  cluster?: { sql: string[]; tables: string[]; assets: { wasm: string; data: string; initdb: string } }
+  cluster?: { sql: string[]; tables: string[]; drains: Drain[]; clock: 'ticker' | 'disabled'; assets: DatabaseAssets }
 }
 
 const payload: Payload = JSON.parse(new TextDecoder().decode(decodeBase64(document.getElementById('pronto-payload')!.textContent!)))
-
-const inflate = (b64: string): Promise<ArrayBuffer> =>
-  new Response(new Blob([decodeBase64(b64)]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
 
 const MIME: Record<string, string> = {
   html: 'text/html', css: 'text/css', js: 'text/javascript', json: 'application/json', yaml: 'text/yaml', md: 'text/markdown',
@@ -50,24 +51,22 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise
 
 ;(async () => {
   if (payload.cluster) {
-    const { sql, tables, assets: a } = payload.cluster
-    const [wasm, data, initdb] = await Promise.all([inflate(a.wasm), inflate(a.data), inflate(a.initdb)])
-    const db = await PGlite.create({
-      pgliteWasmModule: await WebAssembly.compile(wasm),
-      initdbWasmModule: await WebAssembly.compile(initdb),
-      fsBundle: new Blob([data]),
-    })
+    const { sql, tables, drains, clock, assets: a } = payload.cluster
+    const { schema } = JSON.parse(payload.files['shell/shell.json'])
+    const db = await createPageDatabase(a)
     // A change the cluster lost leaves a table no read can trust again, so
     // the page dies of it where its boot would.
     cluster = await createCluster({
-      db, sql, tables, log: console.error,
+      db, sql, tables, schema, drains, clock, log: console.error,
       fail: (e) => {
         document.body.textContent = `page failed: ${e.message}`
         reportError(e)
       },
     })
   }
-  createShell({ config: './shell.json', mount: document.getElementById('app') })
+  // The shim answers every file a preload would ask the network for.
+  await ensureSes(installSes)
+  createShell({ config: './shell.json', mount: document.getElementById('app'), preload: false })
 })().catch((e) => {
   document.body.textContent = `boot failed: ${e instanceof Error ? e.message : String(e)}`
   throw e

@@ -38,7 +38,7 @@ const piece = (n: number, over: Row = {}): Row => ({
   ...over,
 });
 
-// The tables the screen's regions declare, all of them: memoryStore throws on a
+// The tables the screen's regions declare, all of them: fakeDataSync throws on a
 // table it was not given, and the author embed resolves against app_user.
 const world = (over: Record<string, Row[]> = {}): Record<string, Row[]> => ({
   app_user: [

@@ -11,8 +11,7 @@ conforming `brief.md`, `ir.html` and `program.cue` contain is
 [`SPEC.md`](SPEC.md); the component knowledge every compile assumes is
 [`prelude.md`](prelude.md); a screen, in detail, is omnishell's
 [`GUIDE.md`](../omnishell/GUIDE.md), and every attribute it may carry is
-omnishell's [`REFERENCE.md`](../omnishell/REFERENCE.md). `apps/thenote` is the
-golden reference, compiled through the whole ladder.
+omnishell's [`REFERENCE.md`](../omnishell/REFERENCE.md).
 
 ## Starting an app and running a turn
 
@@ -72,8 +71,8 @@ bundle lacks, hand-authored handlers included; omnishell's guide has
 
 The verbs are sayt's, and every check lands under the verb whose layer it
 needs: `lint` for anything that fails in seconds without executing the app
-(`cue vet`, `check-facts`, `check-sql`, `identity.ts check`, omnishell's `check
-handlers` and `check markup`), `test` for the app's behaviour against fixtures
+(`cue vet`, `check-facts`, `check-sql`, `check-hybrids`, `identity.ts check`,
+omnishell's `check handlers` and `check markup`), `test` for the app's behaviour against fixtures
 with no live service (`tests/*.test.ts`, `check machines`, `check battery`),
 `integrate` for anything that needs the cluster up (the migration replay, the
 scheduled pipelines, visual lint). `sayt launch` brings the cluster up,
@@ -122,14 +121,21 @@ reachable by backend services alone. What each mode compiles to, and why, is
 ### Validations
 
 A rule a field or row CEL cannot state and a unique cannot encode is a
-validation: a Jessie predicate over the row and the rows its declared
-references reach.
+lifecycle guard: a Jessie predicate over the row and the rows its declared
+references reach. The machine names which writes it guards.
 
 ```cue
-Favorite: validations: "own-article": {
-	src:  "shell/validations/own-article.js"
-	via:  ["article_id"]
-	note: "a reader cannot favorite what they wrote"
+state: machines: FavoriteRules: {
+	entity: "Favorite"
+	guards: "own-article": {
+		src: "shell/validations/own-article.js"
+		via: ["article_id"]
+		note: "a reader cannot favorite what they wrote"
+	}
+	on: {
+		insert: guard: "own-article"
+		update: guard: "own-article"
+	}
 }
 ```
 
@@ -140,12 +146,26 @@ Favorite: validations: "own-article": {
 `via` lists the edges the predicate may follow: a field of this entity carrying
 `ref` walks forward to the one referenced row, and `"<Entity>.<field>"` whose
 field refs this entity walks backward to every row pointing here. `event` is
-`{type: "insert" | "update", row}`, the row as it will stand; `state.items` is
-`[]` on insert and `[previous]` on update; `state.rows` holds one array per
+`{type: "insert" | "update" | "delete", row}`. `row` is the resulting row
+on insert/update and the previous row on delete; `state.items` is `[]` on
+insert and `[previous]` on update/delete; `state.rows` holds one array per
 edge, keyed by the target table, and an edge may be empty. The answer is a
 boolean; a refusal carries the validation's name (`refused.validation` in a
 machine, `validation <table>.<name>` from the server). No clock, no draw, no
 reads beyond `via`.
+
+A lifecycle transition accepts `guard: "name"` or an ordered list of guard
+names, followed by optional `actions`. Every named guard must be declared in
+that machine and used by at least one transition. The entity's `validations`
+map is derived from these declarations and cannot carry independent predicates.
+
+Guarded server interpreters run `AFTER`: RLS has accepted the write, generated
+columns exist, and related rows are read in that transaction. A false answer
+rolls back the row and actions; a non-boolean is a program error. `BEFORE` and
+`assign` are refused for guarded lifecycle machines. Relational actions run on
+the server. A browser entity may have guard-only lifecycle machines; the store
+checks all guarded rows before starting a local mutation batch. Access remains
+RLS plus its browser visibility mirror, not a privileged Jessie guard.
 
 `derive.ts` refuses, when the writer runs, a `via` that is no reference, an
 edge from a server entity to a `tab` or `device` one, two edges to one table,
@@ -222,6 +242,34 @@ schedules: "session-keepalive": {
 What the emitter refuses — each entity's durability, a target's clock — is
 [pipelines and schedules](docs/pipelines-and-schedules.md#schedules).
 
+### Drains
+
+Work the database already does in SQL — a queue drained in batches, a
+projection recomputed whole — is declared as `drains` and called when its
+tables change, never on an interval:
+
+```cue
+drains: "team-profiles": {
+	on:   ["team_profile_dirty", "day_tick"] // tables whose change wakes it
+	call: "refresh_team_profiles"            // the RPC, as the service role
+	body: batch_size: 50
+}
+```
+
+An answer that moves with the date wakes on a schedule's tick table, as
+`day_tick` here, a `#Schedule` emitting at local midnight:
+
+```cue
+schedules: "local-day": {
+	cron:     "0 0 * * *"
+	timeZone: "America/Sao_Paulo"
+	emits: {entity: "DayTick", values: {}}
+}
+```
+
+What the function owes the drain, and whose job the publication is, is
+[pipelines and schedules](docs/pipelines-and-schedules.md#drains).
+
 ### Identity
 
 An entity is a durable identity — a Cap'n Proto type id, with ordinals for its
@@ -275,8 +323,10 @@ money are the terminal's value formats
 ([where locale-dependent code runs](docs/localization.md#where-locale-dependent-code-runs)).
 
 A screen opts into a localized address with `slug: "<key>"`, localizes its nav
-word with `label: "<key>"`, and, on a route with no `:param`, asks for one
-crawlable document per locale with `prerender: true`
+word with `label: "<key>"`, and, on a route with no `:param` over no rows the
+server holds, asks for one crawlable document per locale with `prerender:
+true`; a route over public reads
+asks to be rendered with its rows on request with `ssr: "ssr"`
 ([addresses](docs/localization.md#addresses),
 [crawlable documents](docs/localization.md#crawlable-documents)). An internal
 link names a route rather than a path — `<a data-route="<screen>">`, with
@@ -302,12 +352,16 @@ prose with CEL — is [SPEC's](SPEC.md#acceptancemd), and `check-facts` warns
 about an acceptance claim nothing has settled. What runs today is the app's own
 drivers and omnishell's battery ([the ladder](docs/compiler.md#the-ladder)). An
 acceptance driver walks the checklist against the running
-app, each case citing the ids it realizes — `apps/truco/tests/acceptance.ts`,
-declared as an `integrate` check, drives the table under `?clock=manual`.
+app, each case citing the ids it realizes — `apps/truco/tests/acceptance.ts`
+(standalone readers: the `bonisoft3/truco` mirror), declared as an
+`integrate` check, drives the table under `?clock=manual`.
 Omnishell's `check battery` (at `test`) runs
 [the battery](../omnishell/docs/automated-tests-battery.md) over every handler
 and validation module; `check machines` fires every arrow of every chart;
-visual lint (at `integrate`) fails only on `critical`. Every driver reads `APP_URL`
+visual lint (at `integrate`) fails only on `critical`. The battery runs from
+the committed `.bayt` closure: render it with the cue.mod-pinned `bayt`
+(`bayt generate`) and commit `.bayt/` before the first integrate — no sayt
+verb produces it. Every driver reads `APP_URL`
 when set, so the same drivers can be pointed at any door.
 
 ## Release

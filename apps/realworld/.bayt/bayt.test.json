@@ -1,19 +1,40 @@
 {
   "_generated_from": "bayt.cue (do not edit)",
+  "dockerfile": {
+    "preamble": [],
+    "preambleCopyContexts": [],
+    "from": {
+      "ref": ":build",
+      "name": "realworld-build"
+    },
+    "add": [],
+    "mounts": [],
+    "secrets": {},
+    "extra_hosts": [],
+    "epilogue": [],
+    "copy": [],
+    "healthcheck": null,
+    "expose": [],
+    "entrypoint": null,
+    "incremental": false,
+    "cmd": null
+  },
   "name": "test",
-  "project": "apps_realworld",
-  "dir": "apps/realworld",
+  "project": "realworld",
+  "dir": ".",
   "activate": "mise x --",
   "srcs": {
     "globs": [
-      "*.cue",
-      "bayt.json",
-      "DESIGN.md",
-      "[p]ipelines/*.blobl",
-      "[m]essages/*.json",
-      "[s]hell/boot.js"
+      "**",
+      ".bayt/checks.yaml",
+      ".pronto/facts.json"
     ],
-    "exclude": []
+    "exclude": [
+      ".pronto/proto-baseline.json",
+      "mise.local.lock",
+      "**/node_modules/**",
+      ".task/**"
+    ]
   },
   "outs": {
     "globs": [],
@@ -23,13 +44,184 @@
     "globs": []
   },
   "env": {},
+  "synthetics": {
+    "bayt": {
+      "name": "test_bayt",
+      "project": "realworld",
+      "dir": ".",
+      "activate": "",
+      "srcs": {
+        "globs": [],
+        "exclude": []
+      },
+      "outs": {
+        "globs": [
+          ".bayt/compose.test.yaml",
+          ".bayt/Dockerfile.test",
+          ".bayt/bayt.test.json",
+          ".bayt/Taskfile.yml",
+          ".bayt/Taskfile.bayt.yml",
+          ".bayt/Taskfile.test.yaml",
+          ".bayt/process-compose.yaml"
+        ],
+        "exclude": []
+      },
+      "env": {},
+      "visibility": "internal",
+      "deps": [],
+      "transitiveDeps": [],
+      "transitiveCrossDeps": [],
+      "chainedDeps": [],
+      "cmds": [],
+      "cache": {
+        "full": false,
+        "similar": false
+      },
+      "upClosure": [
+        "./.bayt/compose.test.yaml",
+        "./.bayt/compose.build.yaml",
+        "./.bayt/compose.generate.yaml",
+        "./.bayt/compose.setup.yaml"
+      ]
+    },
+    "outs": {
+      "name": "test_outs",
+      "project": "realworld",
+      "dir": ".",
+      "activate": "",
+      "srcs": {
+        "globs": [],
+        "exclude": []
+      },
+      "outs": {
+        "globs": [],
+        "exclude": []
+      },
+      "env": {},
+      "visibility": "internal",
+      "deps": [],
+      "transitiveDeps": [],
+      "transitiveCrossDeps": [],
+      "chainedDeps": [],
+      "cmds": [],
+      "cache": {
+        "full": false,
+        "similar": false
+      },
+      "upClosure": [
+        "./.bayt/compose.test.yaml",
+        "./.bayt/compose.build.yaml",
+        "./.bayt/compose.generate.yaml",
+        "./.bayt/compose.setup.yaml"
+      ]
+    },
+    "srcs": {
+      "name": "test_srcs",
+      "project": "realworld",
+      "dir": ".",
+      "activate": "",
+      "srcs": {
+        "globs": [],
+        "exclude": []
+      },
+      "outs": {
+        "globs": [
+          "**",
+          ".bayt/checks.yaml",
+          ".pronto/facts.json",
+          "[m]ise.toml",
+          "[.]mise.toml",
+          "[m]ise.lock",
+          "[.]tool-versions"
+        ],
+        "exclude": [
+          ".pronto/proto-baseline.json",
+          "mise.local.lock",
+          "**/node_modules/**",
+          ".task/**"
+        ]
+      },
+      "env": {},
+      "visibility": "internal",
+      "deps": [],
+      "transitiveDeps": [
+        "build_srcs",
+        "generate_srcs",
+        "setup_srcs"
+      ],
+      "transitiveCrossDeps": [
+        {
+          "project": "realworld",
+          "name": "build_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "**",
+              ".bayt/checks.yaml"
+            ],
+            "exclude": [
+              ".pronto/proto-baseline.json",
+              "mise.local.lock",
+              "**/node_modules/**",
+              ".task/**",
+              "tests/**"
+            ]
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "generate_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "**"
+            ],
+            "exclude": [
+              ".bayt/**",
+              ".pronto/proto-baseline.json",
+              "mise.local.lock",
+              "**/node_modules/**",
+              ".task/**",
+              "tests/**"
+            ]
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "setup_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "[m]ise.toml",
+              "[.]mise.toml",
+              "[m]ise.lock",
+              "[.]tool-versions"
+            ],
+            "exclude": []
+          }
+        }
+      ],
+      "chainedDeps": [],
+      "cmds": [],
+      "cache": {
+        "full": false,
+        "similar": false
+      },
+      "upClosure": [
+        "./.bayt/compose.test.yaml",
+        "./.bayt/compose.build.yaml",
+        "./.bayt/compose.generate.yaml",
+        "./.bayt/compose.setup.yaml"
+      ]
+    }
+  },
   "taskfile": {
     "run": "once",
-    "incremental": true,
+    "incremental": false,
     "preconditions": []
   },
   "visibility": "internal",
-  "emitsSrcs": false,
+  "emitsSrcs": true,
   "deps": [
     "build"
   ],
@@ -38,37 +230,30 @@
   ],
   "transitiveDeps": [
     "build",
+    "generate",
     "setup"
   ],
-  "transitiveCrossDeps": [
-    {
-      "name": "setup",
-      "project": "workspaceroot",
-      "dir": "",
-      "outs": {
-        "globs": [
-          "[m]ise.toml",
-          "[.]mise.toml",
-          "[m]ise.lock",
-          "[.]tool-versions",
-          "gradle/libs.versions.toml",
-          "plugins/devserver/dind.sh",
-          ".task/bayt/setup.hash"
-        ],
-        "exclude": []
-      }
-    }
-  ],
+  "transitiveCrossDeps": [],
   "upClosure": [
-    "apps/realworld/.bayt/compose.build.yaml",
-    "apps/realworld/.bayt/compose.setup.yaml",
-    ".bayt/compose.setup.yaml"
+    "./.bayt/compose.test.yaml",
+    "./.bayt/compose.build.yaml",
+    "./.bayt/compose.generate.yaml",
+    "./.bayt/compose.setup.yaml"
   ],
   "chainedDeps": [
     {
       "name": "build",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [],
+        "exclude": []
+      }
+    },
+    {
+      "name": "generate",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []
@@ -76,8 +261,8 @@
     },
     {
       "name": "setup",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []
@@ -88,20 +273,25 @@
     {
       "srcs": {
         "globs": [
-          "*.cue",
-          "bayt.json",
-          "DESIGN.md",
-          "[p]ipelines/*.blobl",
-          "[m]essages/*.json",
-          "[s]hell/boot.js"
+          "**",
+          ".bayt/checks.yaml",
+          ".pronto/facts.json"
         ],
-        "exclude": [],
+        "exclude": [
+          ".pronto/proto-baseline.json",
+          "mise.local.lock",
+          "**/node_modules/**",
+          ".task/**"
+        ],
         "defaultGlobs": null,
         "defaultExclude": null
       },
-      "do": "cue vet -c ./...",
+      "do": "^nu -I (^mise where github:bonisoft3/sayt | str trim) -c 'use task-leaf.nu; task-leaf test'",
+      "shell": "nu",
+      "dockerfile": {
+        "do": "deno eval 0"
+      },
       "name": "builtin",
-      "shell": "exec",
       "stop": false
     }
   ],

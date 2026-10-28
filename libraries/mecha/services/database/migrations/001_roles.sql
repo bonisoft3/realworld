@@ -9,7 +9,6 @@ BEGIN
 
   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticator') THEN
     CREATE ROLE authenticator NOINHERIT;
-    GRANT anon TO authenticator;
   END IF;
 
   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'app_user') THEN
@@ -26,13 +25,20 @@ BEGIN
 END
 $$;
 
+-- PostgREST logs in as authenticator and switches to the role a request's
+-- token names; it applies that role's settings (timeouts, isolation) only to
+-- roles its login is granted, so the grant is what makes them hold, and the
+-- login inherits none of their privileges. On Kubernetes the operator may
+-- have created the role first.
+ALTER ROLE authenticator NOINHERIT LOGIN;
+GRANT anon, app_user, service TO authenticator;
+
 -- A pipeline writes every tenant's rows, and electric reads every tenant's WAL:
 -- both reach across scopes by a role attribute the audit can see. Without it
 -- electric's current_scopes() is empty and every shape syncs empty, silently.
--- The password is a dev credential; cluster.cue, at the URL naming this role,
--- says what a deployment does with both.
+-- electric's password is the deployment's (cluster.cue's #RolePasswordsStep).
 ALTER ROLE service BYPASSRLS;
-ALTER ROLE electric BYPASSRLS REPLICATION LOGIN PASSWORD 'electric';
+ALTER ROLE electric BYPASSRLS REPLICATION LOGIN;
 
 -- The pipelines and the ticker write as `service` through crud, into any
 -- table, as a caller's grants let them.

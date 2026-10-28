@@ -18,7 +18,7 @@
 // Findings print as {severity, path, message} JSON (SPEC.md lint format);
 // exit 1 when any error is reported.
 
-import { exportJson } from "./cue.ts";
+import { readCheckInputs } from "./check-inputs.ts";
 type Finding = { severity: "error" | "advisory"; path: string; message: string };
 
 type Squawk = { file: string; line: number; rule_name: string; message: string; help?: string | null };
@@ -229,15 +229,7 @@ export async function checkDuckStreams(
 }
 
 async function main(appDir: string) {
-  const hatches = await exportJson<Record<string, Hatch>>(appDir, "code.capabilities.hatches");
-  const raw = await exportJson<RawMigration[]>(
-    appDir,
-    "[if code.state.rawMigrations != _|_ {code.state.rawMigrations}, []][0]",
-  );
-  const duckstreams = await exportJson<Record<string, DuckStream>>(
-    appDir,
-    "[if code.state.duckstreams != _|_ {code.state.duckstreams}, {}][0]",
-  );
+  const { hatches, rawMigrations: raw, duckstreams } = await readCheckInputs<unknown, Hatch, DuckStream>(appDir);
 
   const skip = withheld(hatches, raw);
   const all = await sqlFiles(appDir);

@@ -1,114 +1,6 @@
 import type { PGlite } from '@electric-sql/pglite'
 import { validateIdentifier } from './validate.js'
-
-// Operator map: PostgREST operator → SQL operator
-const OP_MAP: Record<string, string> = {
-  eq: '=',
-  neq: '!=',
-  gt: '>',
-  gte: '>=',
-  lt: '<',
-  lte: '<=',
-  like: 'LIKE',
-  ilike: 'ILIKE',
-}
-
-interface Filter {
-  col: string
-  op: string
-  value: string
-}
-
-function parseFilters(params: URLSearchParams): Filter[] {
-  const filters: Filter[] = []
-  for (const [key, val] of params.entries()) {
-    if (key === 'select') continue
-    const dotIdx = val.indexOf('.')
-    if (dotIdx === -1) continue
-    const op = val.slice(0, dotIdx)
-    const value = val.slice(dotIdx + 1)
-    if (op in OP_MAP || op === 'is' || op === 'in') {
-      filters.push({ col: key, op, value })
-    }
-  }
-  return filters
-}
-
-function buildWhereClause(
-  filters: Filter[],
-  params: unknown[],
-): string {
-  if (filters.length === 0) return ''
-
-  const clauses = filters.map((f) => {
-    const quotedCol = `"${validateIdentifier(f.col)}"`
-
-    if (f.op === 'is') {
-      // IS NULL / IS TRUE / IS FALSE — no parameter binding
-      const upper = f.value.toUpperCase()
-      if (upper === 'NULL') return `${quotedCol} IS NULL`
-      if (upper === 'TRUE') return `${quotedCol} IS TRUE`
-      if (upper === 'FALSE') return `${quotedCol} IS FALSE`
-      return `${quotedCol} IS NULL`
-    }
-
-    if (f.op === 'in') {
-      // value looks like (v1,v2,v3)
-      const inner = f.value.replace(/^\(|\)$/g, '')
-      const values = inner.split(',').map((v) => v.trim())
-      const placeholders = values.map((v) => {
-        params.push(v)
-        return `$${params.length}`
-      })
-      return `${quotedCol} IN (${placeholders.join(', ')})`
-    }
-
-    const sqlOp = OP_MAP[f.op]
-    params.push(f.value)
-    return `${quotedCol} ${sqlOp} $${params.length}`
-  })
-
-  return ' WHERE ' + clauses.join(' AND ')
-}
-
-interface OrderTerm {
-  col: string
-  dir: 'ASC' | 'DESC'
-  nulls: 'NULLS FIRST' | 'NULLS LAST' | null
-}
-
-function parseOrder(params: URLSearchParams): OrderTerm[] {
-  const raw = params.get('order')
-  if (!raw) return []
-  return raw.split(',').map((term) => {
-    const parts = term.trim().split('.')
-    const col = parts[0]
-    const dir = parts[1]?.toLowerCase() === 'desc' ? 'DESC' : 'ASC'
-    let nulls: OrderTerm['nulls'] = null
-    for (const p of parts.slice(2)) {
-      if (p.toLowerCase() === 'nullsfirst') nulls = 'NULLS FIRST'
-      else if (p.toLowerCase() === 'nullslast') nulls = 'NULLS LAST'
-    }
-    return { col, dir, nulls }
-  })
-}
-
-function buildOrderClause(terms: OrderTerm[]): string {
-  if (terms.length === 0) return ''
-  const parts = terms.map((t) => {
-    const col = `"${validateIdentifier(t.col)}"`
-    return t.nulls ? `${col} ${t.dir} ${t.nulls}` : `${col} ${t.dir}`
-  })
-  return ' ORDER BY ' + parts.join(', ')
-}
-
-function parsePagination(params: URLSearchParams): { limit: number | null; offset: number | null } {
-  const limitRaw = params.get('limit')
-  const offsetRaw = params.get('offset')
-  const limit = limitRaw !== null && /^\d+$/.test(limitRaw) ? parseInt(limitRaw, 10) : null
-  const offset = offsetRaw !== null && /^\d+$/.test(offsetRaw) ? parseInt(offsetRaw, 10) : null
-  return { limit, offset }
-}
+import { metadataCache, planRead, ReadQueryError, writeWhere, type ReadSchema } from './rest-read.js'
 
 function parsePrefer(header: string | null): {
   returnRepresentation: boolean
@@ -129,12 +21,28 @@ function parsePrefer(header: string | null): {
 /** What the handlers reach for, so a transaction can stand in for the connection. */
 type Queryable = Pick<PGlite, 'query' | 'exec'>
 
-async function tableExists(db: Queryable, table: string): Promise<boolean> {
-  const result = await db.query<{ count: string }>(
-    `SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1`,
+/** Reads within an existing transaction. Its owner supplies the role and scopes. */
+export function readRest(db: Queryable, req: Request, schema?: ReadSchema, cacheOwner: object = db): Promise<Response> {
+  if (req.method !== 'GET') throw new Error('snapshot reads only accept GET')
+  return route(db, req, schema, cacheOwner, 'app_user')
+}
+
+async function tableExists(db: Queryable, table: string, cacheOwner: object, role?: string): Promise<boolean> {
+  const cache = metadataCache(cacheOwner)
+  const key = role ? `${role}\0${table}` : undefined
+  if (key && cache.tables.has(key)) return true
+  const result = await db.query(
+    `SELECT 1 FROM pg_catalog.pg_class c
+       JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relname = $1 AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+        AND (pg_has_role(c.relowner, 'USAGE')
+          OR has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+          OR has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES'))`,
     [table],
   )
-  return parseInt(result.rows[0]?.count ?? '0', 10) > 0
+  const exists = result.rows.length > 0
+  if (exists && key) cache.tables.add(key)
+  return exists
 }
 
 /**
@@ -146,7 +54,10 @@ async function tableExists(db: Queryable, table: string): Promise<boolean> {
  * json or jsonb column, or a domain over one, stores the value sent: a string
  * is a JSON string.
  */
-async function writtenAsJson(db: Queryable, table: string): Promise<Map<string, (p: string) => string>> {
+async function writtenAsJson(db: Queryable, table: string, cacheOwner: object): Promise<Map<string, (p: string) => string>> {
+  const cache = metadataCache(cacheOwner)
+  const cached = cache.asJson.get(table)
+  if (cached) return cached
   const res = await db.query<{ col: string; fn: string | null; type: string }>(
     `SELECT a.attname AS col, quote_ident(n.nspname) || '.' || quote_ident(p.proname) AS fn,
             format_type(a.atttypid, a.atttypmod) AS type
@@ -162,7 +73,9 @@ async function writtenAsJson(db: Queryable, table: string): Promise<Map<string, 
           SELECT FROM base WHERE oid IN ('json'::regtype, 'jsonb'::regtype)))`,
     [table],
   )
-  return new Map(res.rows.map((r) => [r.col, r.fn === null ? (p) => `${p}::${r.type}` : (p) => `${r.fn}(${p}::json)`]))
+  const asJson = new Map<string, (p: string) => string>(res.rows.map((r) => [r.col, r.fn === null ? (p) => `${p}::${r.type}` : (p) => `${r.fn}(${p}::json)`]))
+  cache.asJson.set(table, asJson)
+  return asJson
 }
 
 /** The placeholder a written value takes, as JSON where its column takes it so. */
@@ -181,45 +94,27 @@ async function handleGet(
   table: string,
   url: URL,
   req: Request,
+  schema: ReadSchema | undefined,
+  cacheOwner: object,
 ): Promise<Response> {
   const params = url.searchParams
   const prefer = parsePrefer(req.headers.get('Prefer'))
 
-  const selectParam = params.get('select')
-  const columns = selectParam
-    ? selectParam
-        .split(',')
-        .map((c) => `"${validateIdentifier(c.trim())}"`)
-        .join(', ')
-    : '*'
-
-  const filters = parseFilters(params)
-  const bindParams: unknown[] = []
-  const where = buildWhereClause(filters, bindParams)
-
-  const order = buildOrderClause(parseOrder(params))
-  const { limit, offset } = parsePagination(params)
-
-  let limitClause = ''
-  if (limit !== null) limitClause += ` LIMIT ${limit}`
-  if (offset !== null) limitClause += ` OFFSET ${offset}`
-
-  const sql = `SELECT ${columns} FROM "${table}"${where}${order}${limitClause}`
-  const result = await db.query(sql, bindParams)
+  const plan = await planRead(db, table, params, schema, cacheOwner)
+  const result = await db.query<{ data: unknown }>(plan.sql, plan.params)
 
   const responseHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
 
   if (prefer.countExact) {
-    const countSql = `SELECT COUNT(*) AS count FROM "${table}"${where}`
-    const countResult = await db.query<{ count: string }>(countSql, bindParams)
+    const countResult = await db.query<{ count: string }>(plan.countSql, plan.params)
     const total = parseInt(countResult.rows[0]?.count ?? '0', 10)
-    const rangeOffset = offset ?? 0
+    const rangeOffset = plan.offset
     const rangeEnd = rangeOffset + result.rows.length - 1
-    const rangeEndStr = result.rows.length === 0 ? rangeOffset : rangeEnd
-    responseHeaders['Content-Range'] = `${rangeOffset}-${rangeEndStr}/${total}`
+    const rangeEndStr = result.rows.length === 0 ? '*' : `${rangeOffset}-${rangeEnd}`
+    responseHeaders['Content-Range'] = `${rangeEndStr}/${total}`
   }
 
-  return new Response(JSON.stringify(result.rows), {
+  return new Response(JSON.stringify(result.rows.map((row) => row.data)), {
     status: 200,
     headers: responseHeaders,
   })
@@ -229,6 +124,7 @@ async function handlePost(
   db: Queryable,
   table: string,
   req: Request,
+  cacheOwner: object,
 ): Promise<Response> {
   const prefer = parsePrefer(req.headers.get('Prefer'))
   const rawBody = await req.json()
@@ -248,7 +144,7 @@ async function handlePost(
   const quotedCols = cols.map((c) => `"${validateIdentifier(c)}"`).join(', ')
 
   // Build multi-row VALUES clause
-  const asJson = await writtenAsJson(db, table)
+  const asJson = await writtenAsJson(db, table, cacheOwner)
   const bindParams: unknown[] = []
   const valueClauses = rows.map((row) => {
     const placeholders = cols.map((c) => bindWritten(asJson, c, row[c], bindParams))
@@ -287,19 +183,19 @@ async function handlePatch(
   table: string,
   url: URL,
   req: Request,
+  cacheOwner: object,
 ): Promise<Response> {
   const prefer = parsePrefer(req.headers.get('Prefer'))
   const body = (await req.json()) as Record<string, unknown>
 
-  const asJson = await writtenAsJson(db, table)
+  const asJson = await writtenAsJson(db, table, cacheOwner)
   const bindParams: unknown[] = []
   const setCols = Object.keys(body)
   const setClause = setCols
     .map((c) => `"${validateIdentifier(c)}" = ${bindWritten(asJson, c, body[c], bindParams)}`)
     .join(', ')
 
-  const filters = parseFilters(url.searchParams)
-  const where = buildWhereClause(filters, bindParams)
+  const where = writeWhere(url.searchParams, bindParams)
   const returning = prefer.returnRepresentation ? ' RETURNING *' : ''
 
   const sql = `UPDATE "${table}" SET ${setClause}${where}${returning}`
@@ -318,15 +214,35 @@ async function handleDelete(
   db: Queryable,
   table: string,
   url: URL,
+  req: Request,
 ): Promise<Response> {
+  const prefer = parsePrefer(req.headers.get('Prefer'))
   const bindParams: unknown[] = []
-  const filters = parseFilters(url.searchParams)
-  const where = buildWhereClause(filters, bindParams)
+  const where = writeWhere(url.searchParams, bindParams)
+  const returning = prefer.returnRepresentation ? ' RETURNING *' : ''
 
-  const sql = `DELETE FROM "${table}"${where}`
-  await db.query(sql, bindParams)
+  const sql = `DELETE FROM "${table}"${where}${returning}`
+  const result = await db.query(sql, bindParams)
 
+  if (prefer.returnRepresentation) {
+    return new Response(JSON.stringify(result.rows), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
   return new Response(null, { status: 204 })
+}
+
+/**
+ * What mecha's pre-request hook adds to a write's response on the server tier
+ * (rls.sql): the transaction it ran in, which the client confirms the write by,
+ * as the 32-bit xid the shape stream reports. Read inside that transaction, so
+ * the request must run in one.
+ */
+async function namingTransaction(db: Queryable, res: Response): Promise<Response> {
+  const txid = await db.query<{ txid: string }>('SELECT pg_current_xact_id()::xid::text AS txid')
+  res.headers.set('x-txid', txid.rows[0].txid)
+  return res
 }
 
 /**
@@ -344,6 +260,11 @@ export interface RestHandlerAuth {
   scopes: (req: Request) => string[] | Promise<string[]>
   /** The non-superuser role policies are written against. */
   role?: string
+  /** The request's JWT claims, as PostgREST puts them in `request.jwt.claims`
+   * for `auth_uid()` and the policies to read. Where one connection serves
+   * many subjects they must be the request's own; absent, whatever the
+   * session holds stands. */
+  claims?: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>
 }
 
 /**
@@ -365,15 +286,18 @@ export async function applyScopeSession(
   await db.exec(`RESET ROLE;` + scopeSql(scopes, role, false))
 }
 
-/** `local` decides whether the setting dies with the transaction. */
-function scopeSql(scopes: string[], role: string, local: boolean): string {
+const quote = (s: string) => `'${s.replace(/'/g, "''")}'`
+
+/** `local` decides whether the settings die with the transaction. */
+function scopeSql(scopes: string[], role: string, local: boolean, claims?: Record<string, unknown>): string {
   for (const s of scopes) {
     if (s.includes(',')) {
       throw new Error(`Invalid scope ${s}: a comma would split it into two scopes`)
     }
   }
   return (
-    `SELECT set_config('app.scopes', '${scopes.join(',').replace(/'/g, "''")}', ${local});` +
+    (claims ? `SELECT set_config('request.jwt.claims', ${quote(JSON.stringify(claims))}, ${local});` : '') +
+    `SELECT set_config('app.scopes', ${quote(scopes.join(','))}, ${local});` +
     `SET${local ? ' LOCAL' : ''} ROLE "${validateIdentifier(role)}";`
   )
 }
@@ -388,28 +312,31 @@ function scopeSql(scopes: string[], role: string, local: boolean): string {
 export function createRestHandler(
   db: PGlite,
   auth?: RestHandlerAuth,
+  schema?: ReadSchema,
 ): (req: Request) => Promise<Response> {
   return async (req: Request): Promise<Response> => {
     try {
       // Transaction-local, not session-level: PGlite is one connection, shared
       // with the app's own collection queries. `SET LOCAL` expires at commit,
-      // and PGlite serialises transactions, so no two requests overlap.
-      if (auth) {
-        const scopes = await auth.scopes(req)
-        const role = auth.role ?? 'app_user'
+      // and PGlite serialises transactions, so no two requests overlap. A
+      // write runs in one without auth too: its response names it.
+      if (auth || req.method.toUpperCase() !== 'GET') {
+        const scopes = auth ? await auth.scopes(req) : undefined
+        const claims = auth?.claims ? await auth.claims(req) : undefined
+        const role = auth ? (auth.role ?? 'app_user') : undefined
         const res = await db.transaction(async (tx) => {
-          await tx.exec(scopeSql(scopes, role, true))
-          return await route(tx, req)
+          if (auth) await tx.exec(scopeSql(scopes!, role!, true, claims))
+          return await route(tx, req, schema, db, role)
         })
         // PGlite yields undefined for a transaction it rolled back without
         // throwing, and there is no response to send in that case.
         if (!res) throw new Error('request transaction rolled back')
         return res
       }
-      return await route(db, req)
+      return await route(db, req, schema, db)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      const isValidationError = message.startsWith('Invalid identifier:')
+      const isValidationError = err instanceof ReadQueryError || message.startsWith('Invalid identifier:')
       return new Response(JSON.stringify({ error: message }), {
         status: isValidationError ? 400 : 500,
         headers: { 'Content-Type': 'application/json' },
@@ -418,7 +345,7 @@ export function createRestHandler(
   }
 }
 
-async function route(db: Queryable, req: Request): Promise<Response> {
+async function route(db: Queryable, req: Request, schema?: ReadSchema, cacheOwner: object = db, role?: string): Promise<Response> {
   const url = new URL(req.url)
   // Extract first path segment as table name
   const segments = url.pathname.split('/').filter(Boolean)
@@ -442,7 +369,7 @@ async function route(db: Queryable, req: Request): Promise<Response> {
   }
 
   // Validate table exists
-  const exists = await tableExists(db, table)
+  const exists = await tableExists(db, table, cacheOwner, role)
   if (!exists) {
     return new Response(
       JSON.stringify({ error: `Table "${table}" not found` }),
@@ -455,13 +382,13 @@ async function route(db: Queryable, req: Request): Promise<Response> {
 
   switch (req.method.toUpperCase()) {
     case 'GET':
-      return await handleGet(db, table, url, req)
+      return await handleGet(db, table, url, req, schema, cacheOwner)
     case 'POST':
-      return await handlePost(db, table, req)
+      return await namingTransaction(db, await handlePost(db, table, req, cacheOwner))
     case 'PATCH':
-      return await handlePatch(db, table, url, req)
+      return await namingTransaction(db, await handlePatch(db, table, url, req, cacheOwner))
     case 'DELETE':
-      return await handleDelete(db, table, url)
+      return await namingTransaction(db, await handleDelete(db, table, url, req))
     default:
       return new Response(
         JSON.stringify({ error: `Method ${req.method} not allowed` }),

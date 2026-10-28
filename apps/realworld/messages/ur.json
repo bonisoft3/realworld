@@ -1,6 +1,7 @@
 {
-  "chrome_signin_hint": "اپنی پاس کی سے ایک ٹیپ — نئے ہیں؟ آپ کے لیے ایک بنا دی جائے گی۔",
-  "chrome_signin": "جاری رکھیں",
+  "chrome_signin_google": "Google کے ساتھ سائن ان کریں",
+  "chrome_signin_hint": "اچھی کہانیاں ہمیں ملاتی ہیں۔ پڑھیں، لکھیں اور اپنی برادری تلاش کریں۔",
+  "chrome_signin": "پاس کی کے ساتھ جاری رکھیں",
   "chrome_signin_guest": "مہمان کے طور پر جاری رکھیں",
   "chrome_signin_failed": "یہ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
   "chrome_signout": "سائن آؤٹ کریں",

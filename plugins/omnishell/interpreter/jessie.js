@@ -9,43 +9,34 @@
 // smoke) skip injection.
 const SES_URL = new URL("./vendor/ses.umd.min.js", import.meta.url).href;
 
-/**
- * Whether this host EXECUTES a script handed to it, which is what the element
- * path below actually depends on — and which the presence of a `document` does
- * not promise. A parsing-only DOM (linkedom's) appends the element and
- * runs nothing, so its `onload` never fires and a branch keyed on `document`
- * would hang there rather than fail. Asked rather than assumed, with an inline
- * script, which a host that runs scripts runs synchronously on insertion.
- */
-function runsInjectedScripts() {
-  if (typeof document === "undefined" || document === null) return false;
-  if (typeof document.createElement !== "function" || !document.head) return false;
-  const probe = document.createElement("script");
-  probe.textContent = "globalThis.__prontoScriptProbe = true;";
-  document.head.append(probe);
-  probe.remove();
-  const ran = globalThis.__prontoScriptProbe === true;
-  delete globalThis.__prontoScriptProbe;
-  return ran;
+// SES alone may submit strings to eval/Function. The default policy grants
+// that crossing only while the platform is loading or evaluating its cage;
+// it never admits script elements, HTML or script URLs.
+let evaluating = 0;
+let evalPolicy;
+function prepareEval() {
+  if (globalThis.trustedTypes && !evalPolicy) {
+    evalPolicy = trustedTypes.createPolicy("default", {
+      createScript(source, _type, sink) {
+        if (evaluating === 0 || (sink !== "eval" && sink !== "Function")) throw new TypeError(`untrusted script sink: ${sink}`);
+        return source;
+      },
+    });
+  }
 }
 
 let sesReady;
-export function ensureSes() {
+// Single-file releases supply their compiled SES installer; the same policy
+// window owns both that installation and the ordinary module load.
+export function ensureSes(install = () => import(SES_URL)) {
   return (sesReady ??= (async () => {
+    prepareEval();
     if (!globalThis.Compartment) {
-      // Same bytes either way, by the means the host actually has: a page that
-      // runs scripts loads a script element, and everything else — deno, and
-      // any DOM that only parses — imports the bundle as a module.
-      if (runsInjectedScripts()) {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = SES_URL;
-          script.onload = resolve;
-          script.onerror = () => reject(new Error(`failed loading ${SES_URL}`));
-          document.head.append(script);
-        });
-      } else {
-        await import(SES_URL);
+      evaluating++;
+      try {
+        await install();
+      } finally {
+        evaluating--;
       }
     }
     // What the bundle owes: the cage, and the call that seals the realm around
@@ -59,7 +50,12 @@ export function ensureSes() {
     // instances of this file on one page.
     if (!globalThis.__prontoLockdown) {
       globalThis.__prontoLockdown = true;
-      lockdown({ errorTaming: "unsafe" });
+      evaluating++;
+      try {
+        lockdown({ errorTaming: "unsafe" });
+      } finally {
+        evaluating--;
+      }
     }
   })());
 }
@@ -71,7 +67,8 @@ export function ensureSes() {
 // What roles are endowed with: pure, deterministic platform primitives
 // granted via manifest endowments or requestedEndowments (SAFE_ENDOWMENTS: tamed Intl,
 // TextEncoder, TextDecoder, URL, URLSearchParams). An adapter is endowed with
-// Intl by default; other roles receive no endowments unless granted.
+// Intl by default; other roles receive no endowments unless granted, and one
+// reached undeclared throws, naming itself.
 // Intl has the host's defaults refused — a module states its locale, its zone
 // and its instant, or it throws. Why it is admitted is
 // plugins/omnishell/docs/terminal.md#the-seats; the rule about what an adapter
@@ -261,7 +258,7 @@ const ROLES = {
  * an app's module — the battery's fuel harness — which answers to no role and
  * still may not run with more authority than the module it wraps.
  */
-export async function evaluateCaged(source, endowments = {}) {
+export async function evaluateCaged(source, endowments = {}, undeclared = {}) {
   await ensureSes();
   const cage = new Compartment(endowments);
   // An endowment is authority the platform hands INTO the cage, and source
@@ -278,7 +275,23 @@ export async function evaluateCaged(source, endowments = {}) {
       configurable: false,
     });
   }
-  return cage.evaluate(source);
+  // A name the platform could endow and this module did not declare throws
+  // where it is reached, saying so, as mecha's cages do.
+  for (const [name, why] of Object.entries(undeclared)) {
+    Object.defineProperty(cage.globalThis, name, {
+      get: () => {
+        throw new TypeError(why);
+      },
+      enumerable: false,
+      configurable: false,
+    });
+  }
+  evaluating++;
+  try {
+    return cage.evaluate(source);
+  } finally {
+    evaluating--;
+  }
 }
 
 export async function evaluateRole(source, role = "handler", requestedEndowments = []) {
@@ -291,7 +304,11 @@ export async function evaluateRole(source, role = "handler", requestedEndowments
     // would otherwise build its endowment before the realm was sealed.
     await ensureSes();
     const combined = [...new Set([...(spec.defaultEndowments ?? []), ...requestedEndowments])];
-    value = await evaluateCaged(spec.wrap(source), spec.endow(combined));
+    const undeclared = Object.fromEntries(Object.keys(SAFE_ENDOWMENTS).filter((n) => !combined.includes(n)).map((n) => [
+      n,
+      `${role}: ${n} is not endowed; declare it among the module's endowments`,
+    ]));
+    value = await evaluateCaged(spec.wrap(source), spec.endow(combined), undeclared);
   } catch (err) {
     // What the compartment is handed is the role's adaptation of the file, not
     // the file: a parse failure is a statement about the shape the role asked
@@ -305,6 +322,66 @@ export async function evaluateRole(source, role = "handler", requestedEndowments
   }
   if (!spec.ok(value)) throw new Error(`${role} source must end in ${spec.want}`);
   return value;
+}
+
+// What a kinetic graph's entry exports, by its role (docs/kinetic.md): an
+// engine's contract, or a sound role's factory over the context it is handed.
+const EXPORTS = {
+  engine: ["initState", "advanceFrame", "saveState", "loadState"],
+  sound: ["createSound"],
+};
+
+/** The key a specifier names from its importer's, both `./`-rooted app paths:
+ * what pronto's engine-link.ts resolved when it linked the graph. */
+function resolveLinked(specifier, referrer) {
+  const parts = referrer.split("/").slice(0, -1);
+  for (const part of specifier.split("/")) {
+    if (part === "..") parts.pop();
+    else if (part !== ".") parts.push(part);
+  }
+  return parts.join("/");
+}
+
+/**
+ * A kinetic engine, from the graph pronto linked at build time: every module a
+ * record Endo's ModuleSource precompiled, imported by the cage's own module
+ * system. One compartment holds the graph, so each module evaluates once and
+ * the engine's cage — no endowments — is the ceiling for all of them. `role`
+ * names what the entry exports: an engine's contract, or a sound role's
+ * factory, whose one authority is the context the terminal hands it.
+ */
+export async function evaluateEngine(graph, role = "engine") {
+  const required = EXPORTS[role];
+  if (required === undefined) throw new Error(`engine: unknown role ${JSON.stringify(role)}`);
+  await ensureSes();
+  const modules = Object.fromEntries(Object.entries(graph.modules).map(([key, record]) => [key, { source: record }]));
+  const cage = new Compartment({
+    __options__: true,
+    modules,
+    resolveHook: resolveLinked,
+    importNowHook: (specifier) => {
+      throw new Error(`engine: ${specifier} is not a module of the linked graph`);
+    },
+  });
+  for (const name of Object.keys(SAFE_ENDOWMENTS)) {
+    Object.defineProperty(cage.globalThis, name, {
+      get: () => {
+        throw new TypeError(`engine: ${name} is not endowed; an engine is endowed with nothing`);
+      },
+      enumerable: false,
+      configurable: false,
+    });
+  }
+  let namespace;
+  evaluating++;
+  try {
+    namespace = cage.importNow(graph.entry);
+  } finally {
+    evaluating--;
+  }
+  const missing = required.filter((name) => typeof namespace[name] !== "function");
+  if (missing.length > 0) throw new Error(`${role} ${graph.entry} must export ${missing.join(", ")}`);
+  return namespace;
 }
 
 export const evaluateHandler = (source, requestedEndowments = []) => evaluateRole(source, "handler", requestedEndowments);

@@ -28,28 +28,41 @@ import (
 
 #Generate: "if ('program.cue' | path exists) { use tools.nu [run-mise]; run-mise exec -- omnishell mode . | save --force program_terminal.cue }"
 
-// The image of omnishell's runtime tree an installed app's images copy from,
+// The image of omnishell's runtime tree an app's images copy from,
 // as pronto pins it: the consumer pins what it builds on, as with mecha's
 // images (clusters/mecha.cue). From the pin line an omnishell release prints.
 published: runtime: =~"^bonitao/omnishell:[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.]+)?@sha256:[0-9a-f]{64}$"
-published: runtime: "bonitao/omnishell:0.5.0@sha256:63d6d0cd5aefe274828e096301423de0adf9d1411ff151bfc1201e6c2ec178d1"
+published: runtime: "bonitao/omnishell:0.20.2@sha256:0f7d84358244c875a76bf97f13974bf6336e15f639a2f01fa31ad3eb0ce0d8a7"
+
+// The build context an app's images copy omnishell's runtime tree from: that
+// image, or in the monorepo the target building it.
+#RuntimeImage: "plugins_omnishell-runtime-image"
 
 // Re-exported beside #Terminal because the emitter reads it directly: CUE has
 // no Intl, so the entry document's direction is resolved from the app's default
 // tag against this list.
 #RtlLanguages: impl.#RtlLanguages
 
-#ComposeProject: impl.#ComposeProject
-#ClosureUp:      impl.#ClosureUp
+// Re-exported because the cluster runs it: a route rendered on request is
+// served by this target, which the emitter adds where a route asks for one.
+#Render: impl.#Render
+#Address: impl.#Address
+
+#BkidCheck: impl.#BkidCheck
+
+// Re-exported because pronto's every op is one of these: the one mutation
+// grammar is defined where the author-facing chart lives, and a form's
+// action, a write and mecha's relational effect each narrow it.
+#MutationOp: impl.#Machine.#MutationOp
 
 #Terminal: impl.#Terminal & {
 	surface: {
-		runtime: string
+		// Where mise puts omnishell, its release or a checkout's tree.
+		runtime: ""
 		verbs: omnishell: {
 			verb: "generate"
-			cmds: [if runtime == "" {#Generate}, if runtime != "" {_localGenerate}]
+			cmds: [#Generate]
 			note: "terminal assets and source layout"
 		}
-		_localGenerate: "mise run omnishell -- mode . --local | save --force program_terminal.cue"
 	}
 }

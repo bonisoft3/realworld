@@ -36,12 +36,19 @@
 //   }
 package bayt
 
+import (
+	"list"
+	"strings"
+)
+
 healthcheck: {
 	// http — HTTP GET status check via microcheck httpcheck.
 	#http: {
 		// Which check this is, for gen_process_compose's host probe.
 		template: "http"
 		url: string
+		authorization: *null | string
+		headers:       *[] | [...string]
 		start_interval: *"200ms" | string
 		interval:       *"1s"    | string
 		timeout:        *"5s"    | string
@@ -51,6 +58,15 @@ healthcheck: {
 	}
 	http: T={
 		healthcheck: #http
+
+		let _authHeader = [if T.healthcheck.authorization != null {
+			let val = T.healthcheck.authorization
+			let auth = [if strings.Contains(val, " ") {val}, "Bearer \(val)"][0]
+			"Authorization: \(auth)"
+		}]
+		let _allHeaders = list.Concat([_authHeader, T.healthcheck.headers])
+		let _headerArgs = [for h in _allHeaders for x in ["-H", h] {x}]
+		let _cmd = list.Concat([["CMD", "httpcheck"], _headerArgs, [T.healthcheck.url]])
 
 		dockerfile: {
 			// defaultCopy, not copy, so a consumer's own `copy` coexists —
@@ -62,7 +78,7 @@ healthcheck: {
 				chmod: "755"
 			}
 			healthcheck: {
-				test:         ["CMD", "httpcheck", T.healthcheck.url]
+				test:         _cmd
 				interval:     T.healthcheck.interval
 				timeout:      T.healthcheck.timeout
 				retries:      T.healthcheck.retries
@@ -70,7 +86,7 @@ healthcheck: {
 			}
 		}
 		compose: healthcheck: {
-			test:           ["CMD", "httpcheck", T.healthcheck.url]
+			test:           _cmd
 			interval:       T.healthcheck.interval
 			timeout:        T.healthcheck.timeout
 			retries:        T.healthcheck.retries

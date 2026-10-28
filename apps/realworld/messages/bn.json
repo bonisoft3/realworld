@@ -1,6 +1,7 @@
 {
-  "chrome_signin_hint": "আপনার পাসকি দিয়ে একটি ট্যাপ — নতুন হলে, আপনার জন্য একটি তৈরি হয়ে যাবে।",
-  "chrome_signin": "চালিয়ে যান",
+  "chrome_signin_google": "Google দিয়ে সাইন ইন করুন",
+  "chrome_signin_hint": "ভালো গল্প আমাদের এক করে। পড়ুন, লিখুন এবং নিজের মানুষদের খুঁজে নিন।",
+  "chrome_signin": "পাসকি দিয়ে এগিয়ে যান",
   "chrome_signin_guest": "অতিথি হিসেবে চালিয়ে যান",
   "chrome_signin_failed": "এটা হয়নি। আবার চেষ্টা করুন।",
   "chrome_signout": "সাইন আউট করুন",

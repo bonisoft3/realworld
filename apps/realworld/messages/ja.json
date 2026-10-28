@@ -1,6 +1,7 @@
 {
-  "chrome_signin_hint": "パスキーでワンタップ。初めての方には新しく作成されます。",
-  "chrome_signin": "続ける",
+  "chrome_signin_google": "Google でログイン",
+  "chrome_signin_hint": "よい物語が、人をつなぐ。読み、書き、仲間と出会う場所。",
+  "chrome_signin": "パスキーで続ける",
   "chrome_signin_guest": "ゲストとして続ける",
   "chrome_signin_failed": "うまくいきませんでした。もう一度お試しください。",
   "chrome_signout": "サインアウト",

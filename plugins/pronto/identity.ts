@@ -10,8 +10,10 @@
 // docs/types-and-identity.md#identity, "Identity is append-only, and no model
 // mints it".
 
-import { boundTypes, boundCarriers } from "./type-table.ts";
+import { boundTypes } from "./type-table.ts";
+import { types, type Types } from "./portable-types.ts";
 import { exportJson } from "./cue.ts";
+import { readCheckInputs } from "./check-inputs.ts";
 import { ifMissing } from "./missing.ts";
 
 export type FieldId = { name: string; type: string; retired: boolean; precision?: number; scale?: number };
@@ -42,8 +44,7 @@ export function identitiesOf(entities: ProgramEntity[]): Identities {
 /** Everything the snapshot holds must still be in the program, under any label
  * and with the type it had: a rename is free, a disappearance and a retyping
  * are not. */
-export function lost(snapshot: Identities, program: Identities): Finding[] {
-  const types = boundTypes();
+export function lost(snapshot: Identities, program: Identities, typeProfile: Pick<Types, "canonicalType"> = boundTypes()): Finding[] {
   const findings: Finding[] = [];
   for (const [id, was] of Object.entries(snapshot)) {
     const now = program[id];
@@ -55,7 +56,7 @@ export function lost(snapshot: Identities, program: Identities): Finding[] {
       const kept = now.fields[ordinal];
       if (kept === undefined) {
         findings.push({ severity: "error", path: "program.cue", message: `${now.name} lost ordinal ${ordinal} (was "${field.name}"): mark it retired instead` });
-      } else if (types.canonicalType(kept.type) !== types.canonicalType(field.type)) {
+      } else if (typeProfile.canonicalType(kept.type) !== typeProfile.canonicalType(field.type)) {
         findings.push({ severity: "error", path: "program.cue", message: `${now.name}.${kept.name} (ordinal ${ordinal}) was ${field.type} and is ${kept.type}: a type change is a retirement beside an addition` });
       } else if (field.precision !== undefined && (kept.precision !== field.precision || kept.scale !== field.scale)) {
         findings.push({ severity: "error", path: "program.cue", message: `${now.name}.${kept.name}: decimal precision/scale changed` });
@@ -134,37 +135,47 @@ function mintId(): string {
  * read: a seed row may open with `name:` too. */
 export function stampCue(source: string, e: ProgramEntity, id: string | undefined): string {
   const lines = source.split("\n");
-  const open = lines.findIndex((l) => new RegExp(`^\\s*${e.name}: \\{\\s*$`).test(l));
+  const open = lines.findIndex((l) => new RegExp(`^\\s*${e.name}:\\s*\\{\\s*$`).test(l));
   if (open < 0) throw new Error(`no "${e.name}: {" line opens the entity`);
   const indent = /^\s*/.exec(lines[open])![0];
-  const close = lines.findIndex((l, i) => i > open && l === `${indent}}`);
+  const close = lines.findIndex((l, i) => i > open && new RegExp(`^${indent}\\}\\s*$`).test(l));
   if (close < 0) throw new Error(`${e.name}: the entity's block does not close at its own indent`);
-  const first = lines.findIndex((l, i) => i > open && i < close && l.startsWith(`${indent}\tfields: [`));
-  const last = lines.findIndex((l, i) => i >= first && i < close && (l === `${indent}\t]` || (i === first && l.trimEnd().endsWith("]"))));
+  const fieldRe = new RegExp(`^(${indent}(?:\\t| +))fields:\\s*\\[`);
+  const candidates = lines.map((line, index) => ({ index, match: fieldRe.exec(line) }))
+    .filter(({ index, match }) => index > open && index < close && match !== null)
+    .sort((a, b) => a.match![1].length - b.match![1].length);
+  const first = candidates[0]?.index ?? -1;
+  const childIndent = candidates[0]?.match![1];
+  const closeBracketRe = new RegExp(`^${childIndent}\\]\\s*$`);
+  const last = lines.findIndex((l, i) => i >= first && i < close && (closeBracketRe.test(l) || (i === first && l.trimEnd().endsWith("]"))));
   if (first < 0 || last < 0) throw new Error(`${e.name}: no \`fields: [\` list closing at its own indent`);
   let next = Math.max(0, ...e.fields.map((f) => f.ordinal ?? 0));
   const seen = new Set<string>();
   for (let i = first; i <= last; i++) {
-    lines[i] = lines[i].replace(/\{(ordinal: \d+, )?name: "([^"]+)"/g, (whole, had: string | undefined, name: string) => {
+    lines[i] = lines[i].replace(/\{(\s*)(ordinal:\s*\d+,\s*)?name:\s*"([^"]+)"/g, (whole, ws: string, had: string | undefined, name: string) => {
       if (!e.fields.some((f) => f.name === name)) return whole;
       seen.add(name);
-      return had === undefined ? `{ordinal: ${++next}, name: "${name}"` : whole;
+      return had === undefined ? `{${ws}ordinal: ${++next}, name: "${name}"` : whole;
     });
   }
   if (seen.size !== e.fields.length) {
     const missed = e.fields.filter((f) => !seen.has(f.name)).map((f) => f.name);
     throw new Error(`${e.name}: ${missed.join(", ")} not declared as a {name: "…"} literal in its fields list: mint reads no other shape`);
   }
-  if (id !== undefined) lines.splice(open + 1, 0, `${indent}\tid: "${id}"`);
+  if (id !== undefined) lines.splice(open + 1, 0, `${childIndent}id: "${id}"`);
   return lines.join("\n");
 }
 
-export function stampIr(ir: string, e: Required<Pick<ProgramEntity, "id">> & ProgramEntity): string {
+/** `fresh` is an app no snapshot has recorded: an id its ir.html already
+ * carries was copied from another app, so the program's replaces it. */
+export function stampIr(ir: string, e: Required<Pick<ProgramEntity, "id">> & ProgramEntity, fresh = false): string {
   const section = sectionOf(ir, e.name);
   if (section === undefined) return ir;
   let body = section.body;
   if (!section.open.includes("data-type-id=")) {
     body = body.replace(section.open, section.open.replace(/>$/, ` data-type-id="${e.id}">`));
+  } else if (fresh) {
+    body = body.replace(section.open, section.open.replace(/data-type-id="[^"]*"/, `data-type-id="${e.id}"`));
   }
   for (const f of e.fields) {
     body = body.replace(`<tr><td>${f.name}</td>`, `<tr data-ordinal="${f.ordinal}"><td>${f.name}</td>`);
@@ -182,15 +193,20 @@ async function cueFiles(appDir: string): Promise<string[]> {
   return files.sort();
 }
 
-async function mint(appDir: string): Promise<void> {
+/** Stamps an id on every entity and an ordinal on every field that has none,
+ * and records them in the snapshot. write.ts calls it first, so an author
+ * never writes one; it writes nothing when everything is already minted. */
+export async function mint(appDir: string): Promise<void> {
   const before = await exportEntities(appDir);
+  if (before.length === 0) return;
+  if (before.every((e) => e.id !== undefined && e.fields.every((f) => f.ordinal !== undefined)) && (await readSnapshot(appDir)) !== undefined) return;
   // Every stamp is computed before any is written: a refusal halfway would
   // otherwise leave a program that is part minted and a snapshot that is not.
   const sources = new Map<string, string>();
   for (const file of await cueFiles(appDir)) sources.set(file, await Deno.readTextFile(file));
   for (const e of before) {
     if (e.id !== undefined && e.fields.every((f) => f.ordinal !== undefined)) continue;
-    const home = [...sources].find(([, text]) => new RegExp(`^\\s*${e.name}: \\{\\s*$`, "m").test(text));
+    const home = [...sources].find(([, text]) => new RegExp(`^\\s*${e.name}:\\s*\\{\\s*$`, "m").test(text));
     if (home === undefined) throw new Error(`${e.name} is declared in no .cue file of ${appDir}`);
     sources.set(home[0], stampCue(home[1], e, e.id === undefined ? mintId() : undefined));
   }
@@ -200,9 +216,10 @@ async function mint(appDir: string): Promise<void> {
   const unminted = after.filter((e) => e.id === undefined).map((e) => e.name);
   if (unminted.length > 0) throw new Error(`still unminted after stamping: ${unminted.join(", ")}`);
 
+  const fresh = (await readSnapshot(appDir)) === undefined;
   const irPath = `${appDir}/ir.html`;
   let ir = await Deno.readTextFile(irPath);
-  for (const e of after) ir = stampIr(ir, e as Required<Pick<ProgramEntity, "id">> & ProgramEntity);
+  for (const e of after) ir = stampIr(ir, e as Required<Pick<ProgramEntity, "id">> & ProgramEntity, fresh);
   await Deno.writeTextFile(irPath, ir);
 
   const program = identitiesOf(after);
@@ -214,7 +231,8 @@ async function mint(appDir: string): Promise<void> {
 }
 
 async function check(appDir: string): Promise<void> {
-  const entities = await exportEntities(appDir);
+  const inputs = await readCheckInputs<ProgramEntity>(appDir);
+  const entities = Object.values(inputs.entities);
   const program = identitiesOf(entities);
   const snapshot = await readSnapshot(appDir);
   const findings: Finding[] = [...collisions(entities)];
@@ -231,7 +249,7 @@ async function check(appDir: string): Promise<void> {
       findings.push({ severity: "error", path: SNAPSHOT, message: "the program carries identities and no snapshot records them: only mint writes ids" });
     }
   } else {
-    findings.push(...lost(snapshot, program));
+    findings.push(...lost(snapshot, program, types(inputs.types)));
     for (const [id, e] of Object.entries(program)) {
       const known = snapshot[id];
       const fresh = known === undefined ? Object.keys(e.fields) : Object.keys(e.fields).filter((o) => known.fields[o] === undefined);

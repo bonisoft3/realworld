@@ -21,11 +21,18 @@ def main [] {
 
 	# determinism + sensitivity
 	test_a_synthetic_dep_resolves_from_its_parent
+	test_a_compiler_source_view_invalidates_generation
 	test_an_unemitted_srcs_view_contributes_nothing
 	test_an_unemitted_other_view_is_an_error
 	test_a_dep_stamp_never_narrows_the_image_scope
 	test_hash_stable_across_runs
 	test_hash_changes_with_content
+	if $nu.os-info.name != "windows" {
+        test_directory_symlinks_hash_the_link
+        test_docker_directory_symlinks_hash_the_link
+        test_file_symlinks_track_content
+    }
+	test_invocation_is_target_scoped
 	test_docker_hash_differs_from_content
 	test_docker_hash_stable_across_runs
 
@@ -76,6 +83,39 @@ def main [] {
 }
 
 # --- helpers --------------------------------------------------------
+
+def test_invocation_is_target_scoped [] {
+	let tmp = (make-tmp)
+	mkdir ($tmp | path join ".bayt")
+	write-manifest ($tmp | path join ".bayt/bayt.test.json") []
+	let base = (run-fp $tmp ["-q" "--manifest" ".bayt/bayt.test.json"])
+	let manifest = ($tmp | path join ".bayt/bayt.test.json" | path expand)
+	let first = with-env {BAYT_INVOCATION: ({manifest: $manifest, value: {args: ["first"], platform: ""}} | to json --raw)} { run-fp $tmp ["-q" "--manifest" ".bayt/bayt.test.json"] }
+	let second = with-env {BAYT_INVOCATION: ({manifest: $manifest, value: {args: ["second"], platform: ""}} | to json --raw)} { run-fp $tmp ["-q" "--manifest" ".bayt/bayt.test.json"] }
+	let unrelated = with-env {BAYT_INVOCATION: ({manifest: ($tmp | path join ".bayt/bayt.other.json"), value: {args: ["first"], platform: ""}} | to json --raw)} { run-fp $tmp ["-q" "--manifest" ".bayt/bayt.test.json"] }
+	rm -rf $tmp
+	for result in [$base $first $second $unrelated] { assert equal $result.exit 0 $result.stderr }
+	assert not equal $first.stdout $base.stdout
+	assert not equal $first.stdout $second.stdout
+	assert equal $base.stdout $unrelated.stdout
+}
+
+def test_a_compiler_source_view_invalidates_generation [] {
+	let tmp = (make-tmp)
+	let app = ($tmp | path join "app")
+	mkdir ($tmp | path join ".bayt") ($app | path join ".bayt")
+	"old compiler" | save ($tmp | path join "compiler.ts")
+	write-synthetic-owner ($tmp | path join ".bayt/bayt.compiler.json") --name compiler --view srcs --view-srcs ["compiler.ts"]
+	{name: "program", dir: "app", srcs: {globs: [], exclude: []}, outs: {globs: [], exclude: []}, state: {globs: []}, chainedDeps: [{name: "compiler_srcs", dir: ""}], cmds: []} | to json | save ($app | path join ".bayt/bayt.program.json")
+	{name: "generate", dir: "app", srcs: {globs: [], exclude: []}, outs: {globs: [], exclude: []}, state: {globs: []}, chainedDeps: [{name: "program", dir: "app"}], cmds: []} | to json | save ($app | path join ".bayt/bayt.generate.json")
+	let before = (run-fp $app ["-q" "--manifest" ".bayt/bayt.generate.json"])
+	"new compiler" | save -f ($tmp | path join "compiler.ts")
+	let after = (run-fp $app ["-q" "--manifest" ".bayt/bayt.generate.json"])
+	rm -rf $tmp
+	assert equal $before.exit 0 $before.stderr
+	assert equal $after.exit 0 $after.stderr
+	assert not equal $before.stdout $after.stdout
+}
 
 def make-tmp []: nothing -> string {
 	mktemp -d
@@ -805,4 +845,49 @@ def test_a_rooted_project_is_its_own_root [] {
 def test_a_nested_project_climbs_to_its_root [] {
 	print "test a nested project's manifest climbs to the root..."
 	assert equal (manifest-root "/w/apps/x/.bayt/bayt.build.json" "apps/x") ("/w" | path expand)
+}
+
+
+def test_directory_symlinks_hash_the_link [] {
+    let tmp = (make-tmp)
+    mkdir ($tmp | path join "one") ($tmp | path join "two")
+    ^ln -s one ($tmp | path join "runtime")
+    let first = (run-fp $tmp ["-q" "**"])
+    assert ($first.exit == 0) $first.stderr
+    let warm = (run-fp $tmp ["-q" "**"])
+    assert ($warm.stdout == $first.stdout)
+    rm ($tmp | path join "runtime")
+    ^ln -s two ($tmp | path join "runtime")
+    let changed = (run-fp $tmp ["-q" "**"])
+    assert ($changed.exit == 0) $changed.stderr
+    assert ($changed.stdout != $first.stdout)
+    rm -rf $tmp
+}
+
+
+def test_file_symlinks_track_content [] {
+    let tmp = (make-tmp)
+    "one" | save ($tmp | path join "target")
+    ^ln -s target ($tmp | path join "input")
+    let first = (run-fp $tmp ["-q" "input"])
+    assert ($first.exit == 0) $first.stderr
+    "two" | save -f ($tmp | path join "target")
+    let changed = (run-fp $tmp ["-q" "input"])
+    assert ($changed.exit == 0) $changed.stderr
+    assert ($changed.stdout != $first.stdout)
+    rm -rf $tmp
+}
+
+
+def test_docker_directory_symlinks_hash_the_link [] {
+    let tmp = (make-tmp)
+    mkdir ($tmp | path join "empty")
+    ^ln -s empty ($tmp | path join "input")
+    let first = (run-fp $tmp ["-q" "--docker" "input"])
+    assert ($first.exit == 0) $first.stderr
+    "child" | save ($tmp | path join "empty/child")
+    let populated = (run-fp $tmp ["-q" "--docker" "input"])
+    assert ($populated.exit == 0) $populated.stderr
+    assert equal $first.stdout $populated.stdout
+    rm -rf $tmp
 }

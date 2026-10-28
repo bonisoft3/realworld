@@ -9,7 +9,7 @@ pipelines:
         plugin: 'builtin:postgres'
         settings:
           url: '${DATABASE_URL}'
-          tables: 'app_user,article,article_tag,comment,favorite,bookmark,follow'
+          tables: 'app_user,me,article,article_tag,comment,favorite,bookmark,follow,favorite_count,article_stats,tag_count,favorite_index'
           cdcMode: logrepl
           snapshotMode: never
           logrepl.publicationName: realworld_cdc
@@ -22,6 +22,17 @@ pipelines:
           url: 'http://mesh-events:3500/v1.0/publish/redis-streams/cdc-events'
           validateConnection: 'false'
     processors:
+      - id: key-as-before
+        plugin: 'builtin:field.set'
+        condition: '{{ if or .Payload.After .Payload.Before }}false{{ else }}true{{ end }}'
+        settings:
+          field: .Payload.Before
+          value: '{{ toJson .Key }}'
+      - id: decode-key-before
+        plugin: 'builtin:json.decode'
+        condition: '{{ if eq (printf "%T" .Payload.Before) "opencdc.RawData" }}true{{ else }}false{{ end }}'
+        settings:
+          field: .Payload.Before
       - id: stamp-collection-after
         plugin: 'builtin:field.set'
         condition: '{{ if .Payload.After }}true{{ else }}false{{ end }}'
@@ -34,14 +45,20 @@ pipelines:
         settings:
           field: .Payload.Before.__table
           value: '{{ index .Metadata "opencdc.collection" }}'
-      - id: stringify-after
-        plugin: 'builtin:json.encode'
-        settings:
-          field: .Payload.After
       - id: stringify-before
         plugin: 'builtin:json.encode'
         settings:
           field: .Payload.Before
+      - id: retain-before
+        plugin: 'builtin:field.set'
+        condition: '{{ if and .Payload.After .Payload.Before }}true{{ else }}false{{ end }}'
+        settings:
+          field: .Payload.After.__before
+          value: '{{ printf "%s" .Payload.Before }}'
+      - id: stringify-after
+        plugin: 'builtin:json.encode'
+        settings:
+          field: .Payload.After
       - id: restore-deleted-row
         plugin: 'builtin:field.set'
         settings:

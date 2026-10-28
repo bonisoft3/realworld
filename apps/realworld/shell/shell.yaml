@@ -31,14 +31,16 @@ access:
     scope: public
 app: realworld
 auth:
+  providers:
+    - google
   required: true
   service: /auth
-  mode: passkey
   self:
     route: profile
     name:
       table: app_user
       column: display_name
+  mode: passkey
   promote: false
 floors:
   touch: 24
@@ -78,6 +80,12 @@ i18n:
 keys:
   article_stats: article_id
 native: true
+read:
+  article_tag: lazy
+  comment: lazy
+  article_stats: lazy
+  tag_count: lazy
+  favorite_index: lazy
 server: true
 routes:
   - path: /
@@ -85,22 +93,6 @@ routes:
     nav:
       key: nav_home
       label: Community
-      labels:
-        en: Community
-        zh: 社区
-        hi: समुदाय
-        es: Comunidad
-        fr: Communauté
-        ar: المجتمع
-        bn: কমিউনিটি
-        pt: Comunidade
-        ru: Сообщество
-        ur: کمیونٹی
-        id: Komunitas
-        de: Community
-        ja: コミュニティ
-        sw: Jamii
-        tr: Topluluk
     files:
       html: shell/screens/home.html
       css: shell/screens/home.css
@@ -109,7 +101,7 @@ routes:
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
-    ssr: ssr
+    ssr: spa
     states:
       - loading
       - empty
@@ -123,22 +115,6 @@ routes:
     nav:
       key: nav_feed
       label: Your Feed
-      labels:
-        en: Your Feed
-        zh: 我的关注
-        hi: आपका फ़ीड
-        es: Tu Feed
-        fr: Votre fil
-        ar: موجزك
-        bn: আপনার ফিড
-        pt: Seu Feed
-        ru: Ваша лента
-        ur: آپ کا فیڈ
-        id: Feed Anda
-        de: Dein Feed
-        ja: フィード
-        sw: Mtiririko wako
-        tr: Akışın
     files:
       html: shell/screens/feed.html
       css: shell/screens/feed.css
@@ -158,22 +134,6 @@ routes:
     nav:
       key: nav_reading_list
       label: Saved
-      labels:
-        en: Saved
-        zh: 已保存
-        hi: सेव किए गए
-        es: Guardados
-        fr: Enregistrés
-        ar: المحفوظات
-        bn: সংরক্ষিত
-        pt: Salvos
-        ru: Сохранённое
-        ur: محفوظ شدہ
-        id: Tersimpan
-        de: Gemerkt
-        ja: 保存済み
-        sw: Zilizohifadhiwa
-        tr: Kaydedilenler
     files:
       html: shell/screens/reading-list.html
       css: shell/screens/reading-list.css
@@ -194,22 +154,6 @@ routes:
     nav:
       key: nav_editor
       label: New Article
-      labels:
-        en: New Article
-        zh: 新建文章
-        hi: नया लेख
-        es: Nuevo artículo
-        fr: Nouvel article
-        ar: مقال جديد
-        bn: নতুন লেখা
-        pt: Novo Artigo
-        ru: Новая статья
-        ur: نئی تحریر
-        id: Artikel Baru
-        de: Neuer Artikel
-        ja: 新規記事
-        sw: Makala Mpya
-        tr: Yeni Yazı
     files:
       html: shell/screens/editor.html
       css: shell/screens/editor.css
@@ -257,7 +201,7 @@ routes:
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
-    ssr: ssr
+    ssr: spa
     states:
       - loading
       - populated
@@ -291,12 +235,12 @@ routes:
       css: shell/screens/article.css
       handlers: []
       adapters: []
-      renderers:
-        - shell/renderers/markdown.js
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
-    ssr: ssr
+      renderers:
+        - shell/renderers/markdown.js
+    ssr: spa
     states:
       - loading
       - populated
@@ -340,7 +284,7 @@ routes:
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
-    ssr: ssr
+    ssr: spa
     states:
       - loading
       - populated
@@ -360,7 +304,7 @@ routes:
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
-    ssr: ssr
+    ssr: spa
     states:
       - loading
       - populated
@@ -379,7 +323,7 @@ routes:
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
-    ssr: ssr
+    ssr: spa
     states:
       - loading
       - populated
@@ -397,16 +341,13 @@ routes:
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
-    ssr: ssr
+    ssr: spa
     states:
       - loading
       - populated
       - empty
       - populated-dark
       - network-error
-sync:
-  comment: on-demand
-  favorite_index: on-demand
 tables:
   - app_user
   - article
@@ -449,7 +390,7 @@ schema:
         name: image_url
         type: string
         required: false
-      - default: now()
+      - defaulted: true
         name: created_at
         type: timestamp
         required: true
@@ -469,12 +410,12 @@ schema:
   article:
     durability: server
     fields:
-      - default: gen_random_uuid()
+      - defaulted: true
         name: id
         pk: true
         type: uuid
         required: true
-      - default: auth_uid()
+      - defaulted: true
         name: author_id
         ref: app_user
         type: uuid
@@ -516,11 +457,11 @@ schema:
         type: string
         required: true
         unique: true
-      - default: now()
+      - defaulted: true
         name: created_at
         type: timestamp
         required: true
-      - default: now()
+      - defaulted: true
         name: updated_at
         type: timestamp
         required: true
@@ -533,7 +474,7 @@ schema:
   article_tag:
     durability: server
     fields:
-      - default: gen_random_uuid()
+      - defaulted: true
         name: id
         pk: true
         type: uuid
@@ -556,7 +497,7 @@ schema:
   comment:
     durability: server
     fields:
-      - default: gen_random_uuid()
+      - defaulted: true
         name: id
         pk: true
         type: uuid
@@ -565,7 +506,7 @@ schema:
         ref: article
         type: uuid
         required: true
-      - default: auth_uid()
+      - defaulted: true
         name: author_id
         ref: app_user
         type: uuid
@@ -576,19 +517,19 @@ schema:
         name: body
         type: string
         required: true
-      - default: now()
+      - defaulted: true
         name: created_at
         type: timestamp
         required: true
   favorite:
     durability: server
     fields:
-      - default: gen_random_uuid()
+      - defaulted: true
         name: id
         pk: true
         type: uuid
         required: true
-      - default: auth_uid()
+      - defaulted: true
         name: user_id
         ref: app_user
         type: uuid
@@ -597,7 +538,7 @@ schema:
         ref: article
         type: uuid
         required: true
-      - default: now()
+      - defaulted: true
         name: created_at
         type: timestamp
         required: true
@@ -612,12 +553,12 @@ schema:
   bookmark:
     durability: server
     fields:
-      - default: gen_random_uuid()
+      - defaulted: true
         name: id
         pk: true
         type: uuid
         required: true
-      - default: auth_uid()
+      - defaulted: true
         name: user_id
         ref: app_user
         type: uuid
@@ -626,7 +567,7 @@ schema:
         ref: article
         type: uuid
         required: true
-      - default: now()
+      - defaulted: true
         name: created_at
         type: timestamp
         required: true
@@ -638,12 +579,12 @@ schema:
   follow:
     durability: server
     fields:
-      - default: gen_random_uuid()
+      - defaulted: true
         name: id
         pk: true
         type: uuid
         required: true
-      - default: auth_uid()
+      - defaulted: true
         name: follower_id
         ref: app_user
         type: uuid
@@ -652,7 +593,7 @@ schema:
         ref: app_user
         type: uuid
         required: true
-      - default: now()
+      - defaulted: true
         name: created_at
         type: timestamp
         required: true
@@ -1136,6 +1077,7 @@ migrations:
   - services/database/migrations/007_txid.sql
   - services/database/migrations/008_publication.sql
   - services/database/migrations/009_validations.sql
+  - services/database/migrations/010_machines.sql
   - services/database/migrations/011_owner_writes.sql
   - services/database/migrations/012_me_readonly.sql
   - services/database/migrations/013_article_tag_sync.sql
@@ -1201,3 +1143,14 @@ validations:
         - table: article
           key: id
           from: article_id
+      'on':
+        - insert
+        - update
+      order:
+        insert:
+          - 0
+          - 0
+        update:
+          - 0
+          - 0
+      machine: FavoriteRules

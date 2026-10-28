@@ -49,9 +49,9 @@ and compiled at build time into JSON ASTs; screens bind them with `{msg.key}`,
 evaluating arguments, plurals, and selects dynamically with zero runtime
 dependencies in pure SES via endowed `Intl.PluralRules` and `Intl.NumberFormat`.
 An arm is text and may interpolate `{col}`, never another `{msg.…}`. `Intl`
-is the interpreter's alone — no handler, renderer or validation can reach it,
-and only an adapter is endowed with a guarded one — which is why plural selection
-and the value formats below resolve here.
+is the interpreter's unless a module declares it — an adapter holds a guarded one
+undeclared, and a handler, renderer or validation only by its `endowments` grant —
+which is why plural selection and the value formats below resolve here.
 
 The active locale is the most explicit thing the arrival carries: the
 address's locale prefix, then `?lang=`, then a bound row's own `locale`
@@ -103,7 +103,7 @@ Three exceptions, each because the empty string is not "absent":
 | `data-when` | the same filter grammar, literals only, matched against the row itself. A template with no `data-when` admits every row |
 | `data-exit-motion="none"` | rows leave at once, removed in the pass that loses them — for a list whose filter selects one row, where a leaving row beside its replacement is a layout jump. `none` is the only value, and a slot has no rows to leave; either mistake is refused |
 | `data-empty` | the empty-state copy, shown when the query returns none, as an element of class `empty` the region admits: an `li` in a list, a `span` in phrasing, a `tr` whose one cell spans the table's columns in a `thead`, `tbody` or `tfoot`, a `p` elsewhere. A slot nested in another region's item has no screen state to fall back on, so it owes a declaration: copy, `data-empty=""` for a probe whose output is its presence, or `data-empty-row`; one that states none is refused at generate and by the interpreter |
-| `data-empty-row` | the row a region binds when it has none, resolved against the enclosing row as `data-filter` is — a whole `{col}` keeps its type and null, so a draft nested in the row it edits starts from it. A machine region synthesizes one from `{...context, field: initial}`; where both are present they must agree, vetted at generate and never arbitrated at runtime |
+| `data-empty-row` | the row a region binds when it has none, resolved against the enclosing row as `data-filter` is — a whole `{col}` keeps its type and null, so a draft nested in the row it edits starts from it. A singleton machine region without this attribute requires a filter pinning `id` and synthesizes a row from the entity's literal field defaults, its filter's equalities and `{[field]: initial}`, in that order. This attribute supplies the whole explicit row |
 | `data-project` | [derived columns](#derived-columns) a region states about its own rows |
 | `data-text` | text interpolation from the bound row or singleton |
 | `data-reads="a,b"` | the foreign tables a reduce this region wakes receives as `state.rows`, read at each step and never subscribed: a change to one does not wake the region |
@@ -126,13 +126,24 @@ The clause set is closed:
 | `{"eq": [column, value]}` | `"true"` or `"false"`; `value` may carry placeholders, resolved against the enclosing row |
 | `"next"`, `"prev"`, `"first"`, `"last"` | the key of the neighbouring or end row along the region's order; an end names itself, never wraps |
 | `{"next": column}`, any lane kind | the same among the rows sharing `column` — a grid's minor axis |
+| `{"date": [column, ...]}` | canonical `YYYY-MM-DD` from the first nonblank source in the reader's timezone; a date-only source stays unchanged, and all-blank sources answer blank |
+| `{"changed": [column, ...]}` | `"true"` on the first row or when any named column differs from the previous row in the region's order; `"false"` within a consecutive group |
+
+`data-display-order="reader_day.asc,competition.asc,kickoff.asc,id.asc"` orders
+only the fetched window: scalar `date` clauses run first, then this order, then
+boundaries, indices and lanes. `data-order` still controls the stored query and
+paging. Display terms accept `column[.asc|.desc][.nullsfirst|.nullslast]`; defaults
+are ascending with nulls last (descending has nulls first), and ties retain
+fetched order. Missing columns, malformed terms and display order on a slot
+are errors. Date sources must be a nonempty list of nonempty column names;
+missing columns and invalid dates are errors, except inert fixture values.
 
 Answers are merged into each row before binding and never into the stored
 rows, so no guard or assign sees them, and a region with a projection re-binds
 every row on every pass. Refused at hydration as a `ProjectionError`: an
 unknown clause kind; a derived name a stored column already carries; a
 projection on a slot; an `eq` naming a column no row carries (a row still in
-flight excepted); a spec that is not JSON or not a map of clauses. Refused by
+flight excepted); a boundary naming a missing column or no columns; a spec that is not JSON or not a map of clauses. Refused by
 design: a predicate over any rows but the region's and its enclosing row's; an
 aggregate (`sum`, `min`, `max` — a fold is a reduce on `data-on-mutation` or a
 `#Pipeline`); and an expression in markup, where the answer is another derived
@@ -144,11 +155,19 @@ column ([focus and ARIA](docs/accessibility.md)).
 |---|---|
 | `data-text-format="plain"` | the default spelled out: the looked-up value as text |
 | `data-text-format="datetime"` | the value as a moment in the reader's language and clock — `Aug 2, 09:00` to an American, `2 de ago., 09:00` to a Brazilian. A storybook render pins UTC — the checks' frames and pronto's prerendered documents alike — since an ambient zone would make each differ by where it was rendered |
+| `data-text-format="time"` | the timestamp as `HH:mm` in the reader's timezone and language, with midnight `00:00`; missing and date-only values have no clock and are blank |
+| `data-text-format="date"` | numeric year, two-digit month and day in the reader's language and timezone; `YYYY-MM-DD` is a civil date and never shifts; missing values are blank |
 | `data-text-format="number"` | grouped and punctuated for the reader's language — `1.234,5` to a Brazilian, `1,234.5` to an American |
 | `data-text-format="money"` | the same, with the currency the bound column declares (`#Field.money`). The column is an integer count of minor units and the code and scale are the column's, never the attribute's; a column declaring none is refused at hydration and by `check markup` |
 | `data-text-format="<name>"` | an app renderer, resolved by basename out of the route's `files.renderers` — a pure `(value) => nodes` Jessie module. `interpreter/render.js` owns the node schema, the tag and attribute allowlists, the URL-scheme check and the DOM write, so a renderer emits no markup it was not granted. A name colliding with a built-in is refused |
 | `data-value` | bind a form control's value from the row. A control the reader has touched is left alone until its form submits or resets — regions re-bind on any change to their table, so binding through would wipe an unsent edit. Checkboxes are exempt: their value is the state, and a refused toggle must roll back where the reader can see it. In a hidden input, `{now}` is the terminal's clock and `null` is JSON null |
 | `data-value-adapter="<module>"` | the [adapter](#adapters) a control's value crosses |
+
+An SVG `g[role="tooltip"]` follows pointer movement over its parent group.
+The terminal translates it beside the pointer, flips at the viewBox edges and
+keeps an eight-unit inset. Pointer leave and keyboard focus restore its authored
+position. Visibility and appearance remain CSS; pointer placement holds no row
+state and grants the renderer no event or DOM authority.
 
 ### Adapters
 
@@ -158,7 +177,7 @@ instant. `data-value-adapter="<module>"` names a Jessie module whose value is
 `{format, parse}` — `format(value, {zone})` fills the control at bind,
 `parse(text, {zone})` makes the column at serialize — one module for both
 directions, because two halves that can drift are two bugs. The reader's zone
-arrives as data. The adapter role alone is endowed with `Intl`, every host
+arrives as data. The adapter role is endowed with `Intl` undeclared, every host
 default refused: a service names its locale, its `timeZone` and the instant it
 formats, a locale the host lacks throws, and services are constructed with
 `new` (the guard is a subclass that stops a module reading its machine by
@@ -186,6 +205,12 @@ included:
 | `upsert` | the row for this natural key — a declared unique, else the primary key — existing or not |
 | `delete` | the enclosing item's row, or every row `data-filter` names |
 | `navigate` | nothing: with `data-route`, the form's named inputs fill the route's `:params` at submit |
+
+Each is a word of `#Machine.#MutationOp` ([`machine.cue`](machine.cue)), the
+one mutation vocabulary; `create` mints its key, so a retried create carries
+the same key and is a join on the wire (the gateway's
+`resolution=ignore-duplicates`, mecha `docs/proxy.md`), never a duplicate;
+`data-sync.js` `add` runs the entity's validations as an insert, nothing more.
 
 A file input carrying `data-upload` sends its blob to the store's object
 bucket first, and the row carries only the resulting key. Validation is the
@@ -228,9 +253,16 @@ A chart's grammar is `#Machine` in [`machine.cue`](machine.cue), vetted by
 - **Closed over one row.** Its state is its `field` on a row, which belongs to a
   `tab` or `device` table ([machines](docs/machines.md#the-chart)); leaves see
   `{items: [row]}` and the event and nothing else; every transition lands as
-  one stated row. A region with no `data-empty-row` binds
-  `{...context, [field]: initial}` plus its filter's equalities.
-- **Data, and value positions.** Targets, state names, `initial`, `context` and
+  one stated row. A singleton region with no `data-empty-row` requires a
+  filter pinning `id` and binds
+  the entity's literal field defaults, then its filter's equalities, then
+  `{[field]: initial}`. An explicit `data-empty-row` supplies the whole row.
+  `shell.yaml` carries literal defaults on each field's `default` under
+  `schema.<table>.fields[]`. `defaulted: true` records a SQL default even
+  when it is an expression, so markup lint accounts for pending rows whose
+  defaulted columns have not arrived. SQL expressions supply no literal
+  value, and `context` is refused.
+- **Data, and value positions.** Targets, state names, `initial` and
   raised types are data. A `guard`, an `assign` value or an `after` delay is a
   literal or a Jessie module called `(state, event, params?)` with literal
   `params`; an assign string is a module reference exactly when it names a
@@ -252,9 +284,13 @@ A chart's grammar is `#Machine` in [`machine.cue`](machine.cue), vetted by
 
 ### Effects
 
-An arrow's `effect` is `{level?, op: create | update | delete | upsert,
-entity?, token?, filter?, values?}`, its `values` literals, `{now}`, the event
-leaf or a module, interpolated against the post-assign row. The terminal
+An arrow's `effect` is `{op: create | update | delete | upsert, entity?,
+token?, filter?, values?}`, its `values` literals, `{now}`, the event
+leaf or a module, interpolated against the post-assign row. `op` is the four
+words of `#Machine.#MutationOp` ([`machine.cue`](machine.cue)) the store
+performs; the whole vocabulary — a form's actions, `reduce`, and the ops a
+cluster-side interpreter runs — is defined there once, each word classified by
+what happens if the write happens twice, and every consumer narrows it. The terminal
 performs it through the store and answers the region's charts with `sync_ack`
 (carrying `token`) when the store settles it, and with `refused` if the write is
 withdrawn, possibly after. An immediate store error also delivers `refused`:
@@ -268,13 +304,14 @@ retry should handle `refused` in every state where a pending write can fail.
 | 1 | `ephemeral` | a write to a browser-owned row; settles | `tab`, `device` |
 | 2 | `compensable` | optimistic; on `refused` the speculative row is withdrawn, never undone by arithmetic | `offline`, `live` |
 | 3 | `replicated` | a join-semilattice write; out-of-order CDC converges | `server` |
-| 4 | `exterior` | at-least-once delivery, exactly once by token; compensation is explicit | outside the cluster |
+| 4 | `external` | at-least-once delivery, exactly once by token; compensation is explicit | outside the cluster |
 
-The durability column is `#DurabilityEffectLevel`, defined in
-[`machine.cue`](machine.cue) and in `plugins/pronto/schema.cue`, and nothing
-compares an effect against it. `machineLint` refuses an effect stating
-`level: 2` or `"compensable"` in a chart with no `refused` arrow; an effect
-naming no level escapes it ([machines](docs/machines.md#effects)).
+The level is the entity's, never the chart's: `#DurabilityEffectLevel` in
+[`machine.cue`](machine.cue) maps the durability `shell.yaml` carries to it, a
+chart states none, and `machineLint` reads it off the row an effect writes —
+the named entity, or the region's. A compensable write in a chart with no
+`refused` arrow is refused, as is a write to a row the emitted schema does not
+declare ([machines](docs/machines.md#effects)).
 
 ## What the terminal stamps
 
@@ -296,11 +333,20 @@ Hooks a stylesheet or a test observes and never writes:
 resolved against the row by the same binder as every other attribute and
 resynchronised on every refresh, so a hatch sees a current-value feed rather
 than a message it has to keep up with. What comes back out is named and
-request-shaped, and crosses as a parsed, frozen event (`parseDetail`). This is
+request-shaped, and crosses as a parsed, frozen event (`parseDetail`). Both
+are the unit's ports (shell.yaml `units.<name>.ports`): the region a mount
+sits in must be a table the unit `reads`, and a `data-on-<event>` on the mount
+must be one it `raises` — the mount refuses the rest, and `check markup`
+reports it first, with any raise no mount handles. An `agent` unit also
+carries a `memo`: the terminal answers a question whose row the memo table
+holds without posting it, and writes the unit's answer as a row on the
+question's key before the mount's `data-on-*` hears it
+([the terminal](docs/terminal.md#the-seats)). This is
 the only rung where code the terminal did not emit runs on a reader's device.
-A unit declares its seat, a frame or a worker; what each seat grants and
-performs is `terminal.cue`'s `hatch`, and what each buys and what an app owes
-an answer is [the terminal](docs/terminal.md#the-seats).
+A unit declares its seat by its `isolation`, a `realm` (an iframe) or an
+`agent` (a worker); what each seat grants and performs is `terminal.cue`'s
+`hatch`, and what each buys and what an app owes an answer is
+[the terminal](docs/terminal.md#the-seats).
 
 ## Rejected
 

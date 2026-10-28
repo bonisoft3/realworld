@@ -1,0 +1,47 @@
+# generated from bayt.cue — do not edit
+services:
+  realworld-ci-replay:
+    build:
+      additional_contexts:
+        realworld-setup: service:realworld-setup
+        realworld-database: service:realworld-database
+      context: ..
+      dockerfile: .bayt/Dockerfile.ci-replay
+      target: ci-replay
+      tags:
+      - bayt-realworld-ci-replay:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+      - bayt-realworld-ci-replay:latest
+      args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-realworld-ci-replay:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+    scale: 0
+  realworld-ci-replay_bayt:
+    build:
+      additional_contexts:
+        realworld-setup_bayt: service:realworld-setup_bayt
+        realworld-database_bayt: service:realworld-database_bayt
+      context: ..
+      dockerfile: .bayt/Dockerfile.ci-replay
+      target: ci-replay_bayt
+      args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-realworld-ci-replay_bayt:latest
+    scale: 0
+  realworld-ci-replay_srcs:
+    build:
+      additional_contexts:
+        realworld-setup_srcs: service:realworld-setup_srcs
+        realworld-database_srcs: service:realworld-database_srcs
+      context: ..
+      dockerfile: .bayt/Dockerfile.ci-replay
+      target: ci-replay_srcs
+      args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-realworld-ci-replay_srcs:latest
+    scale: 0

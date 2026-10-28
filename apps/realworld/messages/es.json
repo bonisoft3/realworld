@@ -1,6 +1,7 @@
 {
-  "chrome_signin_hint": "Un toque con tu clave de acceso — si eres nuevo, se crea una para ti.",
-  "chrome_signin": "Continuar",
+  "chrome_signin_google": "Iniciar sesión con Google",
+  "chrome_signin_hint": "Las buenas historias nos unen. Lee, escribe y encuentra tu comunidad.",
+  "chrome_signin": "Continuar con una clave de acceso",
   "chrome_signin_guest": "Continuar como invitado",
   "chrome_signin_failed": "Eso no funcionó. Inténtalo de nuevo.",
   "chrome_signout": "cerrar sesión",

@@ -1,6 +1,7 @@
 {
-  "chrome_signin_hint": "Geçiş anahtarınla tek dokunuş — buraya ilk gelişinse senin için bir tane oluşturulur.",
-  "chrome_signin": "Devam et",
+  "chrome_signin_google": "Google ile oturum aç",
+  "chrome_signin_hint": "Güzel hikâyeler bizi birleştirir. Oku, yaz ve topluluğunu bul.",
+  "chrome_signin": "Geçiş anahtarıyla devam et",
   "chrome_signin_guest": "Misafir olarak devam et",
   "chrome_signin_failed": "Bu işlem gerçekleşmedi. Tekrar dene.",
   "chrome_signout": "çıkış yap",

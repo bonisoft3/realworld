@@ -13,6 +13,61 @@ program is a pure function and a set of checks. `cue export -e out` is the
 whole backend and `write.ts` its linker. What each artifact must contain is
 [SPEC](../SPEC.md); how an author drives the loop is [GUIDE](../GUIDE.md).
 
+## Incremental builds
+
+`generate` owns the compiler (`write.ts`) and Bayt graph emission. Its cached
+Task target depends on setup; lint depends on generation, and test, launch and
+integration depend on build. OmniShell interprets generated artifacts, so the
+native build target executes consumer build rules without another compiler pass.
+
+The initial bootstrap runs generation directly before a graph exists. Subsequent
+Sayt gates run cached generation first, then start a fresh Task invocation for
+the requested verb: Task loads its graph once per invocation. An unchanged
+generation skips application CUE evaluation.
+The same graph generates gates in `.bayt/say.yaml`. Pronto projects them into
+the application's `.say.yaml`, owning the glue Sayt reads at bootstrap. The complete
+compiler, terminal, cluster and consumer checks remain in `.bayt/checks.yaml`;
+the Task leaf executes that explicit configuration instead of reentering the
+public gate. Consumer additions still compose through CUE unification.
+Missing generated configuration is repaired from `bayt.json` before dispatch;
+a leaf refuses to substitute default checks when its configuration is absent.
+Generation also requires its generated configuration and Task roots to exist.
+If regeneration changes the generation rules, the leaf runs the refreshed
+rules before stamping success; rules that keep changing fail after three runs.
+
+Local generation depends on the workspace's `pronto-sources:srcs` view, whose
+compiler trees also define the Docker program copy. A rooted mirror declares
+those trees within its own source set. Framework edits invalidate generation
+in both layouts.
+
+Test fingerprints include `tests/**`, the generated check configuration and
+compiler facts. Installed-runtime tests use the cache; tests against local
+sibling runtimes run each time until those trees have declared dependency
+edges. In CI, before lint checks its cache, an uncached `lint-inputs` target records
+the protobuf comparison ref in `.pronto/proto-baseline.json`. Local runs record
+`null` and skip historical compatibility checks without accessing Git. That file is part
+of lint's fingerprint and excluded from generation/build/test, so moving the
+ref invalidates lint without forcing every unchanged run to execute its checks.
+The protobuf checker compares against that sampled commit, even if the ref moves
+while the checks run.
+Docker lint retains concrete CUE validation. Moving the full native check set
+into those images requires a declared protobuf baseline instead of a live
+Git checkout.
+
+Launch and integration use separate native action targets so their commands do
+not become Docker build steps in the runtime service. Both run generation and the cached build
+first. Launch always executes; integration retains a successful verdict against
+the app, tests, runner source closures, generated runner graphs and invocation
+arguments. An unchanged invocation returns before Docker; `--no-cache` forces it
+to execute. Arguments pass through the gate to the leaf. Integration runners
+invoke Task inside the Docker secret-injection envelope, preserving setup,
+teardown and failure verdicts; the runner action itself is uncached.
+
+Build checks at the same priority share one integration invocation. Bake runs
+at most two target envelopes per batch by default (`--jobs` changes the bound),
+and each retains its own named stack and database. A failed batch stops the
+remaining batches. Priority boundaries stay ordered.
+
 ## The ladder
 
 The rungs, and which of them are deterministic, are
@@ -49,15 +104,22 @@ two sets, over the kinds and by the rule [SPEC](../SPEC.md#programcue) states.
 | `objects.ts`, `facts.ts`, `check-facts.ts`, `invariants.sql`, `acceptance.ts` | the bijection, the fact store, and the invariants two rungs owe each other |
 | `cel.ts`, `derive-cel.ts`, `cel-emit.ts`, `bounds.ts` | one parse of every `cel:` into `.pronto/cel.json`, and every reading of it |
 | `jessie.ts`, `validations.ts` | what a Jessie module references; what a validation compiles to |
+| `mecha-*.ts`, `hybrid-runtime.js`, `check-hybrids.ts` | Mecha machines: their SQL, runtime and surface, and the lint over their [contracts](decisions/2026-10-15-machine-contracts.md) |
 | `identity.ts`, `type-*.ts`, `types.cue` | [types and identity](types-and-identity.md) |
 | `check-sql.ts`, `check-proto.ts`, `check-replay.ts`, `pgroll.cue` | [schema changes](schema-change-admission.md) |
 | `scales.ts`, `scales/`, `styles.ts` | [the design scale](design-scale.md) |
-| `prerender.ts`, `bundle/` | server-rendered documents; the `release@pages` bundle |
+| `bundle/` | the `release@pages` bundle |
 | `clusters/`, `terminals/`, `loops/`, `builders/` | the rosters ([component contracts](component-contracts.md)) |
 | `bootstrap/`, `distribution/` | what a consumer repository is seeded with, and its pins |
 
 ## Emission
 
+- Generation writes `.pronto/check-inputs.json` with the type table, evaluated entities,
+  hatches, raw migrations and DuckStreams used by identity, SQL and proto
+  checks. Those checks read this compiler output; they do not evaluate CUE.
+  The generation gate restores missing checker inputs, and lint retains
+  concrete CUE validation (`cue vet -c ./...`). Identity minting still evaluates
+  the source before and after stamping it.
 - **The manifest is part of the program.** The export yields `manifest`, every
   emitted path sorted, and `files`, path → `{format, text | data | src}`: raw
   formats render to strings in CUE, structured ones stay structs for the
@@ -80,8 +142,7 @@ two sets, over the kinds and by the rule [SPEC](../SPEC.md#programcue) states.
   what bayt emits — and files every check under the verb whose layer it needs
   ([checks and verbs](component-contracts.md#checks-and-verbs)),
   never a script nobody runs. Pronto's own: `derive`, `types`, `facts`,
-  `proto`, `identity` and `sql` at `lint`, `prerender` at `test`, `replay` at
-  `integrate` after the images exist.
+  `proto`, `identity` and `sql` at `lint`, `replay` at `integrate`.
 
 ## The constraint cascade
 
@@ -111,17 +172,17 @@ fills and which commands exist; **published commands**, so what crosses to
 pronto is what to ask, never how to run it; **relocatability**; and
 **self-bootstrapping**. One trick delivers them: a launcher that resolves its
 own directory and `exec`s a mise tool-stub on its program
-(`plugins/bayt/runtime/bayt`, `plugins/omnishell/runtime/omnishell`),
-depth-relative prefixes in generated invocations, and a mode chosen **at
-generation**. In the monorepo an app's `loop.surface.sources` default to the
-sibling checkouts; a bootstrapped consumer's `generate` writes
-`program_pronto.cue` setting `sources: pronto: ""`, and every command then
-finds the installed distribution with `run-mise where` as it runs. Where pronto
-sits inside the app's CUE module, `write.ts` writes that file instead, from the
-layout it finds: pronto as the app names it, the app's directory under the
-module's root, and the root and the runtime's directory as mecha names them.
-A mirror that holds the app at its root and the runtime under `.runtime/` is
-one such layout, and its build regenerates what copybara wrote.
+(bayt's `runtime/bayt`, omnishell's `runtime/omnishell`),
+depth-relative prefixes in generated invocations, and every command finding
+its runtime with `run-mise where` as it runs. Generated files are the same in
+a source checkout and in an [app's mirror](release-targets.md#pages), which
+receives them as they are; one switch decides what is the checkout's. Where
+pronto sits inside the app's CUE module, `write.ts` writes `mise.local.toml`:
+mise's tools from the runtime's trees, and `MONOREPO_COMPOSE_MODE`, under which
+each image builds mecha's and omnishell's from those trees instead of pulling
+the pins, and takes the checkout's layout (bayt's `imageDir`) so the views of
+the trees it copies land where `mise.local.toml` names them. A mirror has no
+such file and runs the releases it pins; its release gate validates them.
 
 Each brings what the others cannot. sayt bootstraps the rest and carries the
 cross-platform concern, which is why it alone ships per-platform binaries;
@@ -131,8 +192,8 @@ checkable at authoring time and by automation, paid for in imperative
 expressiveness. The install order follows: sayt → bayt → {omnishell, mecha} →
 pronto, each installable by the one below it.
 
-The monorepo is where a terminal change is tested against every app in the
-commit that makes it; the trick lets that coexist with a published
+A source checkout is where a terminal change is tested against every app in
+the commit that makes it; the trick lets that coexist with a published
 distribution running the same program.
 
 ## Rejected
@@ -153,10 +214,9 @@ distribution running the same program.
   no installed branch is a fixed depth relocatable to nothing; a published
   `deno run` carrying lockfile policy, permissions and paths makes pronto know
   how a part runs rather than what to ask it.
-- **Choosing monorepo or distribution mode by a runtime probe** — committed
-  emissions would depend on the machine that wrote them, and
-  `verify-generated` (`.github/workflows/cd.yml`), which regenerates them on
-  every release tag and aborts on a diff, could never pass.
+- **Choosing checkout or distribution mode by a runtime probe** — committed
+  emissions would depend on the machine that wrote them, and a release gate
+  that regenerates them and aborts on a diff could never pass.
 - **A source filesystem that makes one tree both a checkout and a
   distribution** — a FUSE layer such as Google's srcfs is infrastructure this
   repository does not have; the emitted artifact differs between the two

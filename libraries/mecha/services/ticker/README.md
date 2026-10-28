@@ -8,7 +8,7 @@ Four words carry the whole design, and nothing else is a concept:
 | | |
 |---|---|
 | **clock** | The per-tier cadence source. Owns resolution and nothing else. |
-| **poke** | A contentless authenticated HTTP request whose only job is to make a scaled-to-zero unit exist. Two of them: the clock pokes the ticker, the ticker pokes the mesh. |
+| **poke** | A contentless authenticated HTTP request whose only job is to make a scaled-to-zero unit exist. The clock pokes the ticker, and the ticker pokes the units a tick needs: the mesh, and where an effect is declared the [airlock](../airlock/README.md#in-a-cluster). |
 | **tick** | One occurrence of a schedule, as a row in the app's own table, keyed `uuid5(schedule, instant)`. |
 | **outcome** | Where a pipeline says it answered a tick. Keyed by the same tick, in a different table, because a source cannot be its own sink. |
 
@@ -24,8 +24,15 @@ answer.
 
 - `due.ts` — the pure core: what a schedule owes at an instant. No clock of its
   own, no network. Its header lists the hard cases it decides.
-- `main.ts` — the shell. Reads schedules from crud, writes the rows, advances
-  the watermark, wakes the unit that reads the WAL.
+- `sweep.ts` — the sweep over a crud and a wake. Reads schedules, writes the
+  rows, wakes the unit that reads the WAL, advances the watermark, in that
+  order. The edge object runs this same file on its alarm.
+- `main.ts` — the container tier's shell: the poke's credential, crud over
+  HTTP, the wake as a GET to each unit.
+
+`deno.json` keeps `node_modules` beside these (`deno install`): the edge
+release bundles `due.ts` with wrangler, whose bundler resolves croner there
+and nowhere Deno's cache is.
 
 ```sh
 task test          # from libraries/mecha; runs these alongside cue vet + buf lint
@@ -59,18 +66,24 @@ into a service that looks healthy and does half its job:
 |---|---|
 | `CRUD_URL` | PostgREST directly, not the proxy: the proxy's client-facing `Prefer` injection would clobber the resolution below. |
 | `SERVICE_JWT` | Both the incoming poke's credential and the outgoing writes'. |
-| `MESH_URL` | daprd's base URL. See **The wake**. |
+| `WAKE_URLS` | The units a tick needs up, comma-separated, each answering a GET: `mesh-events`'s `/v1.0/healthz/outbound` where the change feed is on, the airlock's `/healthz` where an effect is declared. Empty where neither is: a machine timer fires in the database its tick is written to. See **The wake**. |
 
 ## One table of mecha's, and the app's own
 
 `schedule` is mecha's mechanism, created by the database image as
-`020_schedule.sql` where the cluster declares a schedule, and seeded from the
-app's declarations. An app never authors its rows by hand.
+`800_schedule.sql` where the cluster declares a schedule, and inside
+`012_airlock.sql` where it declares an effect, and seeded from the app's
+declarations at `801`. 800–899 is the framework's initdb range; an app's own
+steps hold 000–799 and its seed 900
+([schema](../../docs/schema.md#how-a-schema-reaches-the-database)). An app
+never authors its rows by hand. Both steps are initdb's, so they reach only a
+volume initdb builds, and migrate refuses a volume that lacks the table.
 
 ```sql
 create table schedule (
   name                 text primary key,
-  cron                 text not null,             -- five fields, the only grammar
+  cron                 text,                      -- five fields, the only grammar
+  due_at               timestamptz,               -- or one instant: a one-shot row
   time_zone            text not null default 'UTC',
   suspended            boolean not null default false,
   max_lateness_seconds integer not null default 300,
@@ -82,7 +95,8 @@ create table schedule (
   emits_values         jsonb not null default '{}',
   last_tick_at         timestamptz,               -- the watermark
   check (concurrency_policy <> 'Forbid'
-         or (done_entity is not null and done_filter is not null))
+         or (done_entity is not null and done_filter is not null)),
+  check ((cron is null) <> (due_at is null))
 );
 ```
 
@@ -115,6 +129,26 @@ resolves against the primary key, so a duplicate `id` comes back as `[]` with
 201, while a *secondary* unique violation comes back `23505` with 409. The
 derived id already is that uniqueness.
 
+### A one-shot row
+
+A row with `due_at` in place of `cron` is owed once that instant has passed and
+its watermark has not reached it, and is owed again when its watermark is
+cleared. It is how a unit asks to be woken for work it already holds: the
+airlock's initdb step seeds one, named `airlock`, emitting into `airlock_wake`;
+an interpreter that enqueues an effect (pronto's) re-arms it in the transition's
+commit, so the next sweep emits one tick, whatever the number of claims since
+the last, and wakes the airlock with it. The re-arm writes only a row not yet
+armed and waits on no lock, so claims never queue on the one row. Below cloud
+tier the airlock heard the enqueue itself, and the tick costs a row, which the
+airlock prunes after a day.
+
+Pronto's server machines use the same one-shot mechanism for `after`.
+Each state entry creates a distinct `machine:` schedule per delay. It emits
+into the private `machine_timer_tick` table, whose interpreter locks the owner
+and checks cancellation before applying the transition. Leaving the state
+deletes its schedules; retained ticks absorb duplicate delivery. The timing
+and migration contract is in [[../../../../plugins/pronto/SPEC|Pronto's spec]].
+
 ## What the mechanism guarantees
 
 **The key is derived.** `uuid5(mecha-namespace, "<schedule>\n<tick_at>")`, and it
@@ -138,8 +172,11 @@ coarse clock produce exact instants.
 one poke emits for a schedule; the watermark moves by what was resolved, so a backlog
 drains across pokes instead of running past the caller's deadline and repeating
 forever. `WALK_CAP = 512` in `due.ts` guards a pathological expression.
-`CALL_TIMEOUT_MS = 10_000` means a hung upstream fails the poke rather than
-holding the pass open until something else kills it mid-write.
+Each call to crud is bounded by `CALL_TIMEOUT_MS`, which the cluster sets past
+the service role's statement bound (pronto's resilience `tickerCall`), so a
+call given up on is not one the database then commits; each wake ping by
+`WAKE_TIMEOUT_MS = 10_000` in `main.ts`, a health read needing none of that.
+A hung upstream fails the poke rather than holding the pass open.
 
 ## Time, decided once
 
@@ -279,8 +316,10 @@ looks like: it puts a message on the bus and wakes neither puller, and every
 CDC pipeline opens by dropping a message whose `.data` is not a non-empty
 string, so it would be discarded on arrival too.
 
-The endpoint is `GET /v1.0/healthz/outbound`, dapr's own readiness, which
-answers 204 and is enough to wake the unit. On daprd 1.16.1 it answers once
+The endpoints are `WAKE_URLS`: `GET /v1.0/healthz/outbound` on `mesh-events`,
+dapr's own readiness, which answers 204 and is enough to wake the unit; and
+`GET /healthz` on the airlock where an effect is declared. Every one must
+answer, or the wake failed. On daprd 1.16.1 it answers once
 daprd's servers are up, before daprd waits on its app channel. `/v1.0/healthz`
 answers 500 until daprd's initialization completes, and that initialization
 blocks until the app channel accepts a connection, so a wake that asked it
@@ -318,6 +357,7 @@ about it.
 | k8s | one cluster-wide CronJob | 60s | not written |
 | host (process-compose) | the same container | 60s | not written |
 | cloud | Cloud Scheduler | 60s | not written |
+| edge (Cloudflare) | the object's alarm at the next owed instant, and an hourly Cron Trigger → POST from outside it | ms | wired ([the edge cluster](../../packages/mecha-edge/README.md#the-clock)) |
 | browser (wasm) | `setInterval` | ms | needs a different shell |
 
 The binding floor is 60s, from Cloud Scheduler and CronJob. Local and compose
@@ -399,9 +439,11 @@ The facts the design rests on:
   later table, mecha's own included: without a policy, `app_user` could repoint
   `schedule.emits_entity` and set `suspended`, which the ticker then acts on as
   `service`. `ENABLE ROW LEVEL SECURITY` with no policy closes it.
-- **croner.** `n/step` means n to the end of the field (`5/10` in minutes is 5,
-  15 … 55); a parser reading a bare value as `lo = hi = n` matches only n, and
-  the DST gap check then discards the rest silently.
+- **croner.** A step steps over `*` or a range (`*/10`, `5-59/10`); croner 10
+  refuses `n/step`, and so does the DST gap check's own parser, so the two never
+  disagree on which minutes an expression names. Its time zones are read through
+  `Intl.DateTimeFormat`, which a page's SES lockdown leaves alone; croner 9's
+  `toLocaleString` answered every zoned schedule there "Invalid time value".
 - **A coarse clock.** Poking every 10 seconds against a minutely schedule
   produces exactly one tick per minute, on the minute. At cloud tier each poke is
   a billed wake, which is why `?caller=` is recorded.
@@ -425,9 +467,9 @@ Rejected:
   bulk insert; a tick is the app's row, with mecha's five columns written last.
 - **A `schedule_run` table with a `historyLimit`**: retention is a level the app
   declares.
-- **`done` as a filter over the emits table**: that table is a change-feed
-  source and the publication is the loop breaker, so `done` names a different
-  table.
+- **`done` as a filter over the emits table**: the current schedule contract
+  keeps the occurrence and its outcome in different tables. Publication
+  carries both; consumers select the changes they handle.
 
 ## Not built
 
@@ -438,8 +480,8 @@ Rejected:
   the ticker end to end.
 - **The k8s and host clocks**, when a tier needs one. Both run the same
   container as compose; only `?caller=` differs.
-- **The browser tier.** `due.ts` ports unchanged; `main.ts` does not — no Deno,
-  no daprd to wake, and crud is
+- **The browser tier.** `due.ts` and `sweep.ts` port unchanged, as the edge
+  proves; `main.ts` does not — no Deno, no daprd to wake, and crud is
   [the wasm PostgREST subset](../../docs/browser.md#what-stands-in-for-what). That subset answers
   `resolution=ignore-duplicates` with a bare `ON CONFLICT DO NOTHING`, so the
   derived key holds there too.

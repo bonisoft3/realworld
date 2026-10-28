@@ -108,10 +108,21 @@ the one seam ([managed equivalents](docs/deployment.md#managed-equivalents)).
 **conduit reclaims a slot a dead connection holds**, terminating the stale
 backend before it starts ([what bites](docs/deployment.md#what-bites-on-cloud-run)).
 
-**The edge tier** ([the tiers](docs/deployment.md#the-tiers)).
+**The edge tier's change path, blobs and accounts**
+([the edge cluster](packages/mecha-edge/README.md)). The object serves guests
+over a data directory a release loaded; no outbox carries its changes to a
+transform, no blob plane is routed, and passkeys
+need the auth service's ceremonies. Its shape log lives in the isolate, so
+every new object sends every client back to a snapshot, and a live request
+keeps the object awake where a hibernating WebSocket would not.
 
 **The ticker's cloud clock**, with the rest of its unbuilt parts:
 [the ticker](services/ticker/README.md#not-built).
+
+**A gateway behind the airlock's daprd**, should its bindings-only allowlist
+be judged too thin a wall: a route that does not exist rather than an API
+that does not, which would also refuse a declared name that resolves inward
+([its wake and wall](docs/deployment.md#the-airlocks-wake-and-wall)).
 
 ## The browser platform
 

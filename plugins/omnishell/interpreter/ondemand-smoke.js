@@ -1,42 +1,50 @@
-// Deno smoke: a table that syncs on demand, over the real store, the vendored
+// Deno smoke: a table read lazily, over the real store, the vendored
 // client and a ShapeStream answered by an Electric in process. A view's rows
 // are only the ones its subsets loaded, so the store must never answer before
 // they are all there, never wake a region on a half-joined row, and refuse
-// every read that would take the collection for the table.
+// require explicit complete demand for a local snapshot.
 
+import "./server-mutation-smoke.js";
 import { FIXTURE_CARRIERS } from "./fixture-types.js";
 import { ProgramError } from "./fragment.js";
 import { assert, tick, until, withBrowser } from "./smoke-browser.js";
+import { BasicIndex, BTreeIndex } from "./vendor/mecha-client.js";
 
-// Electric's shape protocol as @electric-sql/client asks it: an on-demand
+// Electric's shape protocol as @electric-sql/client asks it: a lazy
 // shape opens at `offset=now` with only changes logged, each view's rows come
 // as a subset snapshot, and live polls hang until a change is pushed. A subset
 // waits on the gate the test holds for its table.
 let worlds = 0;
+const servers = new Map();
 function electric(server, schema) {
+  const base = `http://fake${++worlds}`;
   const subsets = [];
   const gates = new Map();
   const stalls = new Map();
   const failing = new Map();
   const live = new Map();
+  const offsets = new Map();
+  let transaction = 10;
   const headers = (table) => ({
     "content-type": "application/json",
     "electric-handle": `h-${table}`,
-    "electric-offset": "0_0",
+    "electric-offset": `0_${offsets.get(table) ?? 0}`,
     "electric-schema": JSON.stringify(schema[table]),
-    "electric-cursor": "0",
+    "electric-cursor": String(offsets.get(table) ?? 0),
   });
   const message = (table, operation, value, txid) => ({
     key: `"public"."${table}"/"${value.id}"`,
     value,
     headers: { operation, relation: ["public", table], ...(txid === undefined ? {} : { txids: [txid] }) },
   });
-  const upToDate = { headers: { control: "up-to-date", global_last_seen_lsn: "1" } };
+  const upToDate = (table) => ({ headers: { control: "up-to-date", global_last_seen_lsn: String(offsets.get(table) ?? 0) } });
   // `"c" = $1` and `"c" = ANY($1)`, ANDed: what a view's eq clauses and a
   // join's lazy load compile to.
   const matches = (where, params) => {
     // A key that is null is a row that does not exist.
+    if (where.trim() === "true = true") return () => true;
     if (/^"\w+" IS NULL$/.test(where.trim())) return () => false;
+    if (/^"\w+" IS NOT NULL$/.test(where.trim())) return () => true;
     const clauses = where.split(" AND ").map((c) => /^"(\w+)" = (ANY\()?\$(\d+)\)?$/.exec(c.trim()));
     if (clauses.some((m) => m === null)) throw new Error(`the fake Electric cannot read: ${where}`);
     return (row) =>
@@ -47,6 +55,32 @@ function electric(server, schema) {
   };
   const fetcher = async (input, init) => {
     const url = new URL(String(input));
+    if (url.origin !== base) return servers.get(url.origin)(input, init);
+    if (url.pathname.includes("/crud/")) {
+      const table = url.pathname.split("/").at(-1);
+      const id = url.searchParams.get("id")?.slice(3);
+      const rows = server[table];
+      const current = rows.find((r) => r.id === id);
+      const txid = ++transaction;
+      const operation = init.method === "DELETE" ? "delete" : init.method === "PATCH" ? "update" : "insert";
+      const value = {
+        ...current,
+        ...(init.body ? JSON.parse(init.body) : {}),
+        txid: String(txid),
+      };
+      if (operation === "delete") rows.splice(rows.indexOf(current), 1);
+      else if (current) Object.assign(current, value);
+      else rows.push(value);
+      const queued = live.get(table) ?? { changes: [], wake: null };
+      live.set(table, queued);
+      queued.changes.push(message(table, operation, value, txid));
+      queued.wake?.();
+      queued.wake = null;
+      // The transaction is named as mecha's pre-request hook names it.
+      return new Response(JSON.stringify([value]), {
+        headers: { "content-type": "application/json", "x-txid": String(txid) },
+      });
+    }
     if (url.pathname.endsWith("/auth/shape")) {
       const { table } = JSON.parse(init.body);
       return new Response(JSON.stringify({ token: "t", where: `table ${table}`, expires_in: 900 }));
@@ -64,14 +98,14 @@ function electric(server, schema) {
       }
       const rows = (server[table] ?? []).filter(matches(where, params));
       return new Response(JSON.stringify({
-        metadata: { xmin: "1", xmax: "1", xip_list: [], snapshot_mark: subsets.length, database_lsn: "1" },
+        metadata: { xmin: "1", xmax: "1", xip_list: [], snapshot_mark: subsets.length, database_lsn: String(offsets.get(table) ?? 0) },
         data: rows.map((r) => message(table, "insert", r)),
       }), { headers: headers(table) });
     }
     if (p.get("live") !== "true") {
       await (stalls.get(table) ?? Promise.resolve());
       const rows = p.get("log") === "changes_only" ? [] : (server[table] ?? []).map((r) => message(table, "insert", r));
-      return new Response(JSON.stringify([...rows, upToDate]), { headers: headers(table) });
+      return new Response(JSON.stringify([...rows, upToDate(table)]), { headers: headers(table) });
     }
     const queued = live.get(table) ?? { changes: [], wake: null };
     live.set(table, queued);
@@ -82,14 +116,16 @@ function electric(server, schema) {
       });
     }
     const batch = queued.changes.splice(0);
-    return new Response(JSON.stringify([...batch, upToDate]), { headers: headers(table) });
+    offsets.set(table, (offsets.get(table) ?? 0) + 1);
+    return new Response(JSON.stringify([...batch, upToDate(table)]), { headers: headers(table) });
   };
+  servers.set(base, fetcher);
   return {
     fetcher,
     // A host of its own: Electric's client remembers a shape's position by its
     // URL for the life of the module, and would resume one test's stream into
     // the next test's fake.
-    base: `http://fake${++worlds}`,
+    base,
     subsets,
     /** Answers the next subsets of `table` with each `status` and `body` in
      * turn, one per subset. */
@@ -115,7 +151,32 @@ function electric(server, schema) {
         release();
       };
     },
+    remove(table, id, txid) {
+      transaction = Math.max(transaction, txid);
+      const rows = server[table];
+      const index = rows.findIndex(row => row.id === id);
+      assert(index !== -1, `external delete finds ${table}/${id}`);
+      const [row] = rows.splice(index, 1);
+      const queued = live.get(table) ?? { changes: [], wake: null };
+      live.set(table, queued);
+      queued.changes.push(message(table, "delete", row, txid));
+      queued.wake?.();
+      queued.wake = null;
+    },
+    update(table, id, changes, txid) {
+      transaction = Math.max(transaction, txid);
+      const row = server[table].find(r => r.id === id);
+      assert(row !== undefined, `external update finds ${table}/${id}`);
+      const old = Object.fromEntries(Object.keys(changes).map(k => [k, row[k]]));
+      Object.assign(row, changes, { txid: String(txid) });
+      const queued = live.get(table) ?? { changes: [], wake: null };
+      live.set(table, queued);
+      queued.changes.push({ ...message(table, "update", { ...row }, txid), old_value: old });
+      queued.wake?.();
+      queued.wake = null;
+    },
     push(table, row, txid) {
+      transaction = Math.max(transaction, txid);
       (server[table] ??= []).push(row);
       const queued = live.get(table) ?? { changes: [], wake: null };
       live.set(table, queued);
@@ -127,7 +188,7 @@ function electric(server, schema) {
 }
 
 const SCHEMA = {
-  player_game: { id: { type: "text" }, game_id: { type: "text" }, player_id: { type: "text" }, round: { type: "int4" }, txid: { type: "int8" } },
+  player_game: { id: { type: "text" }, game_id: { type: "text" }, player_id: { type: "text" }, round: { type: "int4" }, done: { type: "bool" }, txid: { type: "int8" } },
   player: { id: { type: "text" }, name: { type: "text" }, txid: { type: "int8" } },
   stat: { id: { type: "text" }, player_id: { type: "text" }, games: { type: "int4" }, rate: { type: "numeric" }, ref: { type: "uuid" }, at: { type: "timestamptz" }, txid: { type: "int8" } },
 };
@@ -136,21 +197,21 @@ const config = (extra = {}) => ({
   appBase: "http://fake/app/",
   tables: ["player_game", "player", "stat"],
   schema: {
-    player_game: { fields: [{ name: "id", type: "string" }, { name: "game_id", type: "string" }, { name: "player_id", type: "string" }, { name: "round", type: "int32" }] },
+    player_game: { fields: [{ name: "id", type: "string" }, { name: "game_id", type: "string" }, { name: "player_id", type: "string", ref: "player" }, { name: "round", type: "int32" }] },
     player: { fields: [{ name: "id", type: "string" }, { name: "name", type: "string" }] },
     stat: { fields: [
-      { name: "id", type: "string" }, { name: "player_id", type: "string" }, { name: "games", type: "int32" },
+      { name: "id", type: "string" }, { name: "player_id", type: "string", ref: "player" }, { name: "games", type: "int32" },
       { name: "rate", type: "decimal", precision: 10, scale: 2 }, { name: "ref", type: "uuid" }, { name: "at", type: "timestamptz" },
     ] },
   },
-  sync: { player_game: "on-demand", player: "on-demand" },
+  read: { player_game: "lazy", player: "lazy" },
   ...extra,
 });
 const world = () => ({
   player_game: [
-    { id: "pg1", game_id: "g1", player_id: "p1", round: "3", txid: "1" },
-    { id: "pg2", game_id: "g1", player_id: "p2", round: "4", txid: "1" },
-    { id: "pg3", game_id: "g2", player_id: "p3", round: "3", txid: "1" },
+    { id: "pg1", game_id: "g1", player_id: "p1", round: "3", done: "true", txid: "1" },
+    { id: "pg2", game_id: "g1", player_id: "p2", round: "4", done: "false", txid: "1" },
+    { id: "pg3", game_id: "g2", player_id: "p3", round: "3", done: "true", txid: "1" },
   ],
   player: [{ id: "p1", name: "Ana", txid: "1" }, { id: "p2", name: "Bia", txid: "1" }, { id: "p3", name: "Cris", txid: "1" }, { id: "p9", name: "Duda", txid: "1" }],
   stat: [
@@ -159,19 +220,255 @@ const world = () => ({
   ],
 });
 
-/** A test of the store over an Electric serving world(), handed both. */
-const onDemand = (name, fn) =>
+for (const [table, id] of [["stat", "s1"], ["player", "p1"]]) {
+  Deno.test({
+    name: `a server-computed join refreshes after an external ${table} deletion`,
+    sanitizeOps: false,
+    sanitizeResources: false,
+    async fn() {
+      const rows = world();
+      const fake = electric(rows, SCHEMA);
+      await withBrowser({
+        fetch: (input, init) => String(input).includes("/crud/stat?")
+          ? Promise.resolve(Response.json(rows.stat.filter(row => rows.player.some(player => player.id === row.player_id))))
+          : fake.fetcher(input, init),
+      }, async createStore => {
+        const cfg = config({ read: { stat: "lazy", player: "lazy", player_game: "lazy" } });
+        cfg.schema.stat.durability = "live";
+        cfg.schema.player.durability = "server";
+        const store = createStore(fake.base, cfg);
+        const opts = { select: "*,player!inner(name)" };
+        const refreshes = [];
+        let visible = [];
+        const stop = store.subscribe("stat", () => {
+          refreshes.push(store.query("stat", null, opts).then(value => { visible = value; }));
+        }, opts);
+        try {
+          visible = await store.query("stat", null, opts);
+          assert(visible.length === 2, "both server rows are initially visible");
+          await until(() => refreshes.length > 0, "invalidation stream established");
+          await tick(30);
+          assert(["stat", "player"].every(name => globalThis.__mechaClient.collections[name].size === 0), "invalidation retains no rows");
+          fake.remove(table, id, 20);
+          await until(() => visible.length === 1, "external delete refreshes the server result");
+          await Promise.all(refreshes);
+          assert(visible[0].id === "s2", "the row removed by the server join is no longer rendered");
+          assert(fake.subsets.length === 0, "server results do not load local query subsets");
+        } finally {
+          stop();
+        }
+      });
+    },
+  });
+}
+
+// A server-computed read re-runs when its own table changes in a row its
+// filter could hold, and not for a write to any other row of that table: a
+// backfill writing every team's matches otherwise re-reads one team's page
+// on each batch. A row leaving the filter, a deleted row, a self-embed and a
+// literal the client cannot state still wake it.
+const serverRead = (name, setup, fn) =>
   Deno.test({
     name,
     sanitizeOps: false,
     sanitizeResources: false,
     async fn() {
-      const fake = electric(world(), SCHEMA);
-      await withBrowser({ fetch: fake.fetcher }, (createStore) => fn({ fake, store: createStore(fake.base, config()) }));
+      const rows = world();
+      const fake = electric(rows, SCHEMA);
+      await withBrowser({
+        fetch: (input, init) => String(input).includes("/crud/stat?")
+          ? Promise.resolve(Response.json(rows.stat.filter(row => row.player_id === "p1")))
+          : fake.fetcher(input, init),
+      }, async createStore => {
+        const cfg = config({ read: { stat: "lazy", player: "lazy", player_game: "lazy" } });
+        cfg.schema.stat.durability = "live";
+        cfg.schema.player.durability = "server";
+        const opts = setup(cfg);
+        const store = createStore(fake.base, cfg);
+        const refreshes = [];
+        const stop = store.subscribe("stat", () => {
+          refreshes.push(store.query("stat", null, opts));
+        }, opts);
+        try {
+          await store.query("stat", null, opts);
+          await until(() => refreshes.length > 0, "invalidation stream established");
+          await Promise.all(refreshes);
+          await tick(30);
+          const woke = async (change, expected, what) => {
+            const before = refreshes.length;
+            change();
+            if (expected) await until(() => refreshes.length > before, what);
+            else {
+              await tick(100);
+              assert(refreshes.length === before, `${what}: ${refreshes.length - before}`);
+            }
+            await Promise.all(refreshes);
+          };
+          await fn(fake, woke);
+        } finally {
+          stop();
+        }
+      });
+    },
+  });
+const stat = (id, player_id, txid) =>
+  ({ id, player_id, games: "1", rate: "1", ref: "0c000000-0000-4000-8000-0000000000cc", at: "2026-09-24 10:00:00+00", txid: String(txid) });
+
+serverRead(
+  "a server-computed read ignores its own table's changes outside its filter",
+  () => ({ filter: "player_id=eq.p1", select: "*,player!inner(name)" }),
+  async (fake, woke) => {
+    await woke(() => fake.push("stat", stat("s3", "p2", 21), 21), false, "another player's stat does not re-read this one's");
+    await woke(() => fake.push("stat", stat("s4", "p1", 22), 22), true, "this player's new stat re-reads the region");
+    await woke(() => fake.update("stat", "s1", { player_id: "p2" }, 23), true, "a row leaving the filter re-reads the region");
+    await woke(() => fake.remove("stat", "s4", 24), true, "a deleted row the filter held re-reads the region");
+  },
+);
+
+serverRead(
+  "a server-computed read whose own table is also its embed wakes for every change of it",
+  (cfg) => {
+    cfg.schema.stat.fields.push({ name: "parent_id", type: "string", ref: "stat" });
+    return { filter: "player_id=eq.p1", select: "*,parent:parent_id(games)" };
+  },
+  async (fake, woke) => {
+    await woke(() => fake.push("stat", stat("s3", "p2", 21), 21), true, "a row outside the filter can be an embedded parent");
+  },
+);
+
+serverRead(
+  "a server-computed read with a literal the client refuses wakes for every change",
+  () => ({ filter: "at=eq.2026-09-24 10:00:00", select: "*,player!inner(name)" }),
+  async (fake, woke) => {
+    await woke(() => fake.push("stat", stat("s3", "p2", 21), 21), true, "Postgres may cast what the client refuses");
+  },
+);
+
+// A guest's document carries the reads it was drawn from, one region's asked
+// and another's not yet; a player renamed meanwhile wakes the first region,
+// and the second, asked after, must read the rename rather than what the
+// document was drawn from.
+Deno.test({
+  name: "a server read's invalidation drops the reads the document carries",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const rows = world();
+    const fake = electric(rows, SCHEMA);
+    const asked = [];
+    const named = (player_id) => rows.stat.filter((row) => row.player_id === player_id)
+      .map((row) => ({ ...row, player: { name: rows.player.find((p) => p.id === row.player_id).name } }));
+    await withBrowser({
+      fetch: (input, init) => {
+        const url = new URL(String(input));
+        if (url.pathname !== "/crud/stat") return fake.fetcher(input, init);
+        asked.push(url.pathname + url.search);
+        return Promise.resolve(Response.json(named(url.searchParams.get("player_id").slice(3))));
+      },
+    }, async (createStore) => {
+      const cfg = config({ read: { stat: "lazy", player: "lazy", player_game: "lazy" } });
+      cfg.schema.stat.durability = "live";
+      cfg.schema.player.durability = "server";
+      const first = { filter: "player_id=eq.p1", select: "*,player!inner(name)" };
+      const second = { filter: "player_id=eq.p2", select: "*,player!inner(name)" };
+      const probe = createStore(fake.base, cfg);
+      await probe.query("stat", null, first);
+      await probe.query("stat", null, second);
+      const [firstKey, secondKey] = asked.splice(0);
+      let inDocument = true;
+      const textContent = JSON.stringify({ [firstKey]: JSON.stringify(named("p1")), [secondKey]: JSON.stringify(named("p2")) });
+      const element = { textContent, remove: () => (inDocument = false) };
+      globalThis.document.getElementById = (id) => id === "pronto-reads" && inDocument ? element : null;
+      globalThis.location = new URL("http://localhost/jogador/p1");
+      sessionStorage.setItem("pronto-token", JSON.stringify({ token: "t", user: { id: "g1", guest: true } }));
+      const store = createStore(fake.base, { ...cfg, mintedGuest: true });
+      const refreshes = [];
+      const stop = store.subscribe("stat", () => refreshes.push(store.query("stat", null, first)), first);
+      try {
+        await store.query("stat", null, first);
+        assert(asked.length === 0, "the first region is answered from the document");
+        await until(() => refreshes.length > 0, "invalidation stream established");
+        await Promise.all(refreshes);
+        await tick(30);
+        const before = refreshes.length;
+        fake.update("player", "p2", { name: "Bia Renomeada" }, 20);
+        await until(() => refreshes.length > before, "the rename wakes the first region");
+        await Promise.all(refreshes);
+        const read = await store.query("stat", null, second);
+        assert(read[0].player.name === "Bia Renomeada", `the second region reads the rename: ${read[0].player.name}`);
+      } finally {
+        stop();
+        sessionStorage.removeItem("pronto-token");
+        delete globalThis.location;
+      }
+    });
+  },
+});
+
+for (const mode of ["eager", "lazy"]) {
+  Deno.test({
+    name: `a registered reverse embed stays server-computed with ${mode} collections`,
+    sanitizeOps: false,
+    sanitizeResources: false,
+    async fn() {
+      const rows = world();
+      const fake = electric(rows, SCHEMA);
+      await withBrowser({ fetch: (input, init) => {
+        const url = new URL(String(input));
+        if (url.pathname === "/crud/player") {
+          assert(url.searchParams.get("id") === "eq.p1", "the server receives the region's predicate");
+          return Promise.resolve(Response.json(rows.player.filter(p => p.id === "p1").map(p => ({
+            ...p, player_game: rows.player_game.filter(g => g.player_id === p.id).map(g => ({ round: g.round })),
+          }))));
+        }
+        return fake.fetcher(input, init);
+      } }, async createStore => {
+        const cfg = config({ read: { player: mode, player_game: mode, stat: mode } });
+        cfg.schema.player.durability = "live";
+        const store = createStore(fake.base, cfg);
+        const opts = { filter: "id=eq.p1", select: "*,player_game(round)" };
+        let visible = await store.query("player", null, opts);
+        assert(Array.isArray(visible[0].player_game) && visible[0].player_game[0].round === "3", "reverse embeds preserve cardinality and values");
+        const refreshes = [];
+        const stop = store.subscribe("player", () => {
+          refreshes.push(store.query("player", null, opts).then(value => { visible = value; }));
+        }, opts);
+        try {
+          await until(() => refreshes.length > 0, "dependency invalidation established");
+          await Promise.all(refreshes);
+          fake.remove("player_game", "pg1", 20);
+          await until(() => visible[0].player_game.length === 0, "child deletion refreshes the reverse embed");
+          await Promise.all(refreshes);
+          assert(fake.subsets.length === 0, "a reverse join loads no local subsets");
+          assert(["player", "player_game"].every(t => globalThis.__mechaClient.collections[t].size === 0), "invalidation retains no snapshots");
+        } finally {
+          stop();
+        }
+      });
+    },
+  });
+}
+
+/** A test of the store over an Electric serving world(), handed both. */
+const lazy = (name, fn, options = {}) =>
+  Deno.test({
+    name,
+    sanitizeOps: false,
+    sanitizeResources: false,
+    async fn() {
+      const fake = electric(options.server ?? world(), options.electricSchema ?? SCHEMA);
+      const online = Object.getOwnPropertyDescriptor(navigator, "onLine");
+      Object.defineProperty(navigator, "onLine", { value: true, configurable: true });
+      try {
+        await withBrowser({ fetch: fake.fetcher }, (createStore) => fn({ fake, store: createStore(fake.base, options.config ?? config()) }));
+      } finally {
+        if (online) Object.defineProperty(navigator, "onLine", online);
+        else delete navigator.onLine;
+      }
     },
   });
 
-onDemand("a view on demand answers only once its subset and its join's are in, and wakes on whole rows", async ({ fake, store }) => {
+lazy("a lazy view answers only once its subset and its join's are in, and wakes on whole rows", async ({ fake, store }) => {
   const opts = { filter: "game_id=eq.g1", select: "*,player(name)" };
   const wakes = [];
   const view = () => [...globalThis.__prontoViews.values()][0].view;
@@ -219,7 +516,79 @@ onDemand("a view on demand answers only once its subset and its join's are in, a
   stop();
 });
 
-onDemand("a typed column's equality is one literal of its type, and no `or`", async ({ fake, store }) => {
+const goalWorld = () => {
+  const rows = world();
+  rows.player = [
+    { id: 1, name: "Ana", txid: "1" }, { id: 2, name: "Bia", txid: "1" },
+    { id: 3, name: "Cris", txid: "1" }, { id: 9, name: "Duda", txid: "1" },
+    { id: 99, name: "Unused", txid: "1" },
+  ];
+  rows.goal = [
+    { id: "goal1", game_id: "match", player_id: 1, minute: "12", txid: "1" },
+    { id: "goal2", game_id: "match", player_id: 2, minute: "31", txid: "1" },
+    { id: "goal3", game_id: "match", player_id: 3, minute: "45", txid: "1" },
+    { id: "goal4", game_id: "match", player_id: 9, minute: "90", txid: "1" },
+  ];
+  return rows;
+};
+const goalSchema = {
+  ...SCHEMA,
+  player: { id: { type: "int4" }, name: { type: "text" }, txid: { type: "int8" } },
+  goal: { id: { type: "text" }, game_id: { type: "text" }, player_id: { type: "int4" }, minute: { type: "int4" }, txid: { type: "int8" } },
+};
+const baseGoalConfig = config();
+const goalConfig = config({
+  tables: ["goal", "player"],
+  schema: {
+    ...baseGoalConfig.schema,
+    player: { fields: [{ name: "id", type: "int32" }, { name: "name", type: "string" }] },
+    goal: { fields: [
+      { name: "id", type: "string" }, { name: "game_id", type: "string" },
+      { name: "player_id", type: "int32", ref: "player" }, { name: "minute", type: "int32" },
+    ] },
+  },
+  read: { goal: "lazy", player: "lazy" },
+});
+
+lazy("join and order indexes on one key retain their distinct types", async ({ store }) => {
+  await store.query("goal", "minute.asc", { filter: "game_id=eq.match", select: "*,player(name)" });
+  await store.query("player", "id.asc", { filter: "id=eq.1&limit=1" });
+  const indexes = [...globalThis.__mechaClient.collections.player.indexes.values()];
+  assert(indexes.some(index => index instanceof BasicIndex), "the join key has its equality index");
+  assert(indexes.some(index => index instanceof BTreeIndex), `the same key also has its ordered index: ${JSON.stringify(indexes.map(index => ({ id: index.id, type: index.constructor.name })))}`);
+}, { server: goalWorld(), electricSchema: goalSchema, config: goalConfig });
+
+lazy("a joined player index is recreated after on-demand collection cleanup", async ({ fake, store }) => {
+  const readGoals = (opts = {}) => store.query("goal", "minute.asc", { filter: "game_id=eq.match", select: "*,player(name)", ...opts });
+  const expected = [["goal1", "Ana"], ["goal2", "Bia"], ["goal3", "Cris"], ["goal4", "Duda"]];
+  const checkRows = (rows, message) => {
+    const actual = rows.map(row => [row.id, row.player?.name]).sort(([a], [b]) => a.localeCompare(b));
+    assert(JSON.stringify(actual) === JSON.stringify(expected), `${message}: ${JSON.stringify(actual)}`);
+  };
+  const checkPlayerSubsets = (subsets, message) => {
+    const expectedIDs = ["1", "2", "3", "9"];
+    assert(subsets.length > 0, `${message}: no player subset was requested`);
+    for (const subset of subsets) {
+      assert(subset.where.includes("ANY"), `${message}: player demand was not keyed: ${JSON.stringify(subset)}`);
+      const ids = subset.params["1"].replace(/[{}\"]/g, "").split(",").sort();
+      assert(JSON.stringify(ids) === JSON.stringify(expectedIDs), `${message}: requested ${JSON.stringify(ids)}`);
+      assert(subset.where.trim() !== "true = true", `${message}: demanded every player`);
+    }
+  };
+  const first = await readGoals();
+  checkRows(first, "the first read joins the four goal scorers");
+  const initialPlayerSubsets = fake.subsets.filter(subset => subset.table === "player");
+  checkPlayerSubsets(initialPlayerSubsets, "the first read asks only for its four referenced players");
+  await tick(5200);
+  assert(globalThis.__mechaClient.collections.player.getIndexMetadata().length === 0, "collection garbage collection removed the join index");
+
+  const second = await readGoals({ current: true });
+  checkRows(second, "the repeated read still joins the four goal scorers");
+  const repeatedPlayerSubsets = fake.subsets.filter(subset => subset.table === "player").slice(initialPlayerSubsets.length);
+  checkPlayerSubsets(repeatedPlayerSubsets, "the repeated read stays scoped to referenced IDs");
+}, { server: goalWorld(), electricSchema: goalSchema, config: goalConfig });
+
+lazy("a typed column's equality is one literal of its type, and no `or`", async ({ fake, store }) => {
   const opts = { filter: "round=eq.3" };
   const stop = store.subscribe("player_game", () => {}, opts);
   const rows = await store.query("player_game", null, opts);
@@ -229,17 +598,55 @@ onDemand("a typed column's equality is one literal of its type, and no `or`", as
   stop();
 });
 
-onDemand("a read whose order is only positional joins the view its subscription opened", async ({ fake, store }) => {
+lazy("a read whose order is only positional joins the view its subscription opened", async ({ fake, store }) => {
   const stop = store.subscribe("player_game", () => {}, { filter: "game_id=eq.g1", order: "round.desc" });
   // Regression: read() looked the view up by opts.order alone, so a read
   // passing its order only as the positional argument missed the view and,
-  // on a table that syncs on demand, was refused as a whole read.
+  // on a table read lazily, was refused as a whole read.
   const rows = await store.query("player_game", "round.desc", { filter: "game_id=eq.g1" });
   assert(JSON.stringify(rows.map((r) => r.id)) === `["pg2","pg1"]`, `the read is the view, ordered: ${JSON.stringify(rows)}`);
   stop();
 });
 
-onDemand("a literal its column cannot hold is a view of no rows, which Electric can state", async ({ fake, store }) => {
+for (const [kind, opts, indexedTable, column] of [
+  ["joined", { filter: "game_id=eq.g1", select: "*,player(name)" }, "player", "id"],
+  ["capped", { filter: "game_id=eq.g1&limit=1", order: "round.desc" }, "player_game", "round"],
+]) {
+  lazy(`a ${kind} demand stays bounded after its source collection is cleaned up`, async ({ fake, store }) => {
+    let stop = store.subscribe("player_game", () => {}, opts);
+    const first = await store.query("player_game", null, opts);
+    const collections = globalThis.__mechaClient.collections;
+    assert(collections[indexedTable].indexes.size === 1, "the first read installs its index");
+    stop();
+    // A renderer's last document can release every source reader. Its next
+    // request reuses the collection after idle GC has discarded the indexes.
+    await Promise.all([collections.player_game.cleanup(), collections.player.cleanup()]);
+    assert(collections[indexedTable].indexes.size === 0, "source cleanup discarded the index");
+    const warnings = [];
+    const savedConsole = globalThis.console;
+    globalThis.console = { ...savedConsole, warn: (...args) => warnings.push(args.join(" ")) };
+    const before = fake.subsets.length;
+    try {
+      stop = store.subscribe("player_game", () => {}, opts);
+      assert(collections[indexedTable].indexes.size === 1, `${column} index is recreated before the next query compiles`);
+      const again = await store.query("player_game", null, opts);
+      assert(JSON.stringify(again) === JSON.stringify(first), "the revisited query returns the same bounded rows");
+      // The revisit answers what the view last held while its subset loads.
+      await until(() => fake.subsets.slice(before).some(s => s.table === "player_game" && s.where === '"game_id" = $1'), "the revisit requests the game's subset");
+      if (kind === "joined") await until(() => collections.player.size > 0, "the revisit loads the game's players");
+      const subsets = fake.subsets.slice(before);
+      assert(subsets.every(s => s.table === "player_game" ? s.where === '"game_id" = $1' : s.where === '"id" = ANY($1)'), "every reopened source requests only matching rows");
+      assert(collections.player_game.size === 2, "the unrelated game's row stays unloaded");
+      if (kind === "joined") assert(collections.player.size === 2, "unrelated players stay unloaded");
+      assert(warnings.length === 0, `no index fallback: ${warnings.join("; ")}`);
+    } finally {
+      stop();
+      globalThis.console = savedConsole;
+    }
+  });
+}
+
+lazy("a literal its column cannot hold is a view of no rows, which Electric can state", async ({ fake, store }) => {
   // What a probe nested under a row with a null foreign key asks for: the
   // placeholder interpolates to the empty string. Regression: sent as the
   // literal, Electric refused to cast it ("invalid syntax for type uuid")
@@ -255,7 +662,7 @@ onDemand("a literal its column cannot hold is a view of no rows, which Electric 
 });
 
 Deno.test({
-  name: "every read that takes an on-demand collection for its table is a program error",
+  name: "folds and validations cannot treat a partial collection as complete",
   sanitizeOps: false,
   sanitizeResources: false,
   async fn() {
@@ -268,30 +675,177 @@ Deno.test({
       const store = createStore(fake.base, config({
         uniques: { player_game: [["game_id", "player_id"]] },
         pipelines: [fold],
-        validations: { stat: { "counted": { src: "v.js", edges: [{ table: "player_game", key: "player_id", from: "player_id" }] } } },
+        validations: { stat: { "counted": { src: "v.js", on: ["insert", "update"], order: {insert: [0, 0], update: [0, 0]}, edges: [{ table: "player_game", key: "player_id", from: "player_id" }] } } },
       }));
       const refused = async (site, run) => {
         try {
           await run();
         } catch (err) {
           assert(err instanceof ProgramError, `${site}: ${err}`);
-          assert(/syncs on demand/.test(err.message), `${site}: ${err.message}`);
+          assert(/reads lazily/.test(err.message), `${site}: ${err.message}`);
           return;
         }
-        throw new Error(`smoke failed: ${site} read an on-demand table whole`);
+        throw new Error(`smoke failed: ${site} read a lazy table whole`);
       };
-      await refused("a snapshot read", () => store.query("player_game", null, { filter: "player_id=ilike.*p*" }));
-      await refused("a whole read", () => store.query("player", null, {}));
-      await refused("a write by key", () => store.write("player_game", [{ key: "pg1", row: { round: 9 } }]));
-      await refused("an upsert", () => store.upsertBy("player_game", { game_id: "g1", player_id: "p1" }));
-      await refused("a delete by filter", () => store.dropWhere("player_game", "game_id=eq.g1"));
       await refused("a fold projection", () => store.query("stat", null, {}));
       await refused("a validation's edge", () => store.add("stat", [{ id: "s2", player_id: "p2", games: 1 }]));
     });
   },
 });
 
-onDemand("a write by key loads the row no view loaded, and a row that does not exist is the collection's own refusal", async ({ fake, store }) => {
+Deno.test({
+  name: "offset paging uses the server even when its other predicates can run locally",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const fake = electric(world(), SCHEMA);
+    const requests = [];
+    await withBrowser({ fetch: (input, init) => {
+      if (String(input).includes("/crud/player_game?")) {
+        requests.push(new URL(input));
+        return Promise.resolve(Response.json([{ id: "server-only" }]));
+      }
+      return fake.fetcher(input, init);
+    } }, async createStore => {
+      const store = createStore(fake.base, config());
+      for (const filter of ["round=eq.3&offset=1&limit=1", "done=is.true&offset=1&limit=1", "player_id=like.p*&offset=1&limit=1"]) {
+        const rows = await store.query("player_game", "id.asc", { filter });
+        assert(rows[0].id === "server-only", "the server applied the page boundary");
+        assert(requests.at(-1).searchParams.get("offset") === "1", "the offset reached the server");
+      }
+      assert(fake.subsets.length === 0, "paging required no local snapshot");
+    });
+  },
+});
+
+Deno.test({
+  name: "an unordered cap reads the complete base and embedded collections",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const fake = electric(world(), SCHEMA);
+    await withBrowser({ fetch: fake.fetcher }, async createStore => {
+      const store = createStore(fake.base, config({ read: {} }));
+      const rows = await store.query("player_game", null, { filter: "game_id=eq.g1&limit=1", select: "*,player(name)" });
+      assert(rows.length === 1 && rows[0].player.name === "Ana", "the cap keeps the joined row");
+      assert(fake.subsets.length === 0, "both collections are eager");
+    });
+  },
+});
+
+for (const operation of ["write", "upsert", "delete"]) {
+  lazy(
+    `an opaque ${operation} waits for complete demand before touching an unseen row`,
+    async ({ fake, store }) => {
+      const opts = { filter: "game_id=eq.g1" };
+      const stop = store.subscribe("player_game", () => {}, opts);
+      await store.query("player_game", null, opts);
+      const collection = globalThis.__mechaClient.collections.player_game;
+      assert(!collection.has("pg3"), "the first screen loaded only its subset");
+      const release = fake.hold("player_game");
+      let done = false;
+      const mutate = () =>
+        operation === "write"
+          ? store.write("player_game", [{ key: "pg3", row: { round: 9 } }])
+          : operation === "upsert"
+          ? store.upsertBy("player_game", { id: "pg3", round: 9 })
+          : store.dropWhere("player_game", "game_id=eq.g2");
+      const pending = mutate().then(() => {
+        done = true;
+      });
+      await until(
+        () => fake.subsets.some((s) => s.where.includes("IS NOT NULL")),
+        "requested complete mutation demand",
+      );
+      await tick(30);
+      assert(
+        !done && !collection.has("pg3"),
+        "the operation waits for the missing rows",
+      );
+      release();
+      await pending;
+      assert(
+        operation === "delete" ? !collection.has("pg3") : collection.get("pg3").round === 9,
+        `the unseen row was mutated: ${JSON.stringify(collection.get("pg3"))}`,
+      );
+      const before = fake.subsets.length;
+      await mutate();
+      assert(
+        fake.subsets.length === before,
+        "repeated mutations reuse complete demand",
+      );
+      stop();
+    },
+  );
+}
+
+lazy(
+  "mutation demand survives a screen releasing its shared view",
+  async ({ fake, store }) => {
+    const opts = { filter: "id=not.is.null" };
+    const stop = store.subscribe("player_game", () => {}, opts);
+    await store.query("player_game", null, opts);
+    await store.write("player_game", [{ key: "pg3", row: { round: 9 } }]);
+    stop();
+    // TanStack collects a view five seconds after its last real subscriber.
+    await tick(5200);
+    fake.push("player_game", {
+      id: "pg4",
+      game_id: "g2",
+      player_id: "p9",
+      round: "7",
+      txid: "20",
+    }, 20);
+    const collection = globalThis.__mechaClient.collections.player_game;
+    await until(
+      () => collection.has("pg4"),
+      "the retained demand received a later row",
+    );
+    await store.dropWhere("player_game", "id=eq.pg4");
+    assert(collection.has("pg3") && !collection.has("pg4"), "the later row is available to a subsequent mutation");
+  },
+);
+
+lazy(
+  "concurrent mutations share complete demand and wait through a transport failure",
+  async ({ fake, store }) => {
+    fake.fail("player_game", [401, { error: "invalid shape token" }]);
+    await Promise.all([
+      store.write("player_game", [{ key: "pg1", row: { round: 8 } }]),
+      store.write("player_game", [{ key: "pg3", row: { round: 9 } }]),
+    ]);
+    assert(
+      globalThis.__prontoViews.size === 1 && fake.subsets.length >= 2,
+      "both writes share the retained view across its retry",
+    );
+    const collection = globalThis.__mechaClient.collections.player_game;
+    assert(
+      collection.get("pg1").round === 8 && collection.get("pg3").round === 9,
+      "both writes landed",
+    );
+  },
+);
+
+lazy(
+  "a refused mutation subset leaves the collection untouched",
+  async ({ fake, store }) => {
+    fake.fail("player_game", [400, REFUSED_BY_ELECTRIC]);
+    const error = await store.write("player_game", [{
+      key: "pg1",
+      row: { round: 9 },
+    }]).then(() => null, (err) => err);
+    assert(
+      error instanceof ProgramError,
+      `the subset refusal reaches the caller: ${error}`,
+    );
+    assert(
+      !globalThis.__mechaClient.collections.player_game.has("pg1"),
+      "no optimistic mutation preceded the refused read",
+    );
+  },
+);
+
+lazy("a write by key loads the row no view loaded, and a row that does not exist is the collection's own refusal", async ({ fake, store }) => {
   // Regression: the key a form or an effect carries need not be a row any
   // view on the screen loaded (a pick from a server-computed list), and
   // TanStack refuses to update a key it does not hold. Resolving is the
@@ -310,7 +864,7 @@ onDemand("a write by key loads the row no view loaded, and a row that does not e
   assert(/passed to update but an object for this key was not found/.test(refusal?.message), `patch of a missing key: ${refusal}`);
 });
 
-onDemand("a read waiting on a view its region released settles, and the region's next subscription reads afresh", async ({ fake, store }) => {
+lazy("a read waiting on a view its region released settles, and the region's next subscription reads afresh", async ({ fake, store }) => {
   const opts = { filter: "game_id=eq.g1" };
   const release = fake.hold("player_game");
   const stop = store.subscribe("player_game", () => {}, opts);
@@ -336,7 +890,7 @@ onDemand("a read waiting on a view its region released settles, and the region's
 const REFUSED_BY_ELECTRIC = { message: "Invalid request", errors: { subset: { where: ["At location 0: unknown reference nope"] } } };
 const REFUSED_BY_GATE = { message: "Invalid request", errors: { subset: { where: ["subset__where is not a predicate a subset may state"] } } };
 
-onDemand("a subset that failed in transit is asked again while the read waits, and only a refusal of the subset itself is a program error", async ({ fake, store }) => {
+lazy("a subset that failed in transit is asked again while the read waits, and only a refusal of the subset itself is a program error", async ({ fake, store }) => {
   const ids = (rows) => JSON.stringify(rows.map((r) => r.id).sort());
   const failure = (p) => p.then(() => null, (err) => err);
   const asked = (filter) => fake.subsets.filter((s) => s.table === "player_game" && s.params["1"] === filter).length;
@@ -379,12 +933,34 @@ onDemand("a subset that failed in transit is asked again while the read waits, a
   stopG2();
 });
 
+lazy("a subset that fails while the page is hidden is asked again once it shows", async ({ fake, store }) => {
+  // Regression: a failure while the page was being left skipped its retry,
+  // and a page the back-forward cache gave back held a view that never
+  // rebuilt, its reads waiting for good.
+  const ids = (rows) => JSON.stringify(rows.map((r) => r.id).sort());
+  const opts = { filter: "game_id=eq.g1" };
+  const stop = store.subscribe("player_game", () => {}, opts);
+  globalThis.dispatchEvent(new Event("pagehide"));
+  try {
+    fake.fail("player_game", [401, { error: "invalid shape token" }]);
+    const read = store.query("player_game", null, opts).then(ids);
+    await until(() => fake.subsets.some((s) => s.table === "player_game" && s.params["1"] === "g1"), "the subset asked while hidden");
+    await new Promise((r) => setTimeout(r, 50));
+    globalThis.dispatchEvent(new Event("pageshow"));
+    const late = new Promise((r) => setTimeout(() => r("never"), 4000));
+    assert((await Promise.race([read, late])) === `["pg1","pg2"]`, "the read of a view that failed while hidden never settled");
+  } finally {
+    globalThis.dispatchEvent(new Event("pageshow"));
+    stop();
+  }
+});
+
 // Regression: every failure that was no refusal rebuilt the view without end,
 // and the read waited on it all the while: an auth service minting nothing, a
 // gate refusing what it minted, or the page's cluster answering in a body the
 // store did not read as a refusal left the region loading for good, the cause
 // on the console alone, where the screen used to say network-error.
-onDemand("a subset that keeps failing fails the read once its rebuilds run out, and the next read asks again", async ({ fake, store }) => {
+lazy("a subset that keeps failing fails the read once its rebuilds run out, and the next read asks again", async ({ fake, store }) => {
   const opts = { filter: "game_id=eq.g1" };
   const stop = store.subscribe("player_game", () => {}, opts);
   const asked = () => fake.subsets.filter((s) => s.table === "player_game" && s.params["1"] === "g1").length;
@@ -398,7 +974,7 @@ onDemand("a subset that keeps failing fails the read once its rebuilds run out, 
   stop();
 });
 
-onDemand("a typed literal is read against its column's own field and compared in canonical form", async ({ fake, store }) => {
+lazy("a typed literal is read against its column's own field and compared in canonical form", async ({ fake, store }) => {
   const read = async (filter) => {
     const stop = store.subscribe("stat", () => {}, { filter });
     try {
@@ -423,20 +999,334 @@ onDemand("a typed literal is read against its column's own field and compared in
   assert(await read("at=neq.2026-09-22 14:18:21.84623+00") === `["s2"]`, "a physical label's neq");
 });
 
-// Regression: the check that an embedded table is read whole ran after the
-// base table's first snapshot, so an eager table embedding an on-demand one
-// raised nothing while its own shape stalled, and the region sat loading
-// where it should have named the program error.
-onDemand("a read embedding a table on demand is a program error before it waits on anything", async ({ fake, store }) => {
+lazy("a whole read demands its embeds while an eager base snapshot is pending", async ({ fake, store }) => {
   const release = fake.stall("stat");
-  try {
-    const failed = await Promise.race([
-      store.query("stat", null, { select: "*,player(name)" }).then(() => null, (err) => err),
-      tick(500).then(() => "still waiting"),
-    ]);
-    assert(failed instanceof ProgramError, `the read failed as the program's error: ${failed}`);
-    assert(/a read of stat embedding it reads player whole/.test(failed.message), `the error names the embed: ${failed.message}`);
-  } finally {
+  const releaseEmbed = fake.hold("player");
+  let answered;
+  const pending = store.query("stat", null, { select: "*,player(name)" }).then(rows => answered = rows);
+  await until(() => fake.subsets.some(s => s.table === "player"), "demanded the embed concurrently");
+  release();
+  await tick(30);
+  assert(answered === undefined, "the base alone cannot answer the join");
+  releaseEmbed();
+  await pending;
+  assert(answered.length === 2 && answered[1].player.name === "Bia", "complete embedded rows arrived");
+  assert(globalThis.__prontoViews.size === 0, "temporary complete demand released");
+});
+
+lazy("a broad reader neither widens nor blocks a concurrent filtered reader", async ({ fake, store }) => {
+  const opts = { filter: "game_id=eq.g1" };
+  const stopSubset = store.subscribe("player_game", () => {}, opts);
+  assert((await store.query("player_game", null, opts)).length === 2, "filtered screen loaded its subset");
+  assert(!globalThis.__mechaClient.collections.player_game.has("pg3"), "unmounted broad screen costs no rows");
+  const release = fake.hold("player_game");
+  const stopWhole = store.subscribe("player_game", () => {});
+  let answered;
+  const pending = store.query("player_game", null).then(rows => answered = rows);
+  await until(() => fake.subsets.some(s => s.where.includes("IS NOT NULL")), "requested complete snapshot");
+  assert((await store.query("player_game", null, opts)).length === 2, "filtered read proceeds while full demand waits");
+  assert(answered === undefined, "ready source is not proof of complete snapshot");
+  release();
+  await pending;
+  assert(answered.length === 3, "broad read includes unseen row");
+  stopWhole();
+  assert(globalThis.__prontoViews.size === 1, "only the subset view remains");
+  assert((await store.query("player_game", null, opts)).length === 2, "release preserves filtered reader");
+  stopSubset();
+  assert(globalThis.__prontoViews.size === 0, "all readers released");
+});
+
+for (const filter of ["game_id=eq.g1", "game_id=ilike.g1", undefined]) {
+  lazy(`a pending ${filter ?? "whole"} read survives its screen leaving past view GC`, async ({ fake, store }) => {
+    const opts = { filter };
+    const release = fake.hold("player_game");
+    const stop = store.subscribe("player_game", () => {}, opts);
+    const pending = store.query("player_game", null, opts);
+    await until(() => fake.subsets.length > 0, "subset pending");
+    stop();
+    await tick(5200);
     release();
-  }
+    const rows = await pending;
+    assert(rows.length === (filter ? 2 : 3), "pending read retained a real listener");
+    assert(globalThis.__prontoViews.size === 0, "read lease released");
+  });
+}
+
+for (const filter of ["game_id=eq.g1", "game_id=ilike.g1"]) {
+  lazy(`a named ${filter} read releases its temporary demand on success and refusal`, async ({ fake, store }) => {
+    fake.fail("player_game", [400, { errors: { subset: ["predicate rejected"] } }]);
+    const error = await store.query("player_game", null, { filter }).then(() => null, err => err);
+    assert(error instanceof ProgramError, "subset refusal reaches caller");
+    assert(globalThis.__prontoViews.size === 0, "failed named demand released");
+    assert((await store.query("player_game", null, { filter })).length === 2, "next named demand succeeds");
+    assert(globalThis.__prontoViews.size === 0, "successful named demand released");
+  });
+}
+
+// A boolean filter reads through the snapshot path, and a snapshot read of an
+// lazy table once demanded the whole table: GolAberto's chances screen,
+// filtered by group and current=is.true, pulled every position_chance row.
+for (const filter of ["game_id=eq.g1&done=is.true", "done=is.true&game_id=eq.g1&limit=5"]) {
+  lazy(`a boolean-filtered read ${filter} demands only the rows its stated clauses bound`, async ({ fake, store }) => {
+    let wakes = 0;
+    const stop = store.subscribe("player_game", () => wakes++, { filter });
+    const rows = await store.query("player_game", null, { filter });
+    assert(rows.length === 1 && rows[0].id === "pg1", `boolean predicate applied locally: ${JSON.stringify(rows)}`);
+    assert(fake.subsets.length > 0 && fake.subsets.every(s => s.table === "player_game" && s.where.trim() === '"game_id" = $1'),
+      `only the group's subset demanded: ${JSON.stringify(fake.subsets)}`);
+    assert(globalThis.__mechaClient.collections.player_game.size === 2, "the other game's rows never loaded");
+    stop();
+  });
+}
+
+lazy("a snapshot subscription holds notifications until all embedded demand is complete", async ({ fake, store }) => {
+  const release = fake.hold("player");
+  const opts = { filter: "game_id=eq.g1&limit=1", select: "*,player(name)" };
+  let wakes = 0;
+  const stop = store.subscribe("player_game", () => wakes++, opts);
+  let answered;
+  const pending = store.query("player_game", null, opts).then(rows => answered = rows);
+  await until(() => globalThis.__mechaClient.collections.player_game.size === 2, "the base's stated subset loaded");
+  await tick(30);
+  assert(wakes === 0 && answered === undefined, "no half-joined wake or answer");
+  release();
+  await pending;
+  await until(() => wakes > 0, "complete snapshot wake released");
+  assert(answered.length === 1 && answered[0].player.name === "Ana", "unordered cap keeps its joined row");
+  // An unordered cap is a snapshot read, which once demanded both tables whole.
+  assert(fake.subsets.every(s => s.table === "player" ? s.where.trim() === '"id" = ANY($1)' : s.where.trim() === '"game_id" = $1'),
+    `the base demanded its stated subset and the embed only its joined rows: ${JSON.stringify(fake.subsets)}`);
+  assert(globalThis.__mechaClient.collections.player.size === 2, "the unjoined players never loaded");
+  stop();
+});
+
+lazy("a capped free-text order demands completeness before sorting locally", async ({ fake, store }) => {
+  const rows = await store.query("player", "name.desc", { filter: "id=not.is.null&limit=1" });
+  assert(rows.length === 1 && rows[0].name === "Duda", "local collation and cap applied");
+  const optionOrder = await store.query("player", null, { order: "name.desc", filter: "id=not.is.null&limit=1" });
+  assert(optionOrder.length === 1 && optionOrder[0].name === "Duda", "options order survives snapshot routing");
+  assert(fake.subsets.length > 0 && fake.subsets.every(s => s.where.includes("IS NOT NULL")), `no server collation cursor: ${JSON.stringify(fake.subsets)}`);
+});
+
+Deno.test({
+  name: "unsupported predicate carriers and joined keys demand complete snapshots without typed equality",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const rows = world();
+    rows.player = [{ id: "1", name: "Ana", txid: "1" }, { id: "2", name: "Bia", txid: "1" }];
+    rows.stat[0].player_id = "1";
+    rows.stat[1].player_id = "2";
+    const fake = electric(rows, { ...SCHEMA, player: { ...SCHEMA.player, id: { type: "int8" } } });
+    const cfg = config({ read: { stat: "lazy", player: "lazy" } });
+    cfg.schema.player.fields[0].type = "int64";
+    await withBrowser({ fetch: fake.fetcher }, async createStore => {
+      const store = createStore(fake.base, cfg);
+      const selected = await store.query("stat", null, { filter: "rate=eq.1.5", select: "*,player(name)" });
+      assert(selected.length === 1 && selected[0].player.name === "Ana", "domain predicate uses carrier comparison");
+      const joined = await store.query("stat", null, { filter: "id=eq.s2", select: "*,player(name)" });
+      assert(joined.length === 1 && joined[0].player.name === "Bia", "unsupported joined key uses complete embed");
+      assert(fake.subsets.every(s => s.table === "stat" || s.where.includes("IS NOT NULL")), "no unsafe equality sent to Electric");
+      assert(fake.subsets.every(s => !s.where.includes('"rate" =')), "no decimal equality sent to Electric");
+      assert(globalThis.__prontoViews.size === 0, "snapshot demands released");
+    });
+  },
+});
+
+for (const mode of ["eager", "lazy"]) {
+  Deno.test({
+    name: `${mode} typed queries preserve canonical equality, nulls and invalid literals`,
+    sanitizeOps: false,
+    sanitizeResources: false,
+    async fn() {
+      const rows = world();
+      rows.stat.push({ ...rows.stat[0], id: "null", rate: null, ref: null });
+      const fake = electric(rows, SCHEMA);
+      await withBrowser({ fetch: fake.fetcher }, async createStore => {
+        const store = createStore(fake.base, config({ read: { stat: mode } }));
+        // A decimal cannot be sent in an Electric subset: the complete
+        // snapshot must compare its literals exactly as an eager view does.
+        const cases = [
+          ["rate=eq.1.50", ["s1"]],
+          ["rate=neq.1.50", ["s2"]],
+          ["rate=eq.1.555", []],
+          ["rate=neq.1.555", ["s1", "s2"]],
+          ["rate=neq.1.555&ref=eq.0C000000-0000-4000-8000-0000000000AA", ["s1"]],
+          ["rate=neq.1.555&ref=eq.invalid", []],
+          ["rate=neq.1.555&ref=neq.invalid", ["s1", "s2"]],
+        ];
+        for (const [filter, expected] of cases) {
+          const opts = { filter };
+          const stop = store.subscribe("stat", () => {}, opts);
+          try {
+            const ids = (await store.query("stat", null, opts)).map(row => row.id).sort();
+            assert(JSON.stringify(ids) === JSON.stringify(expected), `${mode} ${filter}: ${JSON.stringify(ids)}`);
+          } finally { stop(); }
+        }
+        let wakes = 0;
+        const opts = { filter: "rate=eq.1.50" };
+        const stop = store.subscribe("stat", () => { wakes++; }, opts);
+        try {
+          await store.query("stat", null, opts);
+          await tick(30);
+          wakes = 0;
+          fake.push("stat", { ...rows.stat[0], id: "s3", rate: "1.50", txid: "20" }, 20);
+          await until(() => wakes > 0, "a canonical-equivalent external row wakes the query");
+          const ids = (await store.query("stat", null, opts)).map(row => row.id).sort();
+          assert(JSON.stringify(ids) === '["s1","s3"]', `the refreshed query includes the new row: ${JSON.stringify(ids)}`);
+        } finally { stop(); }
+      });
+    },
+  });
+}
+
+for (const mode of ["eager", "lazy"]) {
+  Deno.test({
+    name: `${mode} JSON scalar snapshots preserve queries and external wakes`,
+    sanitizeOps: false,
+    sanitizeResources: false,
+    async fn() {
+      const rows = world();
+      rows.stat[0].payload = "1";
+      rows.stat[1].payload = "true";
+      const fake = electric(rows, { ...SCHEMA, stat: { ...SCHEMA.stat, payload: { type: "json" } } });
+      const cfg = config({ read: { stat: mode } });
+      cfg.carriers = { ...FIXTURE_CARRIERS, types: { ...FIXTURE_CARRIERS.types, json: {
+        pg: "json", column: "checked", subset: false, base: ["json", "jsonb"], json: "value", order: "none", beyond: ["scalar-values", "finite-numbers"],
+      } } };
+      cfg.schema.stat.fields.push({ name: "payload", type: "json" });
+      await withBrowser({ fetch: fake.fetcher }, async createStore => {
+        const store = createStore(fake.base, cfg);
+        // A canonical JSON literal stays text; synced scalars are numbers
+        // and booleans, so snapshot predicates keep their text comparison.
+        for (const [filter, expected] of [
+          ["payload=eq.1&id=like.*", ["s1"]],
+          ["payload=eq.true&id=like.*", ["s2"]],
+          ["payload=neq.1&id=like.*", ["s2"]],
+        ]) {
+          const ids = (await store.query("stat", null, { filter })).map(row => row.id).sort();
+          assert(JSON.stringify(ids) === JSON.stringify(expected), `${mode} ${filter}: ${JSON.stringify(ids)}`);
+        }
+        const watches = [
+          { filter: "payload=eq.1&id=like.*", payload: "1", source: rows.stat[0], id: "s3", expected: ["s1", "s3"], wakes: 0 },
+          { filter: "payload=eq.true&id=like.*", payload: "true", source: rows.stat[1], id: "s4", expected: ["s2", "s4"], wakes: 0 },
+        ];
+        const stops = watches.map(w => store.subscribe("stat", () => { w.wakes++; }, { filter: w.filter }));
+        try {
+          await Promise.all(watches.map(w => store.query("stat", null, { filter: w.filter })));
+          await tick(30);
+          for (const w of watches) w.wakes = 0;
+          for (const [i, w] of watches.entries()) fake.push("stat", { ...w.source, id: w.id, payload: w.payload, txid: String(20 + i) }, 20 + i);
+          await until(() => watches.every(w => w.wakes > 0), "matching external JSON scalars wake their snapshot queries");
+          for (const w of watches) {
+            const ids = (await store.query("stat", null, { filter: w.filter })).map(row => row.id).sort();
+            assert(JSON.stringify(ids) === JSON.stringify(w.expected), `${mode} refreshed ${w.filter}: ${JSON.stringify(ids)}`);
+          }
+        } finally { for (const stop of stops) stop(); }
+      });
+    },
+  });
+}
+
+Deno.test({
+  name: "server durability reads filtered joins on request without opening Electric",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const requests = [];
+    let rows = [{ id: "pg1", game_id: "g1", player: { name: "Ana" } }];
+    await withBrowser({ fetch: async (input, init) => {
+      const url = new URL(String(input));
+      if (servers.has(url.origin)) return servers.get(url.origin)(input, init);
+      assert(url.origin === "http://request-only", `unexpected request origin: ${url.origin}`);
+      requests.push(url);
+      assert(url.pathname === "/crud/player_game", "a server read opened neither auth nor Electric");
+      return Response.json(rows);
+    } }, async createStore => {
+      const cfg = config();
+      cfg.schema.player_game.durability = "server";
+      const store = createStore("http://request-only", cfg);
+      const opts = { filter: "game_id=eq.g1&limit=40&offset=0", select: "*,player(name)", order: "round.desc" };
+      let wakes = 0;
+      const stop = store.subscribe("player_game", () => wakes++, opts);
+      try {
+        assert((await store.query("player_game", null, opts))[0].player.name === "Ana", "joined server result");
+        assert(requests.length === 1, "only the requested read");
+        assert(requests[0].searchParams.get("game_id") === "eq.g1", "filter reaches server");
+        assert(requests[0].searchParams.get("order") === "round.desc", "order reaches server");
+        rows = [];
+        await tick(30);
+        assert(wakes === 0 && requests.length === 1, `remote changes do not trigger a request-only read: ${wakes} wakes, ${requests.map(String).join(", ")}`);
+        assert((await store.query("player_game", null, opts)).length === 1, "a read again answers what the tab read");
+        await until(() => wakes === 1, "the rows the refresh behind it brought wake the reader");
+        assert(requests.length === 2, `one refresh: ${requests.map(String).join(", ")}`);
+        assert((await store.query("player_game", null, opts)).length === 0, "the woken read is what moved");
+        assert(globalThis.__prontoViews.size === 0, "request-only reads create no local views");
+        assert(globalThis.__mechaClient.collections.player_game.size === 0, "request-only reads retain no rows");
+      } finally { stop(); }
+    });
+  },
+});
+
+Deno.test({
+  name: "a completed local command refreshes a server read that began before it",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    let releaseRead;
+    const reading = new Promise(resolve => { releaseRead = resolve; });
+    let calls = 0;
+    let committed = [];
+    let finishWrite;
+    await withBrowser({ fetch: async (input, init) => {
+      assert(String(input).startsWith("http://settled/crud/player_game"), "server commands open no remote subscription");
+      if (init?.method === "POST") {
+        await new Promise(resolve => { finishWrite = resolve; });
+        committed = JSON.parse(init.body);
+        return Response.json(committed);
+      }
+      const snapshot = [...committed];
+      if (++calls === 1) await reading;
+      return Response.json(snapshot);
+    } }, async createStore => {
+      const cfg = config();
+      cfg.schema.player_game.durability = "server";
+      const store = createStore("http://settled", cfg);
+
+      let refreshed;
+      const stop = store.subscribe("player_game", () => { refreshed = store.query("player_game"); });
+      try {
+        const first = store.query("player_game");
+        const write = store.add("player_game", [{ id: "pg1", game_id: "g1", player_id: "p1", round: 1 }]);
+        await until(() => finishWrite !== undefined, "local command started");
+        assert(calls === 1 && refreshed === undefined, "an unfinished command does not refresh");
+        finishWrite();
+        await write;
+        await until(() => refreshed !== undefined, "command completion requests a new read");
+        assert((await refreshed)[0].id === "pg1", "refresh includes committed result");
+        releaseRead();
+        assert((await first).length === 0, "the overlapping read held the old snapshot");
+        assert(calls === 2, "one initial read and one completion refresh");
+      } finally { releaseRead(); stop(); }
+    });
+  },
+});
+
+Deno.test({
+  name: "server reads of absent optional references are empty without an invalid UUID request",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    await withBrowser({ fetch: () => { throw new Error("an impossible typed equality reached the network"); } }, async createStore => {
+      const cfg = config();
+      cfg.schema.stat.durability = "server";
+      cfg.carriers = { ...FIXTURE_CARRIERS, types: { ...FIXTURE_CARRIERS.types,
+        uuid: { ...FIXTURE_CARRIERS.types.uuid, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+      } };
+      const store = createStore("http://optional-reference", cfg);
+      for (const filter of ["ref=eq.", "ref=eq.not-a-uuid", "games=eq.invalid"]) {
+        assert((await store.query("stat", null, { filter })).length === 0, filter);
+      }
+    });
+  },
 });

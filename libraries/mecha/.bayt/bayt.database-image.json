@@ -31,6 +31,46 @@
         "exclude": []
       },
       {
+        "from": null,
+        "srcs": [
+          "services/ticker/schedule.sql"
+        ],
+        "dst": "/usr/share/mecha/initdb/800_schedule.sql",
+        "link": true,
+        "parents": false,
+        "exclude": []
+      },
+      {
+        "from": null,
+        "srcs": [
+          "services/airlock/graphile.sql"
+        ],
+        "dst": "/usr/share/mecha/initdb/011_graphile_worker.sql",
+        "link": true,
+        "parents": false,
+        "exclude": []
+      },
+      {
+        "from": null,
+        "srcs": [
+          "services/airlock/airlock.sql"
+        ],
+        "dst": "/usr/share/mecha/initdb/012_airlock.sql",
+        "link": true,
+        "parents": false,
+        "exclude": []
+      },
+      {
+        "from": null,
+        "srcs": [
+          "services/database/role_passwords.sh"
+        ],
+        "dst": "/usr/share/mecha/initdb/899_role_passwords.sh",
+        "link": true,
+        "parents": false,
+        "exclude": []
+      },
+      {
         "from": {
           "name": "ghcr.io/xataio/pgroll:v0.16.3@sha256:aca5425285691ed78079196c1629de039e7d7b795773b1ff63e1419d79dbd830"
         },
@@ -54,6 +94,11 @@
         "exclude": []
       }
     ],
+    "epilogue": [
+      "RUN for step in /usr/share/mecha/initdb/*.sh; do bash -n \"$step\"; done",
+      "RUN cat /usr/share/mecha/initdb/800_schedule.sql /usr/share/mecha/initdb/012_airlock.sql > /tmp/airlock.sql && mv /tmp/airlock.sql /usr/share/mecha/initdb/012_airlock.sql",
+      "RUN rm /var/lib/postgresql/data && install -d -o postgres -g postgres /var/lib/postgresql/data"
+    ],
     "cmd": [
       "postgres",
       "-c",
@@ -73,7 +118,6 @@
     "mounts": [],
     "secrets": {},
     "extra_hosts": [],
-    "epilogue": [],
     "healthcheck": null,
     "expose": [],
     "entrypoint": null,
@@ -86,7 +130,10 @@
   "srcs": {
     "globs": [
       "services/database/rls/rls.sql",
+      "services/database/role_passwords.sh",
       "services/ticker/schedule.sql",
+      "services/airlock/graphile.sql",
+      "services/airlock/airlock.sql",
       "services/migrate/migrate.sh"
     ],
     "exclude": []
@@ -115,7 +162,8 @@
           ".bayt/Dockerfile.database-image",
           ".bayt/bayt.database-image.json",
           ".bayt/Taskfile.yml",
-          ".bayt/Taskfile.bayt.yml"
+          ".bayt/Taskfile.bayt.yml",
+          ".bayt/process-compose.yaml"
         ],
         "exclude": []
       },
@@ -174,7 +222,10 @@
       "outs": {
         "globs": [
           "services/database/rls/rls.sql",
+          "services/database/role_passwords.sh",
           "services/ticker/schedule.sql",
+          "services/airlock/graphile.sql",
+          "services/airlock/airlock.sql",
           "services/migrate/migrate.sh"
         ],
         "exclude": []

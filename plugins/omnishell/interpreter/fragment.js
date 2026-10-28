@@ -12,6 +12,25 @@ export const PLACEHOLDER = /\{([\w.]+(?:\[\w+\])?)\}/;
 /** The same grammar over a whole text. */
 export const PLACEHOLDERS = new RegExp(PLACEHOLDER.source, "g");
 
+/** The attributes the browser fetches the moment an element is in the
+ * document. */
+const LOADS = ["src", "srcset", "poster"];
+
+/** A child region binds after its parent's row is in the document, so a URL
+ * it has yet to bind would be fetched as written — `{image_url}`, a 404 on the
+ * console. Its template waits in the stash the binding reads
+ * (screen.js's bindElementAttributes), and the attribute is set when the region binds. */
+export function holdUnboundLoads(root) {
+  for (const el of [root, ...root.querySelectorAll(LOADS.map((a) => `[${a}]`).join(","))]) {
+    for (const name of LOADS) {
+      const value = el.getAttribute(name);
+      if (value === null || !PLACEHOLDER.test(value)) continue;
+      (el._prontoAttrs ??= {})[name] = value;
+      el.removeAttribute(name);
+    }
+  }
+}
+
 /** What `binding` answers for a key the row does not carry: the caller's to
  * judge, since a pending optimistic row and a seed are allowed to lack one. */
 export const ABSENT = Symbol("absent");
@@ -79,8 +98,12 @@ export function parseFilterSpec(filter) {
     const col = part.slice(0, eq);
     const expr = part.slice(eq + 1);
     // A cap is not a predicate: parseLimit reads it, and both read paths
-    // apply it after ordering.
+    // apply it after ordering. Offset stays the server's (routeOf).
     if (col === "limit" && /^\d+$/.test(expr)) continue;
+    if (col === "offset" && /^\d+$/.test(expr)) {
+      spec.push({ col: "offset", op: "offset", value: expr });
+      continue;
+    }
     if (col.includes(".")) return null; // embed-path filter — server-computed
     if (expr.startsWith("eq.")) spec.push({ col, op: "eq", value: decodeURIComponent(expr.slice(3)) });
     else if (expr.startsWith("neq.")) spec.push({ col, op: "neq", value: decodeURIComponent(expr.slice(4)) });
@@ -125,6 +148,8 @@ export function parseFilterSpec(filter) {
 export function routeOf(spec, embeds, limit) {
   // null is "server-computed", never "nothing to do" — for both of these.
   if (spec === null || embeds === null) return "server";
+  // Paging over a set that is still arriving is a different question: offset stays the server's.
+  if (spec.some((s) => s.op === "offset")) return "server";
   // A boolean the schema defaults is absent on an unconfirmed optimistic row,
   // which the snapshot predicate admits and a column comparison would not.
   if (spec.some((s) => s.op === "true" || s.op === "false")) return "snapshot";
@@ -334,6 +359,25 @@ export function parseFilter(filter, compare = () => undefined) {
     if (op === "eq") return (row) => String(row[col]) === value;
     if (op === "neq") return (row) => String(row[col]) !== value;
     if (op === "like" || op === "ilike") {
+      const isCollation =
+        col === "search_key" ||
+        col === "search_name" ||
+        col.endsWith("_search_key") ||
+        col.endsWith("_search_name");
+      if (isCollation) {
+        const fold = (s) =>
+          String(s ?? "")
+            .normalize("NFD")
+            .replace(/\p{Diacritic}/gu, "")
+            .toLowerCase()
+            .replaceAll("ı", "i")
+            .replaceAll("þ", "th")
+            .replaceAll("Þ", "th")
+            .replaceAll("æ", "ae")
+            .replaceAll("Æ", "ae");
+        const re = new RegExp(`^${likeSource(fold(value))}$`, "s");
+        return (row) => row[col] != null && re.test(fold(row[col]));
+      }
       const re = new RegExp(`^${likeSource(value)}$`, op === "ilike" ? "is" : "s");
       return (row) => row[col] != null && re.test(String(row[col]));
     }
@@ -343,6 +387,7 @@ export function parseFilter(filter, compare = () => undefined) {
     // unconfirmed row must not hide it (the offline-captured note has to
     // render on the wall). Synced rows always carry every column.
     if (op === "false") return (row) => row[col] === false || (row.$synced === false && row[col] === undefined);
+    if (op === "offset") return () => true;
     if (op === "null") return (row) => row[col] == null;
     if (op === "notnull") return (row) => row[col] != null;
     if (op === "lt") return ordered(col, value, (d) => d < 0);
@@ -606,6 +651,11 @@ export function directionOf(tag) {
  * guard. */
 export class ProgramError extends Error {}
 
+/** A file the server did not answer: nothing arrived, or a server failed it,
+ * as a door does mid-deploy (a 5xx). An outage rather than a program: asked
+ * again, it may answer. */
+export class Unanswered extends Error {}
+
 // A data-order whose closed map is malformed, or whose column named an order
 // the map does not carry.
 export class OrderError extends ProgramError {}
@@ -660,7 +710,7 @@ export function routePattern(route, locale) {
  * what the renderer's URL check gives for a refused one: a reader's data must
  * not take the screen down. A NAME the app got wrong still throws, because
  * that is the author's mistake and no row can fix it. */
-export function routeHref(cfg, screen, params, locale) {
+export function routeHref(cfg, screen, params, locale, { explicitLocale = false } = {}) {
   const route = cfg.routes?.find((r) => r.screen === screen);
   if (route === undefined) throw new ProgramError(`data-route names "${screen}", which is no route of this app`);
   const pattern = routePattern(route, locale);
@@ -684,10 +734,24 @@ export function routeHref(cfg, screen, params, locale) {
   });
   if (unaddressed) return undefined;
   // An app declaring no locales has one language and no prefixes at all.
-  if (cfg.i18n === undefined || locale === cfg.i18n.default) return mounted(cfg, filled);
+  if (cfg.i18n === undefined) return mounted(cfg, filled);
+  if (locale === cfg.i18n.default) {
+    return mounted(cfg, explicitLocale ? `${filled}?lang=${encodeURIComponent(locale)}` : filled);
+  }
   const declared = localeTable(cfg.i18n)[locale];
   if (declared === undefined) throw new ProgramError(`locale "${locale}" is not one this app declares`);
   return mounted(cfg, `/${declared.path}${filled === "/" ? "" : filled}`);
+}
+
+/** The data-param-<name> values an element carries. Read off the attributes
+ * rather than the dataset, so a :param spelled `note_id` survives the
+ * camel-casing the dataset would impose on it. */
+export function routeParams(el) {
+  const out = {};
+  for (const attr of el.attributes ?? []) {
+    if (attr.name.startsWith("data-param-")) out[attr.name.slice("data-param-".length)] = attr.value;
+  }
+  return out;
 }
 
 /** An app address under the path the app is mounted at (cfg.prefix), where it
@@ -721,18 +785,462 @@ export function mounted(cfg, href) {
  * types them — the harness knows its Unit, the shell knows its Route — and this
  * only decides WHICH fields travel, not what they hold.
  *
- * @param {{units?: any, routes?: any, i18n?: any, schema?: any} | undefined} cfg
+ * @param {{hostDom?: any, units?: any, kinetic?: any, routes?: any, i18n?: any, schema?: any} | undefined} cfg
  * @param {T} [over]
- * @returns {{units: any, routes: any, i18n: any, schema: any} & T}
+ * @returns {{hostDom: any, units: any, kinetic: any, routes: any, i18n: any, schema: any} & T}
  */
 export function screenEnv(cfg, over = /** @type {T} */ ({})) {
   return {
+    hostDom: cfg?.hostDom ?? {},
     units: cfg?.units ?? {},
+    kinetic: cfg?.kinetic ?? {},
     routes: cfg?.routes,
     i18n: cfg?.i18n,
     schema: cfg?.schema,
     prefix: cfg?.prefix,
     endowments: cfg?.endowments,
+    iceServers: cfg?.iceServers,
     ...over,
   };
+}
+
+
+// Route patterns may contain :name segments, each matching exactly one
+// non-empty path segment; matched values arrive decoded as route params. The
+// query string is folded in under its own names, so `?q=x` reaches a screen as
+// {param.q}.
+function matchRoute(pattern, path) {
+  const [cleanPath, queryString] = path.split("?");
+  const ps = pattern.split("/");
+  const xs = cleanPath.split("/");
+  if (ps.length !== xs.length) return null;
+  const params = {};
+  // The query is read FIRST so the pattern's own captures land over it: a
+  // :param is part of the address and a query is what rode along beside it, so
+  // /note/7?id=9 is note 7. Refusing the pair instead would let any pasted URL
+  // take the screen down, which is not a visitor's to do.
+  if (queryString) {
+    for (const [k, v] of new URLSearchParams(queryString)) params[k] = v;
+  }
+  for (let i = 0; i < ps.length; i++) {
+    if (ps[i].startsWith(":") && xs[i]) params[ps[i].slice(1)] = decodeURIComponent(xs[i]);
+    else if (ps[i] !== xs[i]) return null;
+  }
+  return params;
+}
+
+/** An address without the path the app is mounted under, where it is mounted
+ * under one (cfg.prefix): a project site serves it at /<repo>/, and the routes
+ * are written from the root. routeHref puts the prefix back. */
+function unprefixed(cfg, pathname) {
+  const prefix = cfg.prefix ?? "";
+  if (prefix === "" || pathname === prefix) return prefix === "" ? pathname : "/";
+  return pathname.startsWith(`${prefix}/`) ? pathname.slice(prefix.length) : pathname;
+}
+
+export function acceptedLanguages(header = '') {
+  return header.split(',')
+    .map(value => { const [tag, q = 'q=1'] = value.trim().split(';'); return { tag: tag.trim(), q: Number(q.trim().replace(/^q\s*=\s*/, '')) }; })
+    .filter(({ tag, q }) => tag && Number.isFinite(q) && q > 0 && q <= 1)
+    .sort((a, b) => b.q - a.q).map(({ tag }) => tag);
+}
+
+/** The language an address is in, and what is left of it once a locale prefix
+ * is taken off. Separate from routeAt because the chrome is drawn before any
+ * route is mounted — the gate, the strip — and has to ask the same resolution
+ * order: a second order is how an address and a screen come to disagree. */
+export function localeAt(cfg, pathname, search, preferred) {
+  // Segment -> tag, so the first segment is asked of a map rather than guessed
+  // from the shape of the word: anything the app does not declare is already a
+  // slug of the default language.
+  const byPath = localeByPath(cfg.i18n);
+  const [, first, ...rest] = unprefixed(cfg, pathname).split("/");
+  const prefixed = Object.hasOwn(byPath, first);
+  const path = prefixed ? byPath[first] : undefined;
+  const query = new URLSearchParams(search).get("lang") ?? undefined;
+  return {
+    rel: prefixed ? `/${rest.join("/")}` : unprefixed(cfg, pathname),
+    path,
+    query,
+    // One resolver, so a row and an address cannot disagree about the language
+    // a screen is in. navigator.languages is the browser's Accept-Language,
+    // and loses to anything the reader was handed.
+    locale: resolveLocale(cfg.i18n, { path, query, preferred }),
+    // The language the ADDRESS is written in, which only the prefix decides:
+    // /regras is Portuguese whatever ?lang= asks for, and the ask is honoured
+    // by redirecting to /es/reglas rather than by matching it here.
+    written: path ?? cfg.i18n?.default,
+  };
+}
+
+/** What an address says, or null where it names no screen. The locale is part
+ * of the answer: the first render is then correct rather than corrected, and
+ * the screen never discovers its own language. `preferred` is the browser's
+ * Accept-Language, passed in so this function decides nothing from ambient
+ * state and can be asked about an address the terminal is not at. */
+export function routeAt(cfg, pathname, search, preferred) {
+  const { rel, path, query, locale, written } = localeAt(cfg, pathname, search, preferred);
+  for (const r of cfg.routes) {
+    const params = matchRoute(routePattern(r, written), rel + search);
+    if (params === null) continue;
+    // `lang` is the wire's name for a locale and dies at this boundary;
+    // `locale` is the model's. It is set only where the ADDRESS decided — a
+    // prefix, or a ?lang= naming a locale the app declares — which is what
+    // leaves a row free to decide on a plain route, and what keeps an app
+    // declaring no locales at all from carrying the key.
+    delete params.lang;
+    if (path !== undefined || (query !== undefined && locale === query)) params.locale = locale;
+    return { route: r, params, locale, written };
+  }
+  return null;
+}
+
+export const COALESCE_CONTROLS = new Set(["select", "order", "limit", "offset"]);
+const COALESCE_AGGREGATE = /\b(?:count|sum|avg|max|min)\(\)/;
+const PROGRESSIVE_READ_PREFIX = "<!--pronto-read:";
+const PROGRESSIVE_READ_SUFFIX = "-->";
+
+export function progressiveReadsComment(reads) {
+  if (reads.size === 0) return "";
+  const json = JSON.stringify(Object.fromEntries(reads))
+    .replace(/--/g, "\\u002d\\u002d")
+    .replace(/>/g, "\\u003e");
+  return `${PROGRESSIVE_READ_PREFIX}${json}${PROGRESSIVE_READ_SUFFIX}`;
+}
+
+export function takeProgressiveReads(buf) {
+  const reads = new Map();
+  let cursor = 0;
+  for (;;) {
+    const start = buf.indexOf(PROGRESSIVE_READ_PREFIX, cursor);
+    if (start < 0) break;
+    const end = buf.indexOf(PROGRESSIVE_READ_SUFFIX, start + PROGRESSIVE_READ_PREFIX.length);
+    if (end < 0) {
+      return { reads, rest: buf.slice(start) };
+    }
+    const obj = JSON.parse(buf.slice(start + PROGRESSIVE_READ_PREFIX.length, end));
+    for (const [k, v] of Object.entries(obj)) reads.set(k, v);
+    cursor = end + PROGRESSIVE_READ_SUFFIX.length;
+  }
+  const tailStart = Math.max(cursor, buf.length - PROGRESSIVE_READ_PREFIX.length);
+  return { reads, rest: buf.slice(tailStart) };
+}
+
+export function stripProgressiveReads(html) {
+  return html.replace(/<!--pronto-read:[\s\S]*?-->/g, "");
+}
+
+const TXID = { name: "txid", type: "int64" };
+
+/** The value order of one table's columns, for parseFilter and compareBy:
+ * undefined for a column the schema does not type. The comparator is the
+ * store's, bound to the carrier table the shell was served.
+ *
+ * @param {(field: object, a: unknown, b: unknown) => number | void} compare
+ *
+ * @returns {(col: string, a: unknown, b: unknown) => number | undefined}
+ */
+export function columnOrder(compare, fields = []) {
+  const byName = new Map(fields.map((f) => [f.name, f]));
+  byName.set(TXID.name, TXID);
+  return (col, a, b) => {
+    const field = byName.get(col);
+    return field === undefined ? undefined : compare(field, a, b);
+  };
+}
+
+/** @param {(col: string, a: unknown, b: unknown) => number | undefined} [compare] */
+export function compareBy(order, compare = () => undefined) {
+  const keys = (order ?? "").split(",").filter(Boolean).map((k) => {
+    const [col, dir, mod] = k.split(".");
+    const sign = dir === "desc" ? -1 : 1;
+    const nullSign = mod === "nullsfirst" ? -1 : mod === "nullslast" ? 1 : sign;
+    return { col, sign, nullSign };
+  });
+  return (a, b) => {
+    for (const { col, sign, nullSign } of keys) {
+      const x = a[col];
+      const y = b[col];
+      if (x == null && y == null) continue;
+      if (x == null) return nullSign;
+      if (y == null) return -nullSign;
+      const typed = compare(col, x, y);
+      if (typed !== undefined) {
+        if (typed !== 0) return typed * sign;
+        continue;
+      }
+      if (x < y) return -sign;
+      if (x > y) return sign;
+    }
+    return 0;
+  };
+}
+
+export function preservesRows(select) {
+  const tree = parseEmbeds(select ?? "*");
+  if (tree === null || tree.cols.some((c) => COALESCE_AGGREGATE.test(c))) return false;
+  const walk = (embeds) =>
+    embeds.every((e) =>
+      !e.hints.includes("inner") && !e.cols.some((c) => COALESCE_AGGREGATE.test(c)) &&
+      walk(e.embeds)
+    );
+  return walk(tree.embeds);
+}
+
+export function normalizeFilterValue(v) {
+  if (!v.startsWith("in.(") || !v.endsWith(")")) return v;
+  const inner = v.slice(4, -1);
+  if (inner === "") return v;
+  const items = [];
+  let i = 0;
+  while (i < inner.length) {
+    if (inner[i] === '"') {
+      let val = "";
+      i++;
+      while (i < inner.length && inner[i] !== '"') {
+        if (inner[i] === "\\" && i + 1 < inner.length) i++;
+        val += inner[i++];
+      }
+      if (inner[i] !== '"') return v;
+      i++;
+      if (i < inner.length && inner[i] !== ",") return v;
+      if (inner[i] === ",") i++;
+      items.push(val);
+    } else {
+      const next = inner.indexOf(",", i);
+      const token = next < 0 ? inner.slice(i) : inner.slice(i, next);
+      if (token === "" || /[()"\\]/.test(token)) return v;
+      items.push(token);
+      i = next < 0 ? inner.length : next + 1;
+    }
+  }
+  if (items.length === 0 || new Set(items).size !== 1) return v;
+  return `eq.${items[0]}`;
+}
+
+function limitCapKey(url) {
+  const offsetRaw = url.searchParams.get("offset");
+  if (offsetRaw !== null && offsetRaw !== "0") return null;
+  if ([...COALESCE_CONTROLS].some((k) => url.searchParams.getAll(k).length > 1)) return null;
+  const limitRaw = url.searchParams.get("limit");
+  if (limitRaw !== null && (!/^\d+$/.test(limitRaw) || Number(limitRaw) <= 0)) return null;
+  const limit = limitRaw === null ? Infinity : Number(limitRaw);
+  const selectRaw = url.searchParams.get("select");
+  if (!preservesRows(selectRaw ?? "*")) return null;
+  const filters = [];
+  for (const [k, rawV] of url.searchParams) {
+    if (COALESCE_CONTROLS.has(k)) continue;
+    filters.push([k, normalizeFilterValue(rawV)]);
+  }
+  filters.sort(([a, av], [b, bv]) => a.localeCompare(b) || av.localeCompare(bv));
+  const sig = JSON.stringify([url.pathname, selectRaw, url.searchParams.get("order"), filters]);
+  return { sig, limit };
+}
+
+export function canCoalesceSchemaEq(schema, carriers) {
+  return (table, col, val) => {
+    const fields = schema?.[table]?.fields;
+    if (!fields) return false;
+    const field = fields.find((f) => f.name === col);
+    if (!field || carriers?.aliases?.[field.type] !== undefined) return false;
+    if (field.type === "text" || field.type === "string") return true;
+    if (field.type === "uuid") return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(val);
+    return false;
+  };
+}
+
+function coalesceCandidate(url, canCoalesceEq) {
+  if (url.searchParams.has("offset") || url.searchParams.has("limit")) return null;
+  const selectRaw = url.searchParams.get("select");
+  if (!preservesRows(selectRaw ?? "*")) return null;
+  const tree = parseEmbeds(selectRaw ?? "*");
+  if (tree === null || !tree.cols.includes("*")) return null;
+  if (tree.cols.some((c) => c.includes(":")) || tree.embeds.some((e) => e.spread)) return null;
+  const shadowed = new Set(tree.embeds.map((e) => e.alias));
+  const table = url.pathname.startsWith("/crud/") ? url.pathname.slice(6) : url.pathname.slice(1);
+  const fixed = [];
+  const eqs = [];
+  const seen = new Set();
+  for (const [k, rawV] of url.searchParams) {
+    if (COALESCE_CONTROLS.has(k)) continue;
+    if (k.includes(".") || seen.has(k)) return null;
+    seen.add(k);
+    const v = normalizeFilterValue(rawV);
+    if (v.startsWith("eq.") && !shadowed.has(k)) {
+      const val = v.slice(3);
+      if (val !== "" && !/[\r\n\0]/.test(val) && !/^0\d+$/.test(val) && (canCoalesceEq === undefined || canCoalesceEq(table, k, val))) {
+        eqs.push([k, val]);
+        continue;
+      }
+    }
+    fixed.push([k, v]);
+  }
+  if (eqs.length === 0) return null;
+  fixed.sort(([a, av], [b, bv]) => a.localeCompare(b) || av.localeCompare(bv));
+  eqs.sort(([a], [b]) => a.localeCompare(b));
+  const eqCols = eqs.map(([k]) => k);
+  const eqVals = eqs.map(([, v]) => v);
+  const orders = url.searchParams.getAll("order");
+  const sig = JSON.stringify([url.pathname, selectRaw, orders, fixed, eqCols]);
+  return { sig, eqCols, eqVals, key: eqVals.join("\u0000") };
+}
+
+// Per-item nested regions queued in the same microtask ask `/crud` for one key
+// each; coalescing them into one `in.(...)` or widest-limit read keeps a
+// list's child wave to one query per table while answering each caller's own
+// slice and order.
+export function coalesceReads(readRows, canCoalesceEq) {
+  let queue = [];
+  let scheduled = false;
+  const resolveGroup = (group, rows) => {
+    for (const caller of group.callers) caller.resolve([...rows]);
+    for (const { group: narrow, limit } of group.narrower ?? []) {
+      const sliced = Number.isFinite(limit) ? rows.slice(0, limit) : rows;
+      for (const caller of narrow.callers) caller.resolve([...sliced]);
+    }
+  };
+  const rejectGroup = (group, err) => {
+    for (const caller of group.callers) caller.reject(err);
+    for (const { group: narrow } of group.narrower ?? []) {
+      for (const caller of narrow.callers) caller.reject(err);
+    }
+  };
+  const flush = () => {
+    const batch = queue;
+    queue = [];
+    scheduled = false;
+    const byHref = new Map();
+    for (const item of batch) {
+      let group = byHref.get(item.url.href);
+      if (group === undefined) {
+        group = {
+          raw: item.raw,
+          url: item.url,
+          callers: [],
+          narrower: [],
+          candidate: coalesceCandidate(item.url, canCoalesceEq),
+          cap: limitCapKey(item.url),
+        };
+        byHref.set(item.url.href, group);
+      }
+      group.callers.push(item);
+    }
+    const byCap = new Map();
+    for (const group of byHref.values()) {
+      if (group.cap === null) continue;
+      const list = byCap.get(group.cap.sig) ?? [];
+      list.push(group);
+      byCap.set(group.cap.sig, list);
+    }
+    const capWidest = new Map();
+    for (const [sig, list] of byCap.entries()) {
+      list.sort((a, b) => (b.cap.limit === a.cap.limit ? 0 : b.cap.limit > a.cap.limit ? 1 : -1));
+      const widest = list[0];
+      for (let i = 1; i < list.length; i++) {
+        widest.narrower.push({ group: list[i], limit: list[i].cap.limit });
+      }
+      capWidest.set(sig, widest);
+    }
+    const activeGroups = [];
+    for (const group of byHref.values()) {
+      if (group.cap === null) {
+        activeGroups.push(group);
+        continue;
+      }
+      const widest = capWidest.get(group.cap.sig);
+      if (widest !== undefined) {
+        capWidest.delete(group.cap.sig);
+        activeGroups.push(widest);
+      }
+    }
+    const buckets = new Map();
+    const singles = [];
+    for (const group of activeGroups) {
+      const c = group.candidate;
+      if (c === null) {
+        singles.push(group);
+        continue;
+      }
+      let bucket = buckets.get(c.sig);
+      if (bucket === undefined) {
+        bucket = { eqCols: c.eqCols, groups: [] };
+        buckets.set(c.sig, bucket);
+      }
+      bucket.groups.push({ group, eqVals: c.eqVals, key: c.key });
+    }
+    for (const bucket of buckets.values()) {
+      if (bucket.groups.length < 2) {
+        singles.push(bucket.groups[0].group);
+        continue;
+      }
+      const { eqCols, groups } = bucket;
+      const colSets = eqCols.map((_, idx) => new Set(groups.map((g) => g.eqVals[idx])));
+      const byCol = new Map(eqCols.map((col, idx) => [col, colSets[idx]]));
+      const first = groups[0].group;
+      const batchUrl = new URL(first.url.href);
+      const nextParams = new URLSearchParams();
+      for (const [k, v] of first.url.searchParams) {
+        const set = byCol.get(k);
+        if (set !== undefined && set.size > 1) {
+          const list = [...set].map((val) => `"${val.replace(/[\\"]/g, "\\$&")}"`).join(",");
+          nextParams.append(k, `in.(${list})`);
+        } else {
+          nextParams.append(k, v);
+        }
+      }
+      batchUrl.search = nextParams.toString();
+      const target = typeof first.raw === "string" && first.raw.startsWith("/")
+        ? batchUrl.pathname + batchUrl.search
+        : first.raw instanceof URL ? batchUrl : batchUrl.href;
+      Promise.resolve(target).then(readRows).then((rows) => {
+        const partitioned = new Map(groups.map(({ key }) => [key, []]));
+        for (const row of rows) {
+          let rowKey = "";
+          let valid = true;
+          for (let i = 0; i < eqCols.length; i++) {
+            const v = row?.[eqCols[i]];
+            if (v === null || v === undefined) {
+              valid = false;
+              break;
+            }
+            const s = String(v);
+            if (!colSets[i].has(s)) {
+              valid = false;
+              break;
+            }
+            rowKey += (i === 0 ? "" : "\u0000") + s;
+          }
+          if (!valid) {
+            throw new Error(`coalesced read on ${batchUrl.pathname} returned a row whose (${eqCols.join(",")}) value did not match any requested eq filter`);
+          }
+          const dest = partitioned.get(rowKey);
+          if (dest !== undefined) dest.push(row);
+        }
+        for (const { group, key } of groups) {
+          const matched = partitioned.get(key) ?? [];
+          resolveGroup(group, matched);
+        }
+      }).catch((err) => {
+        for (const { group } of groups) {
+          rejectGroup(group, err);
+        }
+      });
+    }
+    for (const group of singles) {
+      Promise.resolve(group.raw).then(readRows).then((rows) => {
+        resolveGroup(group, rows);
+      }, (err) => {
+        rejectGroup(group, err);
+      });
+    }
+  };
+  return (raw) =>
+    new Promise((resolve, reject) => {
+      const url = raw instanceof URL ? raw : new URL(String(raw), "https://read.invalid");
+      queue.push({ raw, url, resolve, reject });
+      if (!scheduled) {
+        scheduled = true;
+        queueMicrotask(flush);
+      }
+    });
 }

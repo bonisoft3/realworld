@@ -21,7 +21,8 @@
 // `inputs` is {query name: rows}, frozen, as are the outputs. `seed` is a
 // 32-bit integer derived from the computation's name, so a replay is the
 // same draw. plan and finish run in a fresh worker per run with no
-// permissions and no globals beyond the language (cage.ts).
+// permissions and no globals beyond the language (cage.ts); either may answer
+// a promise of its value, since Crypto's operations answer promises.
 //
 // The language is ES module text as SES 1.15's Compartment admits it, the
 // text compiled by @endo/module-source (both as deno.json pins them):
@@ -33,36 +34,46 @@
 //   - no top-level await: the module runs as a plain function;
 //   - ECMAScript's globals as SES permits them (language.ts), so what SES
 //     does not yet know, such as RegExp.escape or Error.isError, is absent;
-//     less the clock, Math.random, and the host's time zone and locale.
+//     less the clock, Math.random, and the host's time zone and locale;
+//   - and past it, only what the computation declares in `endowments`
+//     (language.ts's ENDOWABLE): Crypto, WebCrypto's operations that are
+//     deterministic by their specification (crypto.ts), TextEncoder,
+//     TextDecoder, URL, URLSearchParams and Cheerio. One used undeclared throws.
 //
 // The service loads every computation at startup and dies on one it refuses;
 // admit.ts loads them as it does, for a lint to refuse them first.
 //
 // A job is its input as JSON on a WASI module's stdin, answered by its stdout
 // parsed as JSON, each in a fresh instance (wasi.ts), one job at a time in one
-// worker, as upstream odds-rust serves one calculation at a time: a second
-// worker would hold a second instance's memory, which a 30-second cadence
-// does not need.
+// worker. Snapshot capture, calculation and publication are serialized in
+// this process; multiple compute replicas are not supported.
 //
 // finish returns {sink table: [rows]} for exactly the tables its `to` names,
 // each row keyed by a text `id`, every row of a sink with the same columns,
 // no number NaN or infinite; each list is the sink's whole content: rows the
-// sink holds and the output lacks are deleted. A sink is a live table, out of
-// the publication, so a write here never feeds the change it answers.
+// sink holds and the output lacks are deleted. Sink changes travel through
+// CDC too, invalidating computations that declare them in `reads`.
 //
-// Each computation is looked at every `every` seconds, and runs when what it
-// reads changed since it last ran. Its whole output is written in a
-// rolled-back Postgres transaction, as crud will write it, before anything is
+// All computations run at startup, then on CDC invalidations of their reads.
+// Each delivery takes a fresh snapshot, including a redelivery. Its output is
+// written in a rolled-back Postgres transaction, as crud will write it, before anything is
 // written; the writes then go through crud as the service role, the path every
 // pipeline writes by: changed rows upserted on id in every sink, then the rows
 // no longer produced deleted. Crud has no transaction across requests, so a
-// write failing past the check leaves a mix that the service, dying, replaces
-// on restart.
+// write failing past the check leaves a mix. A failed delivery answers 500 and
+// the service keeps serving: the Connect consumer resends it with backoff and,
+// past its retries, crashes (events.yaml). A resend reads a fresh snapshot and
+// rewrites every row of the sinks the failed write touched, which replaces the
+// mix and outlasts a deadlock or a row deleted mid-run.
 //
-// Environment: CRUD_URL, DATABASE_URL, LAKE_DIR, COMPUTATIONS (JSON list of
-// {name, file, every, to, wasm}, wasm being the module files it ships);
+// Environment: CRUD_URL, DATABASE_URL, CDC_SLOT, LAKE_DIR, COMPUTATIONS (JSON list of
+// {name, file, to, wasm, endowments?}, wasm being the module files it ships
+// and endowments what its module may use past the language, absent where it
+// declares none, as a cluster written before the field spells it);
 // SERVICE_JWT where the cluster has auth.
 
+import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import {
   arrayFromArrayValue,
   arrayFromListValue,
@@ -85,10 +96,11 @@ import { admit, Cage, IDENTIFIER, type Job, Runner, strictJson } from "./workers
 const BATCH = 1000;
 // Ids per DELETE: quoted uuids keep its URL near 8 KiB.
 const DELETES = 200;
+const RPC_IDENTIFIER = /^[a-z_][a-z0-9_]{0,62}$/;
 
 /** Where the image installed the lake's extensions (install.ts); a running
  * service reaches no extension host. */
-export const EXTENSIONS = new URL("./extensions", import.meta.url).pathname;
+export const EXTENSIONS = fileURLToPath(new URL("./extensions", import.meta.url));
 
 export type Row = Record<string, unknown>;
 export type Out = Record<string, Row[]>;
@@ -144,15 +156,21 @@ const BY_TYPE: Partial<Record<DuckDBTypeId, DuckDBValueConverter<unknown>>> = {
 };
 const PLAIN = createDuckDBValueConverter(BY_TYPE as Record<DuckDBTypeId, DuckDBValueConverter<unknown> | undefined>);
 
-export type Spec = { name: string; file: string; every: number; to: string[]; wasm: string[] };
+export type Spec = {
+  name: string;
+  file: string;
+  to: string[];
+  wasm: string[];
+  onComplete?: string;
+  /** What the module may use past the language; absent, it declares none. */
+  endowments?: string[];
+};
 
 /** What the service needs of a computation; tests stand in their own. */
 export interface Runnable {
   name: string;
-  every: number;
   reads: string[];
   to: string[];
-  ran: string | null;
   run(lake: Reader): Promise<unknown>;
 }
 
@@ -175,11 +193,10 @@ export async function seedOf(name: string): Promise<number> {
 export const stem = (file: string) => file.replace(/^.*\//, "").replace(/\.wasm$/, "");
 
 export class Computation implements Runnable {
-  ran: string | null = null;
+  private previous?: { inputs: Record<string, Row[]>; out: unknown };
 
   private constructor(
     readonly name: string,
-    readonly every: number,
     readonly to: string[],
     readonly file: string,
     private compiled: ModuleSource,
@@ -188,16 +205,22 @@ export class Computation implements Runnable {
     private wasm: Set<string>,
     private seed: number,
     private runner: Runner,
+    readonly onComplete: string | undefined,
+    private endowments: string[],
   ) {}
 
   static async load(spec: Spec, runner: Runner): Promise<Computation> {
-    const { compiled, reads, queries } = await admit(spec.file);
+    if (spec.onComplete !== undefined && !RPC_IDENTIFIER.test(spec.onComplete)) {
+      throw new Error(
+        `computation ${spec.name}: onComplete is no SQL/PostgREST RPC identifier: ${spec.onComplete}`,
+      );
+    }
+    const { compiled, reads, queries } = await admit(spec.file, spec.endowments ?? []);
     if (!spec.to.every((t) => IDENTIFIER.test(t))) {
       throw new Error(`computation ${spec.name}: a sink's table name is no identifier: ${spec.to}`);
     }
     return new Computation(
       spec.name,
-      spec.every,
       [...spec.to],
       spec.file,
       compiled,
@@ -206,15 +229,23 @@ export class Computation implements Runnable {
       new Set(spec.wasm.map(stem)),
       await seedOf(spec.name),
       runner,
+      spec.onComplete,
+      spec.endowments ?? [],
     );
   }
 
   async run(lake: Reader): Promise<unknown> {
     const inputs: Record<string, Row[]> = {};
     for (const [name, sql] of Object.entries(this.queries)) inputs[name] = await lake.query(sql);
+    // One committed transaction can produce many CDC rows. Pure calculations
+    // may reuse their last answer, but every delivery still reads fresh inputs
+    // and retries publication and its completion hook.
+    if (this.previous && isDeepStrictEqual(inputs, this.previous.inputs)) {
+      return structuredClone(this.previous.out);
+    }
     const cage = new Cage(this.file);
     try {
-      await cage.load(this.compiled);
+      await cage.load(this.compiled, this.endowments);
       const ran: Job[] = [];
       const outputs: unknown[] = [];
       let { jobs } = await cage.ask({ inputs, seed: this.seed });
@@ -229,7 +260,9 @@ export class Computation implements Runnable {
         ran.push(...fresh);
         ({ jobs } = await cage.ask({ outputs, plan: true }));
       }
-      return (await cage.ask({ outputs })).out;
+      const out = (await cage.ask({ outputs })).out;
+      this.previous = structuredClone({ inputs, out });
+      return out;
     } finally {
       cage.close();
     }
@@ -249,16 +282,18 @@ export class Computation implements Runnable {
 
 /** The service's one lake: Postgres tables copied into a DuckLake. */
 export class Lake implements Reader {
-  // table -> [fingerprint, snapshot] of its lake copy.
-  held = new Map<string, [string, number]>();
-  snapshots = 0;
-
-  private constructor(private databaseUrl: string, private con: DuckDBConnection, private reader: Reader) {}
+  private constructor(
+    private databaseUrl: string,
+    private con: DuckDBConnection,
+    private reader: Reader,
+  ) {}
 
   /** The lake starts empty: what it holds is only ever this process's copy. */
   static async open(databaseUrl: string, lakeDir: string): Promise<Lake> {
     await Deno.mkdir(lakeDir, { recursive: true });
-    for await (const entry of Deno.readDir(lakeDir)) await Deno.remove(`${lakeDir}/${entry.name}`, { recursive: true });
+    for await (const entry of Deno.readDir(lakeDir)) {
+      await Deno.remove(`${lakeDir}/${entry.name}`, { recursive: true });
+    }
     await Deno.mkdir(`${lakeDir}/data`);
     const db = await duckdb();
     const con = await db.connect();
@@ -271,58 +306,44 @@ export class Lake implements Reader {
     return new Lake(databaseUrl, con, readerOf(reader));
   }
 
+  /** A failed delivery may have left Postgres attached; each one starts clean. */
   async attach() {
-    await this.con.run(`ATTACH ${literal(this.databaseUrl)} AS pg (TYPE postgres, READ_ONLY)`);
+    await this.con.run("DETACH DATABASE IF EXISTS pg");
+    await this.con.run(
+      `ATTACH ${literal(this.databaseUrl)} AS pg (TYPE postgres, READ_ONLY)`,
+    );
   }
 
   async detach() {
     await this.con.run("DETACH pg");
   }
 
-  /** Each table's count of rows inserted, updated and deleted, by Postgres's
-   * own statistics, beside the server's start, the last statistics reset and
-   * the table's file, which TRUNCATE replaces without counting a row.
-   * A transaction counts there once it ends, so the counts move in commit
-   * order, which neither row counts nor xids do: a transaction holding an
-   * older xid can commit after a younger one. Statistics land shortly after
-   * the commit, so this is read before the snapshot that publishes: whatever
-   * it counts, the snapshot holds. */
-  async fingerprint(tables: string[]): Promise<string> {
-    const names = tables.map((t) => `''${t}''`).join(", ");
-    const rows = (await this.con.runAndReadAll(`
-      SELECT * FROM postgres_query('pg', '
-        SELECT s.relname::text, (s.n_tup_ins + s.n_tup_upd + s.n_tup_del)::text,
-               pg_postmaster_start_time()::text, coalesce(d.stats_reset::text, ''''),
-               c.relfilenode::text
-        FROM pg_stat_user_tables s JOIN pg_stat_database d ON d.datname = current_database()
-          JOIN pg_class c ON c.oid = s.relid
-        WHERE s.schemaname = ''public'' AND s.relname IN (${names})')`)).getRows() as string[][];
-    const found = new Map(rows.map(([t, ...rest]) => [t, rest]));
-    const missing = tables.filter((t) => !found.has(t));
-    if (missing.length > 0) throw new Error(`tables missing from Postgres: ${missing.sort()}`);
-    return JSON.stringify(tables.map((t) => found.get(t)));
-  }
-
-  /** The lake holds `tables` at `fingerprint`, all from one snapshot: unless
-   * it already does, they are copied in one DuckDB transaction, which reads
-   * Postgres in one repeatable-read transaction. */
-  async hold(tables: string[], fingerprint: string) {
-    const want = new Map(tables.map((t, i) => [t, JSON.stringify(JSON.parse(fingerprint)[i])]));
-    const held = tables.map((t) => this.held.get(t));
-    if (held.every((h, i) => h !== undefined && h[0] === want.get(tables[i])) && new Set(held.map((h) => h![1])).size === 1) {
-      return;
-    }
-    this.snapshots += 1;
+  /** CDC can arrive before Postgres statistics catch up. Always copy the
+   * declared inputs in one transaction instead of caching by those counters. */
+  async hold(tables: string[]) {
     await this.con.run("BEGIN");
-    for (const t of tables) {
-      await this.con.run(`DROP TABLE IF EXISTS lake.${t}`);
-      await this.con.run(`CREATE TABLE lake.${t} AS SELECT * FROM pg.public.${t}`);
+    try {
+      for (const t of tables) {
+        await this.con.run(`DROP TABLE IF EXISTS lake.${t}`);
+        await this.con.run(
+          `CREATE TABLE lake.${t} AS SELECT * FROM pg.public.${t}`,
+        );
+      }
+      await this.con.run("COMMIT");
+    } catch (e) {
+      // The connection serves the next delivery's snapshot.
+      await this.con.run("ROLLBACK").catch((r) => {
+        throw new AggregateError([e, r], "a snapshot failed, and so did its rollback");
+      });
+      throw e;
     }
-    await this.con.run("COMMIT");
-    for (const t of tables) this.held.set(t, [want.get(t)!, this.snapshots]);
     // Only the newest snapshot is read; older ones are files nobody will.
-    await this.con.run("CALL ducklake_expire_snapshots('lake', older_than => now())");
-    await this.con.run("CALL ducklake_cleanup_old_files('lake', cleanup_all => true)");
+    await this.con.run(
+      "CALL ducklake_expire_snapshots('lake', older_than => now())",
+    );
+    await this.con.run(
+      "CALL ducklake_cleanup_old_files('lake', cleanup_all => true)",
+    );
   }
 
   query(sql: string): Promise<Row[]> {
@@ -366,6 +387,17 @@ export class Database implements Store {
     await con.run("LOAD postgres");
     await con.run(`ATTACH ${literal(databaseUrl)} AS pg (TYPE postgres)`);
     return new Database(con, crudClaims(jwt));
+  }
+
+  /** Conduit's HTTP health can precede the source opening its slot. A
+   * bootstrap snapshot taken earlier would leave a gap in change capture. */
+  async requireCapture(slot: string) {
+    const rows = (await this.con.runAndReadAll(`SELECT * FROM postgres_query('pg', ${literal(
+      `SELECT slot_name FROM pg_replication_slots WHERE slot_name = ${literal(slot)}
+       AND database = current_database() AND plugin = 'pgoutput' AND NOT temporary
+       AND confirmed_flush_lsn IS NOT NULL AND wal_status <> 'lost'`,
+    )})`)).getRows();
+    if (rows.length !== 1) throw new Error(`CDC slot ${slot} is not ready; refusing a bootstrap snapshot before capture`);
   }
 
   /** What crud applies for the role: its transaction's isolation level and
@@ -493,26 +525,39 @@ export class Sinks {
     return plan;
   }
 
-  async apply(c: { name: string; to: string[] }, out: unknown) {
+  async apply(c: { name: string; to: string[]; onComplete?: string }, out: unknown) {
+    if (c.onComplete !== undefined && !RPC_IDENTIFIER.test(c.onComplete)) {
+      throw new Error(`computation ${c.name}: onComplete is no SQL/PostgREST RPC identifier: ${c.onComplete}`);
+    }
     const plan = await this.plan(c, out);
     await this.database.check(Object.fromEntries(Object.entries(plan).map(([t, [rows, deletes]]) => [t, [rows, deletes]])));
-    for (const [table, [rows]] of Object.entries(plan)) {
-      for (let i = 0; i < rows.length; i += BATCH) await this.send("POST", `${table}?on_conflict=id`, rows.slice(i, i + BATCH));
-    }
-    for (const [table, [, deletes]] of Object.entries(plan)) {
-      for (let i = 0; i < deletes.length; i += DELETES) {
-        const ids = deletes.slice(i, i + DELETES).map((k) => JSON.stringify(k)).join(",");
-        await this.send("DELETE", `${table}?id=in.(${encodeURIComponent(ids)})`);
+    try {
+      for (const [table, [rows]] of Object.entries(plan)) {
+        for (let i = 0; i < rows.length; i += BATCH) await this.send("POST", `${table}?on_conflict=id`, rows.slice(i, i + BATCH));
       }
+      for (const [table, [, deletes]] of Object.entries(plan)) {
+        for (let i = 0; i < deletes.length; i += DELETES) {
+          const ids = deletes.slice(i, i + DELETES).map((k) => JSON.stringify(k)).join(",");
+          await this.send("DELETE", `${table}?id=in.(${encodeURIComponent(ids)})`);
+        }
+      }
+    } catch (e) {
+      // Some writes may have landed: what the sinks hold is unknown again, so
+      // the redelivery rewrites every row it produces.
+      for (const table of Object.keys(plan)) this.held.delete(table);
+      throw e;
     }
     for (const [table, [, , now]] of Object.entries(plan)) this.held.set(table, now);
+    if (c.onComplete !== undefined) {
+      await this.send("POST", `rpc/${c.onComplete}`, {}, "return=minimal");
+    }
     return Object.fromEntries(
       Object.entries(plan).map(([t, [rows, deletes, now]]) => [t, { rows: now.size, upserted: rows.length, deleted: deletes.length }]),
     );
   }
 
-  async send(method: string, path: string, body?: unknown) {
-    const headers: Record<string, string> = { ...this.headers, Prefer: "resolution=merge-duplicates,return=minimal" };
+  async send(method: string, path: string, body?: unknown, prefer = "resolution=merge-duplicates,return=minimal") {
+    const headers: Record<string, string> = { ...this.headers, Prefer: prefer };
     if (body !== undefined) headers["Content-Type"] = "application/json";
     const res = await fetch(`${this.crudUrl}/${path}`, {
       method,
@@ -527,49 +572,78 @@ export class Sinks {
 export interface Snapshots {
   attach(): Promise<void>;
   detach(): Promise<void>;
-  fingerprint(tables: string[]): Promise<string>;
-  hold(tables: string[], fingerprint: string): Promise<void>;
+  hold(tables: string[]): Promise<void>;
 }
 
 export class Service {
-  due: Map<string, number>;
+  private active = false;
 
   constructor(
     private computations: Runnable[],
     private lake: Snapshots & Reader,
     private sinks: { apply(c: Runnable, out: unknown): Promise<unknown> },
-  ) {
-    this.due = new Map(computations.map((c) => [c.name, 0]));
-  }
+  ) {}
 
-  /** Run what is due at `now`; resolves to when the next one is. */
-  async tick(now: number): Promise<number> {
-    for (const c of this.computations) {
-      if (this.due.get(c.name)! <= now) {
-        this.due.set(c.name, now + c.every);
-        await this.step(c);
+  /** An overlapping HTTP retry must not start a second snapshot. Leave its
+   * delivery unacknowledged in the broker, rather than queueing it in memory. */
+  async refresh(tables?: string[]): Promise<boolean> {
+    if (this.active) return false;
+    this.active = true;
+    try {
+      for (const c of this.computations) {
+        if (tables === undefined || c.reads.some((t) => tables.includes(t))) {
+          await this.step(c);
+        }
       }
+      return true;
+    } finally {
+      this.active = false;
     }
-    return Math.min(...this.due.values());
   }
 
-  async step(c: Runnable) {
+  private async step(c: Runnable) {
     await this.lake.attach();
-    const seen = await this.lake.fingerprint(c.reads);
-    const changed = seen !== c.ran;
-    if (changed) await this.lake.hold(c.reads, seen);
+    try {
+      await this.lake.hold(c.reads);
+    } catch (e) {
+      await this.lake.detach().catch((d) => {
+        throw new AggregateError([e, d], "a snapshot failed, and so did detaching Postgres");
+      });
+      throw e;
+    }
     await this.lake.detach();
-    if (!changed) return;
     const started = performance.now();
     const out = await c.run(this.lake);
     const written = await this.sinks.apply(c, out);
-    c.ran = seen;
     console.log(JSON.stringify({
       computation: c.name,
       sinks: written,
       seconds: Math.round(performance.now() - started) / 1000,
     }));
   }
+}
+
+/** Internal delivery endpoint. A 2xx means every affected output and hook
+ * completed; a failure reaches serve's onError. */
+export function handler(service: Service, jwt: string | undefined) {
+  return async (req: Request): Promise<Response> => {
+    if (req.method !== "POST" || new URL(req.url).pathname !== "/invalidate") {
+      return new Response(null, { status: 404 });
+    }
+    if (
+      jwt !== undefined && req.headers.get("authorization") !== `Bearer ${jwt}`
+    ) return new Response(null, { status: 401 });
+    const body = await req.json();
+    if (
+      !isRow(body) || !Array.isArray(body.tables) ||
+      !body.tables.every((t) => typeof t === "string" && IDENTIFIER.test(t))
+    ) {
+      throw new Error("invalidation requires {tables: SQL identifiers[]}");
+    }
+    return new Response(null, {
+      status: await service.refresh(body.tables) ? 204 : 503,
+    });
+  };
 }
 
 function need(name: string): string {
@@ -593,15 +667,33 @@ async function main() {
   for (const spec of specs) computations.push(await Computation.load(spec, runner));
   const databaseUrl = need("DATABASE_URL");
   const jwt = Deno.env.get("SERVICE_JWT");
+  const database = await Database.open(databaseUrl, jwt);
+  await database.requireCapture(need("CDC_SLOT"));
   const service = new Service(
     computations,
     await Lake.open(databaseUrl, need("LAKE_DIR")),
-    new Sinks(await Database.open(databaseUrl, jwt), need("CRUD_URL"), jwt),
+    new Sinks(database, need("CRUD_URL"), jwt),
   );
-  while (true) {
-    const due = await service.tick(performance.now() / 1000);
-    await new Promise((resolve) => setTimeout(resolve, Math.max(0, due * 1000 - performance.now())));
-  }
+  await service.refresh();
+  await serve(service, jwt, 9997).finished;
+}
+
+/** An error as one line, each cause of an aggregate included. */
+function said(error: unknown): string {
+  if (error instanceof AggregateError) return `${error.message}: ${error.errors.map(said).join("; ")}`;
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** The delivery server; a failed delivery is logged and answered 500 with its
+ * message, which Connect's crash quotes once the retries run out. */
+export function serve(service: Service, jwt: string | undefined, port: number) {
+  return Deno.serve({
+    port,
+    onError(error) {
+      console.error(error);
+      return new Response(said(error), { status: 500 });
+    },
+  }, handler(service, jwt));
 }
 
 if (import.meta.main) await main();

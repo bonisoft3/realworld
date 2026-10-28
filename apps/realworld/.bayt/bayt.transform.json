@@ -11,10 +11,10 @@
     "ports": [],
     "volumes": [],
     "depends_on": {
-      "apps_realworld-redis": {
+      "realworld-redis": {
         "condition": "service_healthy"
       },
-      "apps_realworld-crud": {
+      "realworld-crud": {
         "condition": "service_healthy"
       }
     },
@@ -55,13 +55,12 @@
     "preamble": [],
     "preambleCopyContexts": [],
     "from": {
-      "name": "redpandadata/connect:4.46.0@sha256:f84ebd666931dc667b8b33c70900ff49a34c73d1811b096f668e360d66a05d4c"
+      "name": "redpandadata/connect:4.114.0@sha256:481e8df48ed733f080623ae67f0dccc82d29ae509dfb3f957347a9e900e74910"
     },
     "add": [],
     "mounts": [],
     "secrets": {},
     "extra_hosts": [],
-    "epilogue": [],
     "copy": [
       {
         "from": null,
@@ -104,6 +103,9 @@
         "exclude": []
       }
     ],
+    "epilogue": [
+      "COPY <<'CDCTRACE' /cdc-trace.yaml\n# The change feed's transaction trace, joined onto every row: shared by every\n# stream reading cdc-events through the transform's `-r`, since streams mode\n# refuses resources in a stream's own file.\n#\n# A writing transaction's first change on the bus is its marker\n# (mecha.txn_trace, rls.sql), and conduit does not interleave transactions, so\n# the marker last read is the transaction of every row after it. A row's own\n# txid cannot answer instead: the bus spells a delete as its before-image,\n# indistinguishable from an insert, and that image's txid, where it carries\n# more than its key, is its last writer's.\n#\n# A stream runs this among its INPUT processors, which Connect runs on one\n# goroutine whatever the pipeline's threads, after stamping @cdc_consumer with\n# a name no other stream uses: the cache is one per process, and each stream\n# reads the bus at its own position. The marker is consumed and dropped; a\n# row leaves with @traceparent set to its transaction's trace, or unset when\n# the transaction had none or began before this process read its marker.\ncache_resources:\n  - label: cdc_trace\n    memory:\n      # One entry per stream, replaced by every marker: the TTL bounds nothing\n      # and only has to outlast the longest transaction's rows (the default\n      # is 5m).\n      default_ttl: 24h\n\nprocessor_resources:\n  - label: cdc_trace_join\n    # A batch runs each processor over every message before the next, so a\n    # marker mid-batch would reach the rows after it only once the batch had\n    # already read the cache; for_each runs the batch a message at a time.\n    for_each:\n      - switch:\n          - check: '@cdc_consumer.or(\"\") == \"\"'\n            processors:\n              - crash: a cdc-events stream ran cdc_trace_join without stamping @cdc_consumer\n          - check: this.catch({}).data.or(\"\").catch(\"\").parse_json().catch({}).__table.or(\"\") == \"txn_trace\"\n            processors:\n              # A marker without its NOT NULL trace keeps the error and stays\n              # on the stream, where the consumer refuses it as it would any\n              # malformed row.\n              - try:\n                  - mapping: |\n                      let trace = this.data.parse_json().traceparent\n                      root = if $trace.type() == \"string\" { $trace } else { throw(\"txn_trace marker has no traceparent\") }\n                  - cache:\n                      resource: cdc_trace\n                      operator: set\n                      key: ${! @cdc_consumer }\n                      value: ${! content() }\n                  - mapping: root = deleted()\n          - processors:\n              - branch:\n                  request_map: root = \"\"\n                  processors:\n                    - cache:\n                        resource: cdc_trace\n                        operator: get\n                        key: ${! @cdc_consumer }\n                    # No marker read yet: the transaction's trace is unknown.\n                    - catch:\n                        - mapping: root = \"\"\n                  result_map: meta traceparent = if content().string() != \"\" { content().string() } else { deleted() }\n\n  # A coalesced call's @traceparent, over a batch archived as a JSON array whose\n  # elements carry their row's @traceparent as `trace` (archive keeps no\n  # metadata): the first transaction's trace, the one that set the call off.\n  - label: cdc_trace_batch\n    mutation: |\n      let traces = this.map_each(m -> m.trace).filter(t -> t != \"\")\n      meta traceparent = if $traces.length() > 0 { $traces.index(0) } else { deleted() }\n\nCDCTRACE"
+    ],
     "healthcheck": null,
     "expose": [],
     "entrypoint": null,
@@ -111,6 +113,8 @@
     "cmd": [
       "streams",
       "--no-api",
+      "-r",
+      "/cdc-trace.yaml",
       "/pipelines/realworld-favorite-recount.yaml",
       "/pipelines/realworld-favorite-count.yaml",
       "/pipelines/realworld-favorite-index.yaml",
@@ -118,8 +122,8 @@
     ]
   },
   "name": "transform",
-  "project": "apps_realworld",
-  "dir": "apps/realworld",
+  "project": "realworld",
+  "dir": ".",
   "activate": "",
   "srcs": {
     "globs": [
@@ -141,8 +145,8 @@
   "synthetics": {
     "bayt": {
       "name": "transform_bayt",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "activate": "",
       "srcs": {
         "globs": [],
@@ -154,7 +158,8 @@
           ".bayt/Dockerfile.transform",
           ".bayt/bayt.transform.json",
           ".bayt/Taskfile.yml",
-          ".bayt/Taskfile.bayt.yml"
+          ".bayt/Taskfile.bayt.yml",
+          ".bayt/process-compose.yaml"
         ],
         "exclude": []
       },
@@ -170,17 +175,16 @@
         "similar": false
       },
       "upClosure": [
-        "apps/realworld/.bayt/compose.transform.yaml",
-        "apps/realworld/.bayt/compose.redis.yaml",
-        "apps/realworld/.bayt/compose.crud.yaml",
-        "apps/realworld/.bayt/compose.database.yaml",
-        "libraries/mecha/.bayt/compose.database-image.yaml"
+        "./.bayt/compose.transform.yaml",
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml"
       ]
     },
     "outs": {
       "name": "transform_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "activate": "",
       "srcs": {
         "globs": [],
@@ -202,17 +206,16 @@
         "similar": false
       },
       "upClosure": [
-        "apps/realworld/.bayt/compose.transform.yaml",
-        "apps/realworld/.bayt/compose.redis.yaml",
-        "apps/realworld/.bayt/compose.crud.yaml",
-        "apps/realworld/.bayt/compose.database.yaml",
-        "libraries/mecha/.bayt/compose.database-image.yaml"
+        "./.bayt/compose.transform.yaml",
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml"
       ]
     },
     "srcs": {
       "name": "transform_srcs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "activate": "",
       "srcs": {
         "globs": [],
@@ -242,11 +245,10 @@
         "similar": false
       },
       "upClosure": [
-        "apps/realworld/.bayt/compose.transform.yaml",
-        "apps/realworld/.bayt/compose.redis.yaml",
-        "apps/realworld/.bayt/compose.crud.yaml",
-        "apps/realworld/.bayt/compose.database.yaml",
-        "libraries/mecha/.bayt/compose.database-image.yaml"
+        "./.bayt/compose.transform.yaml",
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml"
       ]
     }
   },
@@ -266,17 +268,16 @@
   ],
   "transitiveCrossDeps": [],
   "upClosure": [
-    "apps/realworld/.bayt/compose.transform.yaml",
-    "apps/realworld/.bayt/compose.redis.yaml",
-    "apps/realworld/.bayt/compose.crud.yaml",
-    "apps/realworld/.bayt/compose.database.yaml",
-    "libraries/mecha/.bayt/compose.database-image.yaml"
+    "./.bayt/compose.transform.yaml",
+    "./.bayt/compose.redis.yaml",
+    "./.bayt/compose.crud.yaml",
+    "./.bayt/compose.database.yaml"
   ],
   "chainedDeps": [
     {
       "name": "redis_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []
@@ -284,8 +285,8 @@
     },
     {
       "name": "crud_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []

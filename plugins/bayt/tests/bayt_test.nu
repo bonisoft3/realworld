@@ -56,6 +56,20 @@ def export-fail-msg [label: string, files: list<string>, msg: string]: nothing -
 	}
 }
 
+# An interpolation over a field that is not there leaves the value
+# incomplete, which `cue eval` passes; only an export proves it renders.
+def export-pass [label: string, files: list<string>]: nothing -> int {
+	let r = (do { ^cue export ...$files } | complete)
+	if $r.exit_code == 0 {
+		print $"  PASS  ($label)"
+		0
+	} else {
+		print $"  FAIL  ($label) exit=($r.exit_code)"
+		print $r.stderr
+		1
+	}
+}
+
 # _dedup-x-bake guards: dedup only inside x-bake and only for pure
 # scalar items (a dropped mapping-item head re-attaches its continuation
 # to the previous item); blank lines and cross-field duplicates survive.
@@ -121,6 +135,10 @@ def main [] {
 	let neg_undeclared_port = ["./tests/_negative_undeclared_port/"]
 	let neg_entrypoint_cmd = ["./tests/_negative_entrypoint_cmd/"]
 	let neg_port_var_clash = ["./tests/_negative_port_var_clash/"]
+	let neg_publish_clash = ["./tests/_negative_publish_clash/"]
+	let neg_publish_no_compose = ["./tests/_negative_publish_no_compose/"]
+	let neg_publish_host_clash = ["./tests/_negative_publish_host_clash/"]
+	let neg_publish_host_var_clash = ["./tests/_negative_publish_host_var_clash/"]
 	let neg_container_waits_host = ["./tests/_negative_container_waits_host/"]
 	let neg_healthy_no_probe = ["./tests/_negative_healthy_no_probe/"]
 	let neg_entrypoint_mismatch = ["./tests/_negative_entrypoint_mismatch/"]
@@ -146,6 +164,7 @@ def main [] {
 	mut failed = 0
 	print "positive suites"
 	$failed = $failed + (eval-pass "core bayt" $core)
+	$failed = $failed + (export-pass "host probe of an embedded http check" [...$core "-e" "_proc_embedded"])
 	$failed = $failed + (dedup-suite)
 	$failed = $failed + (eval-pass "stacks/sayt" $sayt)
 	$failed = $failed + (eval-pass "stacks/go" $go)
@@ -168,6 +187,10 @@ def main [] {
 	$failed = $failed + (eval-fail-msg "a peer port the peer does not expose has no host spelling" $neg_undeclared_port "names a port of crud that crud does not expose")
 	$failed = $failed + (eval-fail-msg "an entrypoint beside a Dockerfile CMD would take the CMD as arguments" $neg_entrypoint_cmd "entrypoint and dockerfile.cmd together")
 	$failed = $failed + (eval-fail-msg "two ports collapsing to one host variable must fail, naming both" $neg_port_var_clash "web.expose.admin_http and web-admin.expose.http both map to WEB_ADMIN_HTTP_PORT")
+	$failed = $failed + (eval-fail-msg "two services publishing under one host variable must fail, naming both" $neg_publish_clash "both publish under WEB_HOST_PORT")
+	$failed = $failed + (eval-fail-msg "a published port on a target without a compose service must fail, naming it" $neg_publish_no_compose "web.expose.http publishes a port, but web has no compose service")
+	$failed = $failed + (eval-fail-msg "a published port defaulting to a host process's port must fail, naming both" $neg_publish_host_clash "web.expose.http and admin.expose.http both default to host port 9000")
+	$failed = $failed + (eval-fail-msg "a published port moving by a host process's variable must fail, naming both" $neg_publish_host_var_clash "api.expose.http and web.expose.http both move by WEB_HTTP_PORT")
 	$failed = $failed + (eval-fail-msg "a container waiting on a host-only process must fail" $neg_container_waits_host "waits on migrate, which has no container to wait on")
 	$failed = $failed + (eval-fail-msg "a health wait on a process with no probe would hang, so it must fail" $neg_healthy_no_probe "waits for worker to be healthy, but worker has no readiness probe")
 	$failed = $failed + (eval-fail-msg "a Dockerfile entrypoint other than the sugar's must fail" $neg_entrypoint_mismatch "dockerfile.entrypoint and entrypoint name different processes")

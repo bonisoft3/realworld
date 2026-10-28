@@ -10,19 +10,17 @@
       "secrets": [],
       "args": {}
     },
-    "command": [
-      "sh",
-      "-c",
-      "if [ -f /certs/localhost.pem ]; then export CADDY_TLS='/certs/localhost.pem /certs/localhost-key.pem'; fi; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"
-    ],
     "environment": {
-      "ELECTRIC_SECRET": "${ELECTRIC_SECRET:-dev-electric-secret}"
+      "ELECTRIC_SECRET": "${ELECTRIC_SECRET:-dev-electric-secret}",
+      "ORIGIN": "${ORIGIN:-http://localhost:${MECHA_DOOR_HOST_PORT}}"
     },
-    "ports": [
-      "8080:8080"
-    ],
+    "ports": [],
     "volumes": [],
-    "depends_on": {},
+    "depends_on": {
+      "libraries_mecha-crud": {
+        "condition": "service_healthy"
+      }
+    },
     "networks": {
       "default": {
         "aliases": [
@@ -61,7 +59,7 @@
     "preamble": [],
     "preambleCopyContexts": [],
     "from": {
-      "name": "caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0"
+      "name": "caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f"
     },
     "copy": [
       {
@@ -119,6 +117,38 @@
     "incremental": false,
     "cmd": null
   },
+  "entrypoint": {
+    "do": "case \"${ORIGIN#http://}\" in \"$ORIGIN\") h=${ORIGIN#https://};; *) h=${ORIGIN#http://};; esac; case \"$h\" in \"$ORIGIN\"|\"\"|*[!A-Za-z0-9.:-]*) echo \"ORIGIN '$ORIGIN' is no origin: set it to the scheme and host readers reach the door at, as https://app.example\" >&2; exit 1;; esac; set -e -o pipefail; roots=$(caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile | tr , '\\n' | grep -o '\"root\":\"[^\"]*\"' | cut -d'\"' -f4 | sort -u); if [ -n \"$roots\" ]; then find $roots -type f ! -name '*.etag' -exec sh -c 'set -e; q=$1; shift; for f do h=$(sha256sum < \"$f\"); printf \"$q%s$q\" \"${h%% *}\" > \"$f.etag\"; done' sh '\"' {} +; fi; if [ -f /certs/localhost.pem ]; then export CADDY_TLS='/certs/localhost.pem /certs/localhost-key.pem'; fi; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile",
+    "shell": "sh",
+    "env": {
+      "ELECTRIC_SECRET": "${ELECTRIC_SECRET:-dev-electric-secret}",
+      "ORIGIN": "${ORIGIN:-http://localhost:${MECHA_DOOR_HOST_PORT}}"
+    },
+    "after": {
+      "crud": "healthy"
+    },
+    "host": true
+  },
+  "expose": {
+    "door": {
+      "port": 8080,
+      "host": 8080,
+      "publish": {
+        "environment": "MECHA_DOOR_HOST_PORT"
+      }
+    }
+  },
+  "healthcheck": {
+    "template": "http",
+    "url": "http://127.0.0.1:8080/health",
+    "authorization": null,
+    "headers": [],
+    "interval": "5s",
+    "start_interval": "500ms",
+    "timeout": "5s",
+    "retries": 30,
+    "start_period": "10s"
+  },
   "name": "caddy",
   "project": "libraries_mecha",
   "dir": "libraries/mecha",
@@ -153,7 +183,8 @@
           ".bayt/Dockerfile.caddy",
           ".bayt/bayt.caddy.json",
           ".bayt/Taskfile.yml",
-          ".bayt/Taskfile.bayt.yml"
+          ".bayt/Taskfile.bayt.yml",
+          ".bayt/process-compose.yaml"
         ],
         "exclude": []
       },
@@ -169,7 +200,11 @@
         "similar": false
       },
       "upClosure": [
-        "libraries/mecha/.bayt/compose.caddy.yaml"
+        "libraries/mecha/.bayt/compose.caddy.yaml",
+        "libraries/mecha/.bayt/compose.crud.yaml",
+        "libraries/mecha/.bayt/compose.database.yaml",
+        "libraries/mecha/.bayt/compose.database-image.yaml",
+        "libraries/mecha/.bayt/compose.migrate.yaml"
       ]
     },
     "outs": {
@@ -197,7 +232,11 @@
         "similar": false
       },
       "upClosure": [
-        "libraries/mecha/.bayt/compose.caddy.yaml"
+        "libraries/mecha/.bayt/compose.caddy.yaml",
+        "libraries/mecha/.bayt/compose.crud.yaml",
+        "libraries/mecha/.bayt/compose.database.yaml",
+        "libraries/mecha/.bayt/compose.database-image.yaml",
+        "libraries/mecha/.bayt/compose.migrate.yaml"
       ]
     },
     "srcs": {
@@ -218,7 +257,9 @@
       "env": {},
       "visibility": "internal",
       "deps": [],
-      "transitiveDeps": [],
+      "transitiveDeps": [
+        "crud_outs_srcs"
+      ],
       "transitiveCrossDeps": [],
       "chainedDeps": [],
       "cmds": [],
@@ -227,20 +268,44 @@
         "similar": false
       },
       "upClosure": [
-        "libraries/mecha/.bayt/compose.caddy.yaml"
+        "libraries/mecha/.bayt/compose.caddy.yaml",
+        "libraries/mecha/.bayt/compose.crud.yaml",
+        "libraries/mecha/.bayt/compose.database.yaml",
+        "libraries/mecha/.bayt/compose.database-image.yaml",
+        "libraries/mecha/.bayt/compose.migrate.yaml"
       ]
     }
   },
   "visibility": "internal",
   "emitsSrcs": true,
-  "deps": [],
-  "sameProjectDeps": [],
-  "transitiveDeps": [],
+  "deps": [
+    "crud_outs"
+  ],
+  "sameProjectDeps": [
+    "crud_outs"
+  ],
+  "transitiveDeps": [
+    "crud_outs"
+  ],
   "transitiveCrossDeps": [],
   "upClosure": [
-    "libraries/mecha/.bayt/compose.caddy.yaml"
+    "libraries/mecha/.bayt/compose.caddy.yaml",
+    "libraries/mecha/.bayt/compose.crud.yaml",
+    "libraries/mecha/.bayt/compose.database.yaml",
+    "libraries/mecha/.bayt/compose.database-image.yaml",
+    "libraries/mecha/.bayt/compose.migrate.yaml"
   ],
-  "chainedDeps": [],
+  "chainedDeps": [
+    {
+      "name": "crud_outs",
+      "project": "libraries_mecha",
+      "dir": "libraries/mecha",
+      "outs": {
+        "globs": [],
+        "exclude": []
+      }
+    }
+  ],
   "cmds": [],
   "cache": {
     "full": false,

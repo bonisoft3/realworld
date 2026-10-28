@@ -40,6 +40,8 @@
       "base-url.ts",
       "terminal.cue",
       "read-markup.ts",
+      "render-documents.ts",
+      "server/**/*",
       "offline-first-sw.js"
     ],
     "exclude": []
@@ -139,13 +141,20 @@
           "base-url.ts",
           "terminal.cue",
           "read-markup.ts",
+          "render-documents.ts",
+          "server/**/*",
           "offline-first-sw.js",
           "src/**/*",
           "arbitrary.ts",
+          "battery-inputs.ts",
           "instrument.ts",
           "runtime/**/*",
           "package.json",
-          "tsconfig.json"
+          "tsconfig.json",
+          "[m]ise.toml",
+          "[.]mise.toml",
+          "[m]ise.lock",
+          "[.]tool-versions"
         ],
         "exclude": []
       },
@@ -168,14 +177,31 @@
               "interpreter/**/*",
               "check-*.ts",
               "arbitrary.ts",
+              "battery-inputs.ts",
               "components/**/*",
               "base-url.ts",
               "terminal.cue",
               "instrument.ts",
               "read-markup.ts",
+              "render-documents.ts",
+              "server/**/*",
               "runtime/**/*",
               "package.json",
               "tsconfig.json"
+            ],
+            "exclude": []
+          }
+        },
+        {
+          "project": "plugins_omnishell",
+          "name": "setup_srcs",
+          "dir": "plugins/omnishell",
+          "outs": {
+            "globs": [
+              "[m]ise.toml",
+              "[.]mise.toml",
+              "[m]ise.lock",
+              "[.]tool-versions"
             ],
             "exclude": []
           }
@@ -248,6 +274,8 @@
           "base-url.ts",
           "terminal.cue",
           "read-markup.ts",
+          "render-documents.ts",
+          "server/**/*",
           "offline-first-sw.js"
         ],
         "exclude": [],
@@ -269,13 +297,15 @@
           "base-url.ts",
           "terminal.cue",
           "read-markup.ts",
+          "render-documents.ts",
+          "server/**/*",
           "offline-first-sw.js"
         ],
         "exclude": [],
         "defaultGlobs": null,
         "defaultExclude": null
       },
-      "do": "sh -c 'deno test --config test/deno.json --lock test/deno.lock --frozen --cached-only --no-check --allow-env --allow-read --allow-import --allow-net --allow-sys --ignore=test/design-tokens.test.ts,test/check-parity.test.ts,test/chrome-direction.test.ts,test/entry-document.test.ts,test/locale-resolver.test.ts,test/vendor-bundle.test.ts,test/arbitrary-types.test.ts test/ && deno test --config interpreter/deno.json --lock interpreter/deno.lock --frozen --cached-only --allow-env --allow-read interpreter/adapter-smoke.js interpreter/clock-smoke.js interpreter/handler-smoke.js interpreter/hatch-smoke.js interpreter/kinetic-smoke.js interpreter/login-smoke.js interpreter/nav-smoke.js interpreter/ondemand-smoke.js interpreter/pending-smoke.js interpreter/renderer-smoke.js interpreter/validate-smoke.js interpreter/worker-smoke.js'",
+      "do": "sh -c 'deno test --config test/deno.json --lock test/deno.lock --frozen --cached-only --no-check --allow-env --allow-read --allow-import --allow-net --allow-sys --ignore=test/design-tokens.test.ts,test/check-parity.test.ts,test/chrome-direction.test.ts,test/entry-document.test.ts,test/document.test.ts,test/locale-resolver.test.ts,test/vendor-bundle.test.ts,test/arbitrary-types.test.ts,test/data-sync-parity.test.ts test/ && deno test --config interpreter/deno.json --lock interpreter/deno.lock --frozen --cached-only --allow-env --allow-read interpreter/adapter-smoke.js interpreter/clock-smoke.js interpreter/handler-smoke.js interpreter/hatch-smoke.js interpreter/kinetic-smoke.js interpreter/login-smoke.js interpreter/nav-smoke.js interpreter/ondemand-smoke.js interpreter/pending-smoke.js interpreter/renderer-smoke.js interpreter/validate-smoke.js interpreter/worker-smoke.js'",
       "shell": "sh",
       "name": "builtin",
       "stop": false

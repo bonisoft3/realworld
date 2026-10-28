@@ -1,4 +1,5 @@
-const excluded = new Set(["negotiation_test.ts"]);
+// Cross-package contracts import mecha or app fixtures checked at repo tier.
+const excluded = new Set(["endowments_test.ts", "hybrid-edge.integration.test.ts"]);
 const files = [...Deno.readDirSync(".")]
   .filter((entry) => entry.isFile && entry.name.endsWith(".ts") && !excluded.has(entry.name))
   .map((entry) => entry.name)

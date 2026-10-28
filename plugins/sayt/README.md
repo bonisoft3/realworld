@@ -255,6 +255,13 @@ The simplest form of configuration for sayt is through `.say.yaml`. If you prefe
 
 Beyond syntax choice for simple declarative configuration, sayt offers advanced composition through `.say.cue`, which leverages the full power of cue for configuration. Sayt config has a block for configuring sayt itself, and one for each command. Sayt automatically validates your config with a cue schema.
 
+Sayt discovers `.say.*` files. A project owns the glue that places generated
+configuration in those files, or selects a generated file explicitly.
+Conflicting values fail CUE validation. An explicit configuration selector
+loads only its selected files.
+`SAYT_CONFIG` supplies that selector to nested checker processes; an explicit
+`load-config --config` argument takes precedence.
+
 If you prefer to define configuration programmatically or you need to do it dynamically by inspecting the environment, you can drop a `.say.nu` config file — a [nushell](https://www.nushell.sh/) script that works identically across macOS, Linux, and Windows. In fact, all of sayt's verb default behaviors are defined in a default configuration, and you can fully adapt sayt to use your preferred semantics instead.
 
 All these mechanisms co-exist peacefully through cuelang unification rules, but most users will never need to dive into them. It just works.
@@ -264,7 +271,7 @@ A repository can also pin the sayt version it expects under the `self` block:
 ```yaml
 say:
   self:
-    version: "v0.40.0"
+    version: "v0.45.1"
 ```
 
 When the invoked sayt's version differs from the pin, it re-execs itself through the colocated `saytw` wrapper with `SAYT_VERSION` set to the pinned version, so every contributor and CI run uses the same sayt regardless of what's installed. The `sayt/install` GitHub action treats this pin as the version authority.
@@ -298,6 +305,11 @@ say:
 
 When `stop: true`, dispatch halts after the rule executes. When `stop` is absent or `false`, dispatch continues to the next rule. Built-in rules for verbs like `build`, `test`, and `setup` default to `stop: true`. Code generation and lint rules default to run-all, so multiple generators and linters compose naturally.
 
+In a multi-command rule, arguments reach closed preparation steps through
+`SAYT_VERB_ARGS`. A command that calls its imported `cmd.use` module receives
+the arguments directly, so preparation followed by `launch` preserves flags
+such as `--watch`.
+
 By default the first failing rule ends the verb. Set `keep_going: true` on a verb whose rules are independent batteries (say, a visual suite and a window suite under `integrate`): every rule runs, each failure is reported by rule name, and the verb exits 1 after the last rule if any failed. The commands within one rule still stop at the first failure, so a rule's test never runs after its stack failed to boot. `stop` keeps its meaning: no rules run after a rule with `stop: true`, whether that rule passed or failed.
 
 ```yaml
@@ -321,6 +333,19 @@ say:
         cmds:
           - do: "cargo build"
 ```
+
+</details>
+
+<details>
+<summary><strong>Output levels: <code>-v</code> and <code>-q</code></strong></summary>
+
+| Level | Default when | Prints |
+| ----- | ------------ | ------ |
+| verbose (`-v`) | stdout is a terminal, or `CI` is set | each command, then its output, streamed unbuffered |
+| normal | stdout is a pipe, as for an agent or a script | each command, a heartbeat every minute while it runs, then `✓ name (lines, time, log: path)` |
+| quiet (`-q`) | never | nothing unless a command fails |
+
+Below verbose, a command's output goes to a log in one private temp directory per run. A failure prints the whole log to stdout and `✗ name exit N after T, log: path` at every level, and the exit code passes through. Nested sayt processes inherit the level through `SAYT_VERBOSITY`.
 
 </details>
 
@@ -471,7 +496,7 @@ Each skill corresponds to a verb pair and is named after the environment where t
 | **sayt-cli** | `setup` / `doctor` | How to write `.mise.toml` files with correct tool versions, settings, and platform stubs. |
 | **sayt-code** | `generate` / `lint` | How to write `.say.cue` / `.say.yaml` — the ordered-map rule pattern, built-in generators (`auto-gomplate`, `auto-cue`, `auto-bayt`), built-in lint rules (`#copy`, `#shared`, `#vet`), CUE basics. |
 | **sayt-ide** | `build` / `test` | How to write `.vscode/tasks.json` — build/test task schema, `dependsOn` chains, per-language examples (Node/pnpm, Gradle, Go, Python, Rust, plus adapters for Scala, Elixir, Ruby, .NET, Zig, C). |
-| **sayt-cnt** | `launch` / `integrate` | How to write `Dockerfile` + `compose.yaml` — the `launch`/`integrate` service convention, multi-stage targets, multi-platform sha256 pinning, dind helpers. |
+| **sayt-cnt** | `launch` / `integrate` | How to write `Dockerfile` + `compose.yaml` — the `launch`/`integrate` service convention, multi-stage targets, multi-platform sha256 pinning, docker bridge helpers. |
 | **sayt-k8s** | `release` / `verify` | How to write `skaffold.yaml` and `.goreleaser.yaml` — goreleaser for artifact publishing, skaffold for K8s deployment, preview/production profiles. |
 
 The plugin also includes a **sayt-dev-loop** agent that can drive the full
@@ -537,8 +562,8 @@ steps:
       targets: integrate
       load: true
       set: |
-        *.cache-from=type=gha
-        *.cache-to=type=gha,mode=max
+        *.cache-from=type=gha,version=2
+        *.cache-to=type=gha,version=2,mode=max
   - uses: actions/checkout@v4
   - run: docker compose run integrate
 ```
@@ -564,15 +589,15 @@ variable "CACHE_SCOPE" {
 function "cache_from" {
   params = [name]
   result = CACHE_SCOPE != "" ? [
-    "type=gha,scope=main-${name}",
-    "type=gha,scope=${CACHE_SCOPE}-${name}",
+    "type=gha,version=2,scope=main-${name}",
+    "type=gha,version=2,scope=${CACHE_SCOPE}-${name}",
   ] : []
 }
 
 function "cache_to" {
   params = [name]
   result = CACHE_SCOPE != "" ? [
-    "type=gha,mode=max,scope=${CACHE_SCOPE}-${name}"
+    "type=gha,version=2,mode=max,scope=${CACHE_SCOPE}-${name}"
   ] : []
 }
 
@@ -586,20 +611,20 @@ target "ci" {
   dockerfile-inline = <<-EOF
     FROM ghcr.io/bonisoft3/sayt:latest AS ci
     COPY . .
-    RUN --mount=type=secret,id=host.env,required dind.sh sayt integrate
+    RUN --mount=type=secret,id=host.env,required docker-bridge.sh sayt integrate
   EOF
 }
 
-# Inner target: built inside dind.sh where ACTIONS_CACHE_URL is available
+# Inner target: built inside docker-bridge.sh where ACTIONS_RESULTS_URL is available
 target "integrate" {
   cache-from = cache_from("integrate")
   cache-to   = cache_to("integrate")
 }
 ```
 
-The `dind.sh` helper starts a scoped Docker daemon inside the container, so
-`docker compose` and `docker buildx` work without privileged mode or host
-socket mounting. Use the action with `mode: bake`:
+The `docker-bridge.sh` helper points the container's `/var/run/docker.sock` at
+the host daemon over the docker bridge (no second daemon), so `docker compose`
+and `docker buildx` work without privileged mode or a host socket mount. Use the action with `mode: bake`:
 
 ```yaml
 - uses: bonisoft3/sayt/.github/actions/sayt/integrate@main
@@ -610,7 +635,7 @@ socket mounting. Use the action with `mode: bake`:
 This gives you a fully hermetic CI where the build, test, and integration
 steps all happen within a single reproducible container image. You can even run it locally with `sayt integrate --bake --target ci` (or `--depot` to route the inner bake through depot.dev remote builders) or with even more fidelity as `act -j ci` if you configure it as a github workflow job named ci and install the act local runner.
 
-`--target` accepts a comma-separated list (`sayt integrate --bake --target ci,ci-run`), which lets you sidestep buildkit's 4MB gRPC cap by splitting one oversized bake graph into several. Multi-target is only supported with a bake build.
+`--target` accepts a comma-separated list (`sayt integrate --bake --target ci,integrate`), which lets you sidestep buildkit's 4MB gRPC cap by splitting one oversized bake graph into several. Multi-target is only supported with a bake build.
 
 ### `sayt integrate` flags
 
@@ -623,12 +648,11 @@ The build axis is single-valued — the flags conflict with each other:
 | `--no-build` | build | skip the build; `compose up --no-build` (images must pre-exist) |
 | `--no-up` | run | stop after the build. `--bake --no-up` is the *envelope*: the test runs inside the bake `RUN` and bake's exit code is the verdict |
 | `--target <t,…>` | run | compose services / bake targets to run (multi-target needs a bake build) |
-| `--dind` | capability | the runtime `compose up` gets a daemon (`${DOCKER_HOST:-unix:///var/run/docker.sock}`) |
-| `--dind-bridge` | capability | a build `RUN` gets a daemon via a socat tcp bridge |
-| `--with-buildx` | capability | inject the host buildx builder into a build `RUN` (implies `--dind-bridge`) |
+| `--with-docker` | capability | a build `RUN` gets the host daemon over the docker bridge (socat tcp) |
+| `--with-buildx` | capability | inject the host buildx builder into a build `RUN` (implies `--with-docker`) |
 | `--with-kube` | capability | collect the host kubeconfig into the sandbox (`KUBECONFIG_DATA`) |
 | `--with-testcontainers` | capability | provision testcontainers: reachable daemon + host override |
-| `--with-host-env` | capability | compose path: graph env-sources `HOST_ENV` → open a dind bridge |
+| `--with-host-env` | capability | compose path: graph env-sources `HOST_ENV` → open a docker bridge |
 | `--builder <name>` | capability | names the buildx builder to inject and/or drive the outer bake |
 | `--no-cache` / `--no-cache-from` / `--no-cache-to` | cache | escape hatches for runs without registry auth; each strips outer + inner |
 
@@ -650,7 +674,7 @@ The `sayt/depot` action runs `sayt/ci` on [depot.dev](https://depot.dev) remote 
     DEPOT_TOKEN: ${{ secrets.DEPOT_TOKEN }}
 ```
 
-The `phase` input can split CI in two: `build` runs a flat host-side `depot bake` of the project's committed depot HCL closure — building and pushing the runtime images with no dind daemon — and `run` pulls that pushed closure and composes it up. The default `full` does both in one dindbox job. The build phase bakes the project's committed `.bayt/depot.{yaml,hcl}` pair, so it needs no compose walk of its own; the project opts in with `#project.depot`.
+The `phase` input can split CI in two: `build` runs a flat host-side `depot bake` of the project's committed depot HCL closure — building and pushing the runtime images with no bkid step — and `run` pulls that pushed closure and composes it up. The default `full` does both in one bkid job. The build phase bakes the project's committed `.bayt/depot.{yaml,hcl}` pair, so it needs no compose walk of its own; the project opts in with `#project.depot`.
 
 The `targets` input narrows what a baking phase builds — a group name or a list of target names, defaulting per phase (`ci` for `full`, the `depot-build` group for `build`). Naming leaves is enough; their dependencies come along. A caller that knows which leaves are already published passes the remainder, and skips the action entirely when nothing needs rebuilding: empty means the phase default, i.e. a full build.
 

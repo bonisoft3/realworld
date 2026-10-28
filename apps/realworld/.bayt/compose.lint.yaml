@@ -1,0 +1,46 @@
+# generated from bayt.cue — do not edit
+services:
+  realworld-lint:
+    build:
+      additional_contexts:
+        realworld-generate: service:realworld-generate
+      context: ..
+      dockerfile: .bayt/Dockerfile.lint
+      target: lint
+      tags:
+      - bayt-realworld-lint:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+      - bayt-realworld-lint:latest
+      args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-realworld-lint:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+    scale: 0
+  realworld-lint_bayt:
+    build:
+      additional_contexts:
+        realworld-generate_bayt: service:realworld-generate_bayt
+        realworld-setup_bayt: service:realworld-setup_bayt
+      context: ..
+      dockerfile: .bayt/Dockerfile.lint
+      target: lint_bayt
+      args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-realworld-lint_bayt:latest
+    scale: 0
+  realworld-lint_srcs:
+    build:
+      additional_contexts:
+        realworld-generate_srcs: service:realworld-generate_srcs
+        realworld-setup_srcs: service:realworld-setup_srcs
+      context: ..
+      dockerfile: .bayt/Dockerfile.lint
+      target: lint_srcs
+      args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
+        BUILDKIT_SYNTAX: >-
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-realworld-lint_srcs:latest
+    scale: 0

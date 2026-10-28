@@ -13,24 +13,37 @@ why the contract has that shape, and where it bites.
 
 ## A region's rows
 
-`data-live` with its filter, order and select is a query the store maintains
-(`subscribe`, [`data-sync.js`](../interpreter/data-sync.js)). A region wakes
-when a row its filter could show changes, or a table its embeds, row visibility
-or fold sink depends on; a write elsewhere costs it nothing. Each wake re-reads,
-keeps `currentRows` and [patches by key](screen-updates.md#when-data-changes).
+`data-live` names a rendered query; the entity's durability decides its
+freshness. A `server` entity reads through PostgREST on entry, changed query
+parameters, explicit refresh or a completed local command. It opens no remote
+subscription and retains no query snapshot. A `live` entity updates while its
+region is active: a maintainable query uses its demanded local view, while a
+server-computed query refetches on dependency invalidation. `offline`, `tab`
+and `device` keep their collection behavior.
+
+Server-computed live reads observe authorized changes independently of retained
+rows. A deletion of a row never loaded locally still invalidates the query.
+The base table, schema-resolved embeds, access dependencies and fold sources
+supply its dependency set. A change to the base table refreshes the result only
+when a row it names could pass the query's filter, the test a query decided
+locally applies; any other dependency's change, and one whose rows are unknown,
+refreshes it whole. Refreshes are coalesced; there is no polling. Initial stream catch-up
+and a reset request another read, closing the gap before observation began.
+Grant families retain their authorized collection union, since their visibility
+already requires that state. Each wake re-reads and [[screen-updates#When data changes|patches by key]].
 
 The store has many writers — forms, reduces, machine effects, sync, other tabs —
 so no writer knows a region changed; the renderer does, having just applied the
 rows. Elm's one funnel knows what it changed and needs no hook; here the
 transition has to be published and its cycles bounded.
 
-## A table synced on demand
+## A table read lazily
 
-`shell.yaml`'s `sync` names the tables pronto derived as on demand
-([screens](../../pronto/docs/screens.md#the-reads-decide-how-a-table-syncs)).
+`shell.yaml`'s `read` names the tables pronto derived as lazy
+([screens](../../pronto/docs/screens.md#the-reads-decide-how-a-table-is-read)).
 The store passes the mode to mecha's client, which opens the shape from now and
 loads each maintained view's rows, and its embeds' by key, as subset
-snapshots. Three rules follow from a collection that holds only what its views
+snapshots. These rules follow from a collection that holds only what its views
 asked for:
 
 - **A view is read only once it is settled**: ready, and loading no subset.
@@ -55,14 +68,38 @@ asked for:
   service that mints nothing, a gate that refuses what it minted. It fails the
   reads waiting on the view, so the screen says network-error and the region's
   backoff takes over, and the next read starts the rebuilds over.
+- **The subsets asked for together are one snapshot.** A region per row asks
+  the same shape for one subset per row, all at once, and each snapshot pauses
+  the shape's stream until its rows arrive: golaberto's chances page asked for
+  forty, and under load the last held the stream past 30 s. mecha's client
+  loads the subsets one turn of the event loop asks for, each without a limit,
+  as one snapshot of their union.
 - **A view holds its wakes while it loads a subset**, so no region binds a row
   whose embed has not arrived yet.
-- **Nothing else reads the collection as the table.** A snapshot read, a
-  validation, a visibility rule, a fold's projection, an upsert, a delete by
-  filter and a mutation reduce's write by key all raise a `ProgramError`
-  naming the site (`whole` in `data-sync.js`) when they meet an on-demand
-  table. pronto's rule keeps such a table eager, so one raised is a drift
-  between the two.
+- **Whole and snapshot queries demand completeness explicitly.** A snapshot
+  query acquires one view over the clauses a view can state (eq, neq, null
+  tests) with its embeds joined, which loads every row its filter could admit
+  and the rows they join; a whole query, or a snapshot query stating no such
+  clause or a join no view keeps, acquires full-table subset views for its base
+  and local embeds. Each waits for all of them, then evaluates with the local
+  carrier comparisons and optimistic state, so a boolean, a cursor, a pattern
+  or an unkept cap filters the bounded set locally.
+  Predicate, cap, ordering and join eligibility are checked per query against
+  carrier metadata. An unsupported query elsewhere does not widen this query.
+  Subscriptions retain these demands while mounted; named reads use temporary
+  leases with real listeners until settlement, surviving navigation and view
+  garbage collection. Releasing a view need not evict cached source rows.
+- **Incidental whole reads outside queries are refused.** A validation,
+  visibility rule or fold's projection raises a `ProgramError` naming the
+  site (`whole` in `data-sync.js`) when it meets a lazy table. Pronto's
+  rule keeps such a table eager, so one raised is a drift between the two.
+- **Opaque mutations demand completeness before writing.** A reducer's keyed
+  put, natural-key upsert or filtered delete loads all visible rows before
+  classifying inserts, resolving uniqueness or selecting deletion targets.
+  That demand stays subscribed for the store's lifetime, including across
+  view rebuilds, so later operations include remote rows and optimistic
+  changes. An initial mutation requires connectivity if those rows have not
+  loaded; read-only visits pay only for their views.
 - **An update or a delete by key loads its row first.** A row the collection
   lacks is loaded as a view of its key and held until the write has gone out;
   Electric keeps a loaded row current from then on. A key no row has stays
@@ -107,6 +144,13 @@ terminal's clock, so `?clock=manual` holds it; with a draw when it says
 `seed: true`, since the compartment has no randomness and `?seed=` replays the
 draw; with `with` carried across. A value can be recorded and a promise
 cannot, so a reduce returning one throws.
+
+Under `?seed=` each reduce draws from a stream of its own, seeded from the
+seed and the reduce's name, so what one draws does not depend on when another
+ran: two reduces whose first steps wait on different syncs would otherwise
+swap draws from run to run, and the seed would replay only the scheduling it
+happened to get. The keys the terminal mints for a form's create draw from the
+terminal's own stream, ordered by the gestures that mint them.
 
 A hook makes runaway cascades cheap too, so the terminal owns the depth: 8
 steps, then `handler chain did not settle`. An app cannot bound a cycle it

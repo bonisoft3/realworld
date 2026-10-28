@@ -1,15 +1,23 @@
 # generated from bayt.cue — do not edit
 includes:
-  replay:
-    taskfile: ./Taskfile.replay.yaml
+  ci-replay:
+    taskfile: ./Taskfile.ci-replay.yaml
     dir: ../
     optional: true
   setup:
     taskfile: ./Taskfile.setup.yaml
     dir: ../
     optional: true
+  lint-inputs:
+    taskfile: ./Taskfile.lint-inputs.yaml
+    dir: ../
+    optional: true
   lint:
     taskfile: ./Taskfile.lint.yaml
+    dir: ../
+    optional: true
+  generate:
+    taskfile: ./Taskfile.generate.yaml
     dir: ../
     optional: true
   build:
@@ -24,23 +32,28 @@ includes:
     taskfile: ./Taskfile.integrate.yaml
     dir: ../
     optional: true
+  ci-visual:
+    taskfile: ./Taskfile.ci-visual.yaml
+    dir: ../
+    optional: true
+  ci:
+    taskfile: ./Taskfile.ci.yaml
+    dir: ../
+    optional: true
+  launch-action:
+    taskfile: ./Taskfile.launch-action.yaml
+    dir: ../
+    optional: true
+  integrate-action:
+    taskfile: ./Taskfile.integrate-action.yaml
+    dir: ../
+    optional: true
   check-favorites:
     taskfile: ./Taskfile.check-favorites.yaml
     dir: ../
     optional: true
-  workspaceroot:
-    taskfile: ../../../Taskfile.yml
-    dir: ../../../
+  ci-favorites:
+    taskfile: ./Taskfile.ci-favorites.yaml
+    dir: ../
     optional: true
-  libraries_mecha:
-    taskfile: ../../../libraries/mecha/Taskfile.yml
-    dir: ../../../libraries/mecha/
-    optional: true
-tasks:
-  cross_workspaceroot_setup:
-    internal: true
-    run: once
-    if: test -f ../../Taskfile.yml
-    deps:
-    - workspaceroot:bayt:setup
 version: "3"

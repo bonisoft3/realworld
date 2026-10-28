@@ -33,6 +33,7 @@ code: surface: screens: {
 			{table: "comment", op: "create"},
 			{table: "comment", op: "delete"},
 		]
+		charts: []
 		files: {handlers: [], adapters: []}
 	}
 	"edit-article": {
@@ -43,6 +44,7 @@ code: surface: screens: {
 		writes: [
 			{table: "article", op: "update"},
 		]
+		charts: []
 		files: {handlers: [], adapters: []}
 	}
 	editor: {
@@ -53,11 +55,12 @@ code: surface: screens: {
 		writes: [
 			{table: "article", op: "create"},
 		]
+		charts: []
 		files: {handlers: [], adapters: []}
 	}
 	feed: {
 		reads: [
-			{table: "article", kind: "live", nested: false, lists: [], route: "server", clauses: [], limit: 20, orders: ["created_at","id"]},
+			{table: "article", kind: "live", nested: false, lists: [], route: "server", clauses: [], embeds: ["app_user","follow"], limit: 20, orders: ["created_at","id"]},
 			{table: "article", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
 			{table: "article_tag", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
 			{table: "favorite", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
@@ -71,11 +74,12 @@ code: surface: screens: {
 			{table: "bookmark", op: "create"},
 			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
 		]
+		charts: []
 		files: {handlers: [], adapters: []}
 	}
 	"feed-older": {
 		reads: [
-			{table: "article", kind: "live", nested: false, lists: [], route: "server", clauses: [{"col":"created_at","op":"lt"}], limit: 20, orders: ["created_at","id"]},
+			{table: "article", kind: "live", nested: false, lists: [], route: "server", clauses: [{"col":"created_at","op":"lt"}], embeds: ["app_user","follow"], limit: 20, orders: ["created_at","id"]},
 			{table: "article", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
 			{table: "article_tag", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
 			{table: "favorite", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
@@ -89,6 +93,7 @@ code: surface: screens: {
 			{table: "bookmark", op: "create"},
 			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
 		]
+		charts: []
 		files: {handlers: [], adapters: []}
 	}
 	home: {
@@ -108,6 +113,7 @@ code: surface: screens: {
 			{table: "bookmark", op: "create"},
 			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
 		]
+		charts: []
 		files: {handlers: [], adapters: []}
 	}
 	older: {
@@ -126,6 +132,7 @@ code: surface: screens: {
 			{table: "bookmark", op: "create"},
 			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
 		]
+		charts: []
 		files: {handlers: [], adapters: []}
 	}
 	profile: {
@@ -133,7 +140,7 @@ code: surface: screens: {
 			{table: "app_user", kind: "live", nested: false, lists: [], route: "view", clauses: [{"col":"handle","op":"eq"}], embeds: [], orders: []},
 			{table: "me", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"handle","op":"eq"}], embeds: [], orders: []},
 			{table: "follow", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"followed_id","op":"eq"}], embeds: [], orders: []},
-			{table: "article", kind: "live", nested: false, lists: [], route: "server", limit: 20, orders: ["created_at","id"]},
+			{table: "article", kind: "live", nested: false, lists: [], route: "server", embeds: ["app_user"], limit: 20, orders: ["created_at","id"]},
 			{table: "article", kind: "live", nested: true, lists: [3], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
 			{table: "article_tag", kind: "live", nested: true, lists: [3], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
 			{table: "favorite", kind: "live", nested: true, lists: [3], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
@@ -149,6 +156,7 @@ code: surface: screens: {
 			{table: "bookmark", op: "create"},
 			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
 		]
+		charts: []
 		files: {handlers: [], adapters: []}
 	}
 	"profile-favorites": {
@@ -156,7 +164,7 @@ code: surface: screens: {
 			{table: "app_user", kind: "live", nested: false, lists: [], route: "view", clauses: [{"col":"handle","op":"eq"}], embeds: [], orders: []},
 			{table: "me", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"handle","op":"eq"}], embeds: [], orders: []},
 			{table: "follow", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"followed_id","op":"eq"}], embeds: [], orders: []},
-			{table: "favorite_index", kind: "live", nested: false, lists: [], route: "server", limit: 20, orders: ["favorited_at"]},
+			{table: "favorite_index", kind: "live", nested: false, lists: [], route: "server", embeds: ["app_user"], limit: 20, orders: ["favorited_at"]},
 			{table: "article", kind: "live", nested: true, lists: [3], route: "view", clauses: [{"col":"id","op":"eq"}], embeds: ["app_user"], orders: []},
 			{table: "article", kind: "live", nested: true, lists: [3,4], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
 			{table: "article_tag", kind: "live", nested: true, lists: [3,4], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
@@ -173,6 +181,7 @@ code: surface: screens: {
 			{table: "bookmark", op: "create"},
 			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
 		]
+		charts: []
 		files: {handlers: [], adapters: []}
 	}
 	"reading-list": {
@@ -192,6 +201,7 @@ code: surface: screens: {
 			{table: "bookmark", op: "create"},
 			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
 		]
+		charts: []
 		files: {handlers: [], adapters: []}
 	}
 	search: {
@@ -210,6 +220,7 @@ code: surface: screens: {
 			{table: "bookmark", op: "create"},
 			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
 		]
+		charts: []
 		files: {handlers: [], adapters: []}
 	}
 	settings: {
@@ -220,11 +231,12 @@ code: surface: screens: {
 		writes: [
 			{table: "app_user", op: "update"},
 		]
+		charts: []
 		files: {handlers: [], adapters: []}
 	}
 	tag: {
 		reads: [
-			{table: "article", kind: "live", nested: false, lists: [], route: "server", limit: 20, orders: ["created_at"]},
+			{table: "article", kind: "live", nested: false, lists: [], route: "server", embeds: ["app_user","article_tag"], limit: 20, orders: ["created_at"]},
 			{table: "article", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"id","op":"eq"},{"col":"cover_url","op":"notnull"},{"col":"cover_url","op":"neq"}], embeds: [], orders: []},
 			{table: "article_tag", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"}], embeds: [], orders: ["tag"]},
 			{table: "favorite", kind: "live", nested: true, lists: [0], route: "view", clauses: [{"col":"article_id","op":"eq"},{"col":"deleted_at","op":"null"}], embeds: [], orders: []},
@@ -238,6 +250,7 @@ code: surface: screens: {
 			{table: "bookmark", op: "create"},
 			{table: "bookmark", op: "delete", filter: "article_id=eq.{id}"},
 		]
+		charts: []
 		files: {handlers: [], adapters: []}
 	}
 }
@@ -245,7 +258,7 @@ code: surface: screens: {
 _irNotes: {
 	"decision-absolute-recount": "Every derived count is an absolute recount over the source table, never a delta — and every mapping unions the triggering event's own key. All three pipelines are cdc, and the emitted shape (emit.cue:190-245) is a redis-streams input, a branch that GETs ${CRUD_URL}/<source>?<aggregate> with the service token, one bloblang, and a retrying POST to ${CRUD_URL}/<sink>?on_conflict=<pk> carrying Prefer: resolution=merge-duplicates. The CDC event is a trigger, never a payload: the emitted rows are a pure function of the source table's current contents, so replaying an event — or any other event, since every cdc pipeline reads the whole cdc-events stream and from is documentation rather than a filter — recomputes the same values and overwrites them identically. At-least-once delivery is therefore indistinguishable from exactly-once, and out-of-order delivery converges because no value depends on arrival order. Deltas were rejected for the reason the prelude states: at-least-once means a delta applied twice is simply wrong, and nothing in the transport can promise otherwise. The one subtlety, and it is load-bearing: an absolute read over the source cannot see a subject that has just lost its last row, so each mapping unions the event row's own key into the emitted set — without it, the last un-favorite leaves the count frozen at 1 forever, contradicting accept-favorite-toggles. That depends on conduit's restore-deleted-row processor back-filling Payload.After from Payload.Before on deletes, which is present in this tree (emit.cue:745-760). Each mapping also throws rather than degrade when the harness hands it a bare array at the root, because a groups-only count would silently leave stale finals behind. The second subtlety is the cost of that shared stream, and it is the reason each mapping's guard drops the message rather than reasserting the truth. Six tables are in the publication; resolution=merge-duplicates is ON CONFLICT DO UPDATE, which fires the emitted txid restamp trigger (emit.cue:677-696) on every row it touches; so a no-op reassertion would give every article_stats, favorite_index and tag_count row a fresh WAL version on every unrelated comment, and Electric would fan the whole sink out to every connected tab. The write and sync amplification is O(sink) per unrelated event, which is not harmlessness. root = deleted() on a foreign event costs one GET and no write, and the discriminator is exact per pipeline: user_id occurs only on favorite among the crud tables (article and comment carry author_id, follow carries follower_id), and tag only on article_tag (article carries tags). The maintenance trap is stated where it will be needed: a future crud table carrying one of those column names silently re-opens the storm. pipeline-designer fired here on its \"insert, update and delete must all be handled\" clause"
 	"decision-article-tag-trigger": "ArticleTag is a trigger's output, not a pipeline's — the one place this design refuses the recount discipline, and why. The platform has no array type and one form writes one row, so Article.tags is a single text column: the words as the writer typed them, round-tripped by the editor. Three things need tag rows: the /tag/:name inner-embed list, the chips on every preview (a nested region cannot split a string), and tag-recount, which needs a crud-path source because the publication covers crud tables only. A pipeline cannot produce them: an absolute recount can re-assert the pairs an article has, but the CDC event carries the after-image only, so it can never retract the pair it no longer has — retagging would leave stale rows and a dishonest popular-tags panel, contradicting accept-tagcount-true. 013_article_tag_sync.sql is delete-and-reinsert inside the article's own transaction, which is exact by construction and makes the piece appear on each tag's list the moment it appears on the community list (accept-tags-file). SECURITY DEFINER because article_tag carries no app_user write policy at all; deletion needs no arm because the FK cascades. The IS NOT DISTINCT FROM guard is not decoration: the editor's update form always names tags (AFTER UPDATE OF fires on the column being named, not changed), so without it every title fix would churn the whole tag set, replace every chip's DOM node and wake the pipeline for nothing. The corollary the form contract must keep: the revise form always submits all four fields, because omitting tags would silently freeze the projection"
-	"decision-auth-deviation": "Conduit takes the terminal's door and therefore has no anonymous reader — the one place this app deliberately departs from the RealWorld specification. RealWorld specifies email/password registration with a user-chosen username and a JWT the app manages. The terminal publishes its offer as data — capabilities.auth.modes: [\"passkey\", \"guest\"], identity: \"generated\" (plugins/omnishell/terminal.cue:56-65) — and #emit refuses any other mode, so an email/password program does not compile. The gate is also binary: shell.js:254-266 checks auth.required before a store is created or a screen is mounted, renders its own login chrome when no session exists, and with required: false issues no Authorization header at all — under which anon holds schema USAGE and no table privileges (emit.cue:603,614), so an ungated Conduit would read nothing. There is no anonymous-read-with-optional-sign-in mode to ask for. Two designs were therefore rejected outright: a hand-written sign-in screen with an email field, and a public browse mode with a sign-in prompt on write. Per the prelude's capability doctrine, demanding what a runtime does not offer is a compile error; the brief already names this in Out of scope (\"the door is the platform's and it comes first\") and the identity section spells the ceremony out. Accepted losses, recorded rather than smoothed over: a search-engine crawler sees the login chrome and nothing else, a shared article link costs one guest click before it reads, and a guest identity lives in sessionStorage — closing the tab ends it, and only a passkey brings a person back to their own articles (accept-signout-return). What the app gets in exchange is the whole ceremony for free: one tap, no typing, a unique generated handle, the name · handle · sign out chrome, the nav, and 401 recovery, none of it designed here"
+	"decision-auth-deviation": "Conduit takes the terminal's door and therefore has no anonymous reader — the one place this app deliberately departs from the RealWorld specification. RealWorld specifies email/password registration with a user-chosen username and a JWT the app manages. The terminal publishes its offer as data: passkey and guest modes plus capabilities.auth.providers: [\"google\"]. The app keeps auth.required: true; the terminal renders its existing login chrome before mounting a screen. Google is an additional provider link, with credentials supplied to Mecha at runtime rather than to the browser. Its verified issuer and subject select an account, never an email address; signing in does not merge a guest's existing writing into that account. Two designs were therefore rejected outright: a hand-written sign-in screen with an email field, and a public browse mode with a sign-in prompt on write. Per the prelude's capability doctrine, demanding what a runtime does not offer is a compile error; the brief already names this in Out of scope (\"the door is the platform's and it comes first\") and the identity section spells the ceremony out. Accepted losses, recorded rather than smoothed over: a search-engine crawler sees the login chrome and nothing else, a shared article link costs one guest click before it reads, and a guest identity lives in sessionStorage — closing the tab ends it; a passkey or the same Google account brings a person back to their own articles (accept-signout-return). What the app gets in exchange is the whole ceremony for free: one tap, no typing, a unique generated handle, the name · handle · sign out chrome, the nav, and 401 recovery, none of it designed here"
 	"decision-author-card": "The writer's card sits after the body, and repeats the follow control there. The byline at the top sells the piece; the card at the foot sells the person, and that ask only makes sense to a reader who has just finished reading — which is the whole reason the card exists and the reason the ask belongs in it. Its identity costs no region: every value comes from the author embed the article row already carries, which is why bio joined that select rather than arriving as a second read — the byline and the card read the same row and so can never disagree about a name. Reversed from “no follow button here”: the objection was that two controls for one state are two places to be wrong about it, and that is only true of two controls with two sources of truth. These have one. The card's arms are the same two declared forms with the same filters, chosen by a probe with the same followed_id=eq.{author_id} — the same shape, so the two controls settle together on the same refresh and a reader cannot see “Follow” in one and “Following” in the other. What the top of the piece cannot do is catch the reader at the moment they have decided, because by then it is a screen and a half above them"
 	"decision-bookmark-no-public-face": "A save is a favorite with its derived half deleted, and that deletion is the feature. Bookmark is owned on user_id exactly as Favorite is, but where a favorite has two public faces — ArticleStats for the count everyone sees, FavoriteIndex for the list somebody else can read — a save has none. Nobody may see that you saved a piece, no number moves when you do, and so there is no sink, no pipeline, and none of the seconds of lag the derived faces cost. The reading list is therefore read straight off the owned table, which is what lets it be ordered by save time, the thing a reader means by “my list”; profile-favorites cannot do that, because its order has to come from a sink. Two alternatives were rejected. Folding saves into Favorite: one gesture cannot mean both “this was good” and “not yet”, and a reader who hearts a piece to find it again has corrupted the only public signal the app has. A public save count: it is the obvious next feature and it would change what people save — a reading list is a private intention, and an intention with an audience becomes a performance. ACCEPTED COST, and the measurement changed what it says. The star's probe is the seventh Electric shape on a list screen, and home already opened six (article, app_user, article_tag, article_stats, favorite, tag_count — counted live, one shape per table however many cards draw it). Six is Chrome's per-origin connection ceiling on HTTP/1.1, so the pool is fully consumed by long-polls and a write waits for one of them to return. This was written down as a mild cost and then measured, and it is not mild — from PerformanceResourceTiming on the running cluster: screenlive shapeswritestalledserver settings2PATCH app_user, 183 ms1 ms181 ms tag7POST bookmark, 12 151 ms12 073 ms78 ms Seventy-eight milliseconds of server against twelve seconds of stalled: the write is not slow, it is queued behind six long-polls for a connection. Two things follow, and only one of them is about this feature. The first: this is not a regression the save arm introduced — at six shapes the pool was already exhausted, so favoriting from home stalled exactly as long before the seventh shape existed (measured at 7 855 ms on the same page), and article has been over the ceiling at eight since it was written. The optimistic arms are what have hidden it: the star and the pill fill on the press, so the reader sees the write land and the twelve seconds are spent invisibly. The second, which is the one that matters: this is now the app's dominant defect, it is transport and not schema, and it has a known answer — the cluster's own :8443 listener is TLS and therefore h2, which has no per-origin cap, while the human door on :8080 is plain HTTP/1.1 because a browser will not negotiate h2 in clear. Gating a feature every reading surface has on that artifact would be optimising the wrong thing; leaving the number unwritten would be worse. The rule it leaves for the next feature: on this app a new region is free and a new table is not"
 	"decision-browser-tier-unsupported": "The two pipelines still written as bloblang declare the browser tier unsupported rather than quietly broken. A cdc pipeline that is not a fold must ship a browser shim (the file must exist), and that shim's contract is (rows) => singleRowObject upserted on id — but favorite-index and tag-recount both emit a keyed array of sink rows, one per subject, which that contract cannot express. Each is therefore a stub that throws naming this decision, rather than a plausible-looking function: an unsupported tier that fails loudly is a known gap; one that returns a number is a lie. favorite-recount is no longer among them: it declares a browser fold (decision 37), which states a keyed aggregate the shim contract cannot. The remaining two are the same conversion, unstarted"
@@ -284,7 +297,11 @@ _irNotes: {
 	"decision-updated-at-hidden-now": "updated_at is a hidden {now} on the revise form, not a trigger. A column default fires only on INSERT, so \"when it was last changed\" needs a writer on UPDATE. resolveHidden (screen.js:222) resolves a hidden field's {now} to a submit-time ISO string, which is exactly one line of form contract. A third trigger next to the two this design already spends would be machinery for one column, and each trigger is raw SQL a reviewer must read. Accepted loss: the timestamp is the browser's clock at submit rather than the database's at commit, which can differ by the round-trip and by whatever the device's clock believes. Nothing in Conduit orders or filters by updated_at — every list is created_at.desc — so the drift is display-only, and the field is not user-facing on any frame"
 }
 
-code: meta: decisions: [Id=string]: note: _irNotes[Id]
+_deriving: *false | bool @tag(derive,type=bool)
+
+if !_deriving {
+	code: meta: decisions: [Id=string]: note: _irNotes[Id]
+}
 
 _irAccepts: {
 	"test-article-blank-refused": ["accept-article-blank-refused"]
@@ -338,4 +355,6 @@ _irAccepts: {
 	"test-tags-file": ["accept-tags-file"]
 }
 
-code: meta: tests: [Id=string]: accepts: _irAccepts[Id]
+if !_deriving {
+	code: meta: tests: [Id=string]: accepts: _irAccepts[Id]
+}

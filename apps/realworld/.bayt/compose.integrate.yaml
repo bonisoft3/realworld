@@ -1,16 +1,21 @@
 # generated from bayt.cue — do not edit
 services:
-  apps_realworld-integrate:
+  realworld-integrate:
     build:
       additional_contexts:
-        apps_realworld-launch: service:apps_realworld-launch
-        root: ../../..
+        realworld-launch: service:realworld-launch
+        plugins_omnishell-runtime-image: >-
+          ${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/omnishell:0.20.2@sha256:0f7d84358244c875a76bf97f13974bf6336e15f639a2f01fa31ad3eb0ce0d8a7}${MONOREPO_COMPOSE_MODE:+:plugins_omnishell-runtime-image}
       context: ..
       dockerfile: .bayt/Dockerfile.integrate
       target: integrate
+      tags:
+      - bayt-realworld-integrate:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+      - bayt-realworld-integrate:latest
       args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
     command:
     - deno
     - run
@@ -25,32 +30,42 @@ services:
     - /omnishell/check-visual.ts
     - '.'
     depends_on:
-      apps_realworld-launch:
+      realworld-launch:
         condition: service_healthy
         restart: true
+    entrypoint:
+    - sh
+    - -c
+    - >-
+      deno run --allow-env --allow-net --unsafely-ignore-certificate-errors=caddy
+      tests/visual-fixture.ts && exec "$$@"
+    - visual
     environment:
       APP_URL: https://caddy:8443
-    image: bayt-apps_realworld-integrate:${BAYT_IMAGE_TAG:-latest}
+      SETTLE_TIMEOUT_MS: "50000"
+    image: bayt-realworld-integrate:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
     scale: 0
-  apps_realworld-integrate_bayt:
+  realworld-integrate_bayt:
     build:
       additional_contexts:
-        apps_realworld-launch_bayt: service:apps_realworld-launch_bayt
+        realworld-launch_bayt: service:realworld-launch_bayt
       context: ..
       dockerfile: .bayt/Dockerfile.integrate
       target: integrate_bayt
       args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-    image: bayt-apps_realworld-integrate_bayt:latest
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-realworld-integrate_bayt:latest
     scale: 0
-  apps_realworld-integrate_srcs:
+  realworld-integrate_srcs:
     build:
       context: ..
       dockerfile: .bayt/Dockerfile.integrate
       target: integrate_srcs
       args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-    image: bayt-apps_realworld-integrate_srcs:latest
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-realworld-integrate_srcs:latest
     scale: 0

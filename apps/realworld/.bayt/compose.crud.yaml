@@ -1,22 +1,26 @@
 # generated from bayt.cue — do not edit
 services:
-  apps_realworld-crud:
+  realworld-crud:
     build:
       additional_contexts:
-        apps_realworld-database: service:apps_realworld-database
+        realworld-database: service:realworld-database
       context: ..
       dockerfile: .bayt/Dockerfile.crud
       target: crud
+      tags:
+      - bayt-realworld-crud:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+      - bayt-realworld-crud:latest
       args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
     depends_on:
-      apps_realworld-database:
+      realworld-database:
         condition: service_healthy
         restart: true
     environment:
       PGRST_DB_URI: >-
-        postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-realworld}
+        postgres://authenticator:${AUTHENTICATOR_PASSWORD:-dev-authenticator-password}@database:5432/${POSTGRES_DB:-realworld}
       PGRST_DB_SCHEMA: public
       PGRST_DB_ANON_ROLE: anon
       PGRST_DB_PRE_REQUEST: public.app_pre_request
@@ -34,20 +38,21 @@ services:
       retries: 30
       start_period: 30s
       start_interval: 500ms
-    image: bayt-apps_realworld-crud:${BAYT_IMAGE_TAG:-latest}
+    image: bayt-realworld-crud:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
     networks:
       default:
         aliases:
         - crud
-  apps_realworld-crud_bayt:
+  realworld-crud_bayt:
     build:
       additional_contexts:
-        apps_realworld-database_bayt: service:apps_realworld-database_bayt
+        realworld-database_bayt: service:realworld-database_bayt
       context: ..
       dockerfile: .bayt/Dockerfile.crud
       target: crud_bayt
       args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-    image: bayt-apps_realworld-crud_bayt:latest
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-realworld-crud_bayt:latest
     scale: 0

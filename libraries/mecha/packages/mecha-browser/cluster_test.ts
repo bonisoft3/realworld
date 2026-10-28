@@ -4,6 +4,7 @@
 // on `featured=is.true` showed nothing.
 import assert from 'node:assert/strict'
 import { PGlite } from '@electric-sql/pglite'
+import { createDatabase } from './src/database.ts'
 import { isVisibleInSnapshot, ShapeStream } from '@electric-sql/client'
 import { type Cluster, createCluster } from './cluster.ts'
 
@@ -16,6 +17,44 @@ const schema = `
   );
   INSERT INTO flag (id, featured, n, tags, meta) VALUES ('00000000-0000-4000-8000-000000000001', true, 3, '{a,b}', '{"k": 1}');
 `
+
+Deno.test('request views boot without shapes while physical server sources still invalidate live reads', async () => {
+  const db = await PGlite.create()
+  try {
+    const cluster = await createCluster({
+      db, sql: [rls, schema, `
+        CREATE ROLE app_user;
+        CREATE VIEW flag_read WITH (security_invoker=true) AS SELECT * FROM flag;
+        GRANT SELECT ON flag, flag_read TO app_user;
+      `], tables: ['flag', 'flag_read'],
+      schema: { flag: { durability: 'server' }, flag_read: { durability: 'server' } },
+      log: console.error, fail: (e) => { throw e },
+    })
+    const read = () => cluster.handle(new Request('http://cluster.local/crud/flag_read?select=n'))
+    assert.deepEqual(await (await read()).json(), [{ n: 3 }])
+    await db.query('UPDATE flag SET n = 4')
+    assert.deepEqual(await (await read()).json(), [{ n: 4 }])
+    const shape = await cluster.handle(new Request('http://cluster.local/electric/v1/shape?table=flag&offset=-1'))
+    assert.equal(shape.status, 200)
+    const unsupported = await cluster.handle(new Request('http://cluster.local/electric/v1/shape?table=flag_read&offset=-1'))
+    assert.equal(unsupported.status, 400)
+    assert.deepEqual((await db.query("SELECT tgname FROM pg_trigger WHERE tgrelid = 'flag_read'::regclass")).rows, [])
+  } finally {
+    await db.close()
+  }
+})
+
+Deno.test('a live view still fails the shape primary-key contract', async () => {
+  const db = await PGlite.create()
+  try {
+    await assert.rejects(() => createCluster({
+      db, sql: [rls, schema, 'CREATE VIEW flag_read AS SELECT * FROM flag'], tables: ['flag_read'],
+      schema: { flag_read: { durability: 'live' } }, log: console.error, fail: (e) => { throw e },
+    }), /flag_read carries a shape and has no primary key/)
+  } finally {
+    await db.close()
+  }
+})
 
 Deno.test('a shape answers every value as Postgres text, in its snapshot and in its log', async () => {
   const db = await PGlite.create()
@@ -72,6 +111,14 @@ const ids = async (res: Response) => ((await res.json()) as { data: Msg[] }).dat
 /** A real ShapeStream of item from now, up to date, whose live requests wait
  * until `open()`, so a write can land between its position and a snapshot. */
 async function gatedStream(cluster: Cluster) {
+  const ac = new AbortController()
+  const timers: ReturnType<typeof setTimeout>[] = []
+  const origSetTimeout = globalThis.setTimeout
+  globalThis.setTimeout = ((fn: (...args: unknown[]) => void, ms?: number, ...args: unknown[]) => {
+    const id = origSetTimeout(fn, ms, ...args)
+    timers.push(id)
+    return id
+  }) as typeof setTimeout
   let open: () => void = () => {}
   const gate = new Promise<void>((r) => (open = r))
   const fetchClient = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -82,8 +129,15 @@ async function gatedStream(cluster: Cluster) {
     return cluster.handle(new Request(url, init))
   }
   const stream = new ShapeStream<Record<string, unknown>>({
-    url: 'http://cluster.local/electric/v1/shape', params: { table: 'item', replica: 'full' }, log: 'changes_only', offset: 'now', fetchClient,
+    url: 'http://cluster.local/electric/v1/shape', params: { table: 'item', replica: 'full' }, log: 'changes_only', offset: 'now', fetchClient, signal: ac.signal,
   })
+  const origUnsubscribe = stream.unsubscribeAll.bind(stream)
+  stream.unsubscribeAll = () => {
+    origUnsubscribe()
+    ac.abort()
+    globalThis.setTimeout = origSetTimeout
+    for (const t of timers) clearTimeout(t)
+  }
   const seen: Msg[] = []
   stream.subscribe((ms) => { for (const m of ms as Msg[]) if (m.key) seen.push(m) })
   while (!stream.isUpToDate) await new Promise((r) => setTimeout(r, 10))
@@ -211,7 +265,7 @@ Deno.test("a real ShapeStream merges a late subset with the changes around it, e
   await new Promise((r) => setTimeout(r, 50))
   const { metadata, data } = await stream.requestSnapshot({ where: '"game" = $1', params: { '1': '7' } })
   assert.deepEqual(data.map((m) => m.value.id).sort(), [1, 3])
-  assert.ok(isVisibleInSnapshot(Number((await db.query<{ t: string }>('SELECT txid::text AS t FROM item WHERE id = 3')).rows[0].t), metadata))
+  assert.ok(isVisibleInSnapshot(Number((await db.query<{ t: string }>('SELECT xmin::text AS t FROM item WHERE id = 3')).rows[0].t), metadata))
 
   // Written after it: delivered, and judged by no snapshot.
   await db.query('UPDATE item SET game = 9 WHERE id = 1')
@@ -220,6 +274,49 @@ Deno.test("a real ShapeStream merges a late subset with the changes around it, e
   const ops = seen.map((m) => `${m.headers.operation} ${m.value?.id}`)
   assert.deepEqual(ops, ['insert 1', 'insert 3', 'update 1'])
   stream.unsubscribeAll()
+  await db.close()
+})
+
+// A write is confirmed by its transaction: the CRUD response names it and its
+// changes carry it, both as the 32-bit xid Electric reports. The row's own txid
+// column is the 64-bit xid8 rows are ordered by, which differs from the xid
+// once the epoch moves; a column holding an epoch-1 value shows no message
+// reads it, so a page never awaits one domain against the other.
+Deno.test('a write is named, and its changes carry, the 32-bit xid and never the row txid column', async () => {
+  const epochOne = 2 ** 32
+  const db = await PGlite.create()
+  const cluster = await createCluster({
+    db, sql: [rls, `
+      CREATE TABLE app_user (id uuid PRIMARY KEY, handle text NOT NULL);
+      CREATE TABLE note (id int PRIMARY KEY, body text, txid bigint NOT NULL, scope_id text GENERATED ALWAYS AS ('public:') STORED NOT NULL);
+      CREATE ROLE app_user;
+      GRANT SELECT, INSERT, UPDATE, DELETE ON note TO app_user;
+      INSERT INTO note (id, body, txid) VALUES (1, 'seeded', ${epochOne + 5});
+    `], tables: ['note'], log: console.error, fail: (e) => { throw e },
+  })
+  const shape = (q: string) => cluster.handle(new Request(`http://cluster.local/electric/v1/shape?table=note&${q}`))
+  const write = (method: string, query: string, body?: unknown) => cluster.handle(new Request(`http://cluster.local/crud/note${query}`, {
+    method, headers: { 'content-type': 'application/json', Prefer: 'return=representation' }, body: body === undefined ? undefined : JSON.stringify(body),
+  }))
+  const xmin = async (id: number) => Number((await db.query<{ x: string }>('SELECT xmin::text AS x FROM note WHERE id = $1', [id])).rows[0].x)
+
+  const first = await shape('offset=-1')
+  const snapshot = (await first.json()) as Msg[]
+  assert.deepEqual(snapshot[0].headers.txids, [await xmin(1)])
+  assert.equal(snapshot[0].value?.txid, String(epochOne + 5))
+
+  const named: number[] = []
+  for (const [method, query, body] of [['POST', '', { id: 2, body: 'written', txid: epochOne + 7 }], ['PATCH', '?id=eq.2', { body: 'edited' }], ['DELETE', '?id=eq.2', undefined]] as const) {
+    const res = await write(method, query, body)
+    assert.ok(res.ok, `${method} ${res.status}`)
+    named.push(Number(res.headers.get('x-txid')))
+  }
+  assert.ok(named.every((t) => t > 0 && t < epochOne), `named ${named}`)
+  await new Promise((r) => setTimeout(r, 50))
+  const log = (await (await shape(`offset=${first.headers.get('electric-offset')}&handle=${first.headers.get('electric-handle')}`)).json()) as Msg[]
+  const changes = log.filter((m) => m.key)
+  assert.deepEqual(changes.map((m) => [m.headers.operation, m.headers.txids]), [['insert', [named[0]]], ['update', [named[1]]], ['delete', [named[2]]]])
+  assert.equal(changes[0].value?.txid, String(epochOne + 7))
   await db.close()
 })
 
@@ -303,4 +400,19 @@ Deno.test('a subset leaves the stream where it was, so a change outside it still
   assert.deepEqual(seen.map((m) => `${m.headers.operation} ${m.value?.id} ${m.value?.game ?? ''}`), ['insert 1 7', 'update 3 9'])
   stream.unsubscribeAll()
   await db.close()
+})
+
+Deno.test('the browser database honors case and accent insensitive ICU collations by default', async () => {
+  const db = await createDatabase({})
+  try {
+    await db.exec(`
+      CREATE COLLATION search (provider = icu, locale = 'und-u-ks-level1', deterministic = false);
+      CREATE TABLE names (name text COLLATE search);
+      INSERT INTO names VALUES ('Flamengo'), ('São Paulo'), ('Other');
+    `)
+    assert.deepEqual((await db.query("SELECT name FROM names WHERE name LIKE '%flamengo%' OR name LIKE '%sao%' ORDER BY name")).rows,
+      [{ name: 'Flamengo' }, { name: 'São Paulo' }])
+  } finally {
+    await db.close()
+  }
 })

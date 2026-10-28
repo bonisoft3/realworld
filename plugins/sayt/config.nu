@@ -1,5 +1,5 @@
 # config.nu — Shared config-loading for sayt verbs and built-in lint rules
-use tools.nu [run-cue vrun]
+use tools.nu [run-cue vrun verbosity]
 
 const _self_dir = (path self | path dirname)
 
@@ -17,15 +17,16 @@ export def "path relpath" [base: string] {
 	if ($result | is-empty) { "." } else { $result | path join }
 }
 
-export def load-config [--config=".say.{cue,yaml,yml,json,toml,nu}"] {
+export def load-config [--config: string] {
+	let config = $config | default ($env.SAYT_CONFIG? | default ".say.{cue,yaml,yml,json,toml,nu}")
 	# Step 1: Find and merge all .say.* config files
 	let default = $_self_dir | path join "config.cue" | path relpath $env.PWD
-	let config_files = glob $config | each { |f| $f | path basename } | append $default
+	let config_files = glob $config | each { |f| $f | path relpath $env.PWD } | append $default
   let nu_file = $config_files | where { |it| $it | str ends-with ".nu" } | get 0?
   let cue_files = $config_files | where { |it| not ($it | str ends-with ".nu") }
 	# Step 2: Generate merged configuration
 	let nu_result = if ($nu_file | is-empty) {
-		print -e -n $"echo | "
+		if (verbosity) != "quiet" { print -e -n $"echo | " }
 		$in
 	} else {
 		vrun --trail="| " --envs { "NU_LIB_DIRS": $env.FILE_PWD } nu -n $in

@@ -12,22 +12,15 @@ import (
 	"strings"
 )
 
-// The running cluster's compose project, as a nushell expression: the
-// COMPOSE_PROJECT_NAME the app's mise env publishes, else the app's own name.
-// Everything that joins that cluster names it this way, or brings up a second.
-#ComposeProject: {
-	app: string
-	out: "(^mise exec -- printenv COMPOSE_PROJECT_NAME | complete | get stdout | str trim | str replace -r '^$' '\(app)')"
-}
-
-// A target's closure up as a verdict: its `bayt` service's exit code, with its
-// dependencies' output attached, so a runtime that fails to come up says why.
-// -p, not --project-directory: the closure's own directory is where its
-// includes and extends resolve, so only the project NAME may move.
-#ClosureUp: {
-	project: string
-	target:  string
-	out: "mise exec -- docker compose -p \(project) --profile '*' -f .bayt/compose.\(target).closure.yaml up bayt --abort-on-container-failure --exit-code-from bayt --build --remove-orphans --attach-dependencies"
+// A check as a verdict: its bkid runner (sayt.ci) baked as the envelope, so
+// the bake's exit code is the check's. The runner brings the check's closure up
+// inside the build, on the host daemon, as a stack named after the caller's
+// compose project and the check, apart from the launch stack, and tears it
+// down; bake skips a runner whose inputs already passed. Run through sayt's
+// integrate engine, not the verb, which would re-enter this rule.
+#BkidCheck: {
+	runner: string
+	out:    "use integrate.nu; integrate --bake --no-up --with-buildx --target \(runner)"
 }
 
 #Path:   string
@@ -52,6 +45,48 @@ _shellHtmlAsset: _ @embed(file="shell.html", type=text)
 _shellCssAsset:  _ @embed(file="shell.css", type=text)
 _bootJsAsset:    _ @embed(file="boot.js", type=text)
 _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
+_cspAsset:       _ @embed(file="content-security-policy.txt", type=text)
+_presenterPolicy: _ @embed(file="presenter-security-policy.txt", type=text)
+
+// The server terminal (server/render.ts): a route's document rendered on
+// request, with its rows, by a process that reads the app through the door it
+// is served behind. Published as data for a compiler to run where its routes
+// ask for it, the way the statics are: an image pinned to the deno the
+// toolchain pins, the runtime directories it is built from, the step that
+// fetches its dependencies from the lock and only from the lock, the command,
+// and the address that says it is ready.
+#Render: {
+	image: "denoland/deno:debian-2.9.7@sha256:fa335acdf6b72106eda2cb6a8cb5f4187e7630e357467489db4b2e7352d5e432"
+	// Where this plugin sits in the runtime that holds it; the runtime image
+	// (bayt.cue's runtime-image) holds the same tree at its root.
+	home: "plugins/omnishell"
+	// Directories of this plugin, relative to the runtime that holds it, each
+	// copied whole to the same name under `workdir`.
+	dirs: ["\(home)/interpreter", "\(home)/server"]
+	workdir: "/render"
+	// The app's entry page, where the app keeps it and where the image places
+	// it: the door answers the entry's own address with a redirect, so it is
+	// the one file not read through it.
+	entry: {source: "shell/index.html", target: "/render/entry.html"}
+	port:  8090
+	cache: "deno cache --frozen --config plugins/omnishell/server/deno.json plugins/omnishell/server/render.ts"
+	command: ["deno", "run", "--frozen", "--cached-only", "--config", "plugins/omnishell/server/deno.json", "--allow-net", "--allow-env", "--allow-read=/render", "plugins/omnishell/server/render.ts"]
+	health: "http://127.0.0.1:8090/health"
+}
+
+// The stage that writes a door's served tree as a release
+// (server/release-addresses.ts): omnishell's tree sits at `home`, every
+// static at its URL's path under `tree`; addressing rewrites `tree` in place
+// and writes the inline scripts its documents run to `scripts`, which the
+// door's policy names.
+#Address: {
+	image:   #Render.image
+	home:    "/omnishell"
+	tree:    "/served"
+	scripts: "/served.scripts"
+	cache:   "deno cache --frozen --config \(home)/server/deno.json \(home)/server/address.ts"
+	run:     "deno run --frozen --cached-only --config \(home)/server/deno.json --allow-read=\(tree) --allow-write=\(tree),\(scripts) \(home)/server/address.ts \(tree) \(scripts)"
+}
 
 // cluster.#Static-shaped, not imported: terminal.cue and cluster.cue each
 // define their own copy rather than coupling the two packages together.
@@ -83,13 +118,17 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 	}
 
 	capabilities: {
+		hostDom: true
+
 		// Platform doctrine, published as data. Pronto reads this at compile
 		// time: the prelude describes it to hop 1, and #emit refuses an app auth
 		// mode the terminal does not offer. Users never type identifiers — a
 		// passkey ceremony is one tap with a server-generated display handle,
 		// and a guest mint (always rendered, origin-independent, no ceremony)
-		// issues the same identity shape; social hand-off (firebase) is the
-		// planned third mode.
+		// issues the same identity shape. `providers` are the ones the terminal
+		// draws a way in for, at the gate and in a guest's strip, and adopts
+		// the session of when the provider sends the reader back; the auth
+		// service runs the sign-in itself.
 		// `chrome` is the strip the terminal draws for a signed-in person and
 		// what an app may tell it about that person: `self.route`, the route
 		// that is their own page, whose :params the terminal fills from the
@@ -99,12 +138,14 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 		// `self` and the handle stands alone — but then the one identity a
 		// reader always has on screen leads nowhere.
 		auth: {
-			modes:    [...string]
-			identity: string
+			modes:     [...string]
+			providers: [...string]
+			identity:  string
 			chrome:   string
 		}
 		auth: {
-			modes:    ["passkey", "guest"]
+			modes:     ["passkey", "guest"]
+			providers: ["google"]
 			identity: "generated"
 			chrome:   "<name · handle> · sign out; self.route and self.name are the app's"
 		}
@@ -118,6 +159,8 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 		"text-formats": [Name=string]: {renders: string, note: string}
 		"text-formats": plain:    {renders: "the column's text, placeholders interpolated", note: "the default when data-text-format is absent"}
 		"text-formats": datetime: {renders: "the moment in the reader's own language and clock (\"Aug 2, 09:00\" to an American, \"2 de ago., 09:00\" to a Brazilian)", note: "raw ISO / postgres timestamptz never reaches a reader; the zone is the reader's, except in the storybook, which pins UTC for the checks and for prerendered documents"}
+		"text-formats": date: {renders: "numeric year, two-digit month and day in the reader's language and timezone", note: "date-only YYYY-MM-DD is a civil date and never shifts; missing values are blank"}
+		"text-formats": time: {renders: "HH:mm in the reader's language and timezone", note: "h23 renders midnight as 00:00; missing values are blank"}
 		"text-formats": number:   {renders: "the number in the reader's own digits and grouping (\"1.234,5\" to a Brazilian)", note: "the column's ASCII spelling is nobody's"}
 
 
@@ -171,24 +214,24 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 		"os-bridge":    [Name=string]: {yields: string, note: string}
 		"network-peer": [Name=string]: {yields: string, note: string}
 
-		// Boundaries a unit can be given. They are not ordered, and each buys
-		// one thing:
+		// Boundaries a unit can be given, named by ECMA-262's own words for
+		// them. They are not ordered, and each buys one thing:
 		//   compartment  SES, and what generated logic runs in — no ambient
 		//                authority at all, the terminal's own code, this thread.
-		//   iframe       containment, and this thread. An opaque origin, no
-		//                storage, no cookies, no reach through window.parent —
-		//                which is what a unit rendering something audited by
-		//                nobody (a provider's embed, fetched at read time) has
-		//                to sit behind.
-		//   worker       a thread, and containment in no sense whatsoever. Same
-		//                origin, so fetch, IndexedDB and the cache API all
-		//                survive: this is MORE ambient authority than the frame
-		//                seat, not less. What stands behind a worker unit is
-		//                the app's audit of the wrapper and the pinned hash of
-		//                what the wrapper loads — audited and pinned, never
-		//                contained.
+		//   realm        an iframe: its own globals and DOM, containment, and
+		//                this thread. An opaque origin, no storage, no cookies,
+		//                no reach through window.parent — which is what a unit
+		//                rendering something audited by nobody (a provider's
+		//                embed, fetched at read time) has to sit behind.
+		//   agent        a worker: its own thread and event loop, and
+		//                containment in no sense whatsoever. Same origin, so
+		//                fetch, IndexedDB and the cache API all survive: this
+		//                is MORE ambient authority than the realm seat, not
+		//                less. What stands behind an agent unit is the app's
+		//                audit of the wrapper and the pinned hash of what the
+		//                wrapper loads — audited and pinned, never contained.
 		isolation: [...string]
-		isolation: *["compartment", "iframe", "worker"] | [...string]
+		isolation: *["compartment", "realm", "agent"] | [...string]
 
 		// The terminal's measured floors, in device px — what a body can hit,
 		// not what a design would like. WCAG 2.5.8 (AA); 2.5.5's 44px is real
@@ -210,17 +253,24 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 		// names it knows and hands the rest to the screen.
 		// Keyed by boundary, because the two do not share their answers:
 		// `grants: []` is a true statement about an opaque origin and a false
-		// one about a same-origin worker, and `height` names a frame that a
-		// worker seat does not have.
+		// one about a same-origin worker, and `height` names a frame that an
+		// agent seat does not have.
 		hatch: [Boundary=string]: {
 			isolation: Boundary
 			mount:     string
 			props:     string
 			events: [Name=string]: {performs: string, note: string}
+			// What an event's detail may carry across either seat: at most
+			// `keys` string fields, each named by `key`, each at most `value`
+			// printable-ASCII characters — hatch.js's DETAIL, which pronto's
+			// vendored-unit test holds equal to this. A memo's columns ride in
+			// one answer, so pronto's #emit holds a memo's count, names and
+			// declared size bounds to it.
+			detail: {keys: 8, key: "^[a-z][a-z0-9_]{0,23}$", value: 128}
 			grants: [...string]
 			note: string
 		}
-		hatch: iframe: {
+		hatch: realm: {
 			mount: "data-hatch=\"<unit>\", naming an #App.capabilities.vendored entry"
 			props: "data-prop-* attributes, delivered as one current-value object"
 			events: height: {performs: "sets the unit frame's height", note: "the unit measures itself; clamped so a wrong answer cannot blow out the page"}
@@ -228,12 +278,36 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 				performs: "dispatches a non-bubbling CustomEvent of the same name on the mount element, where data-on-answer names the reduce that receives it"
 				note:     "the detail is rebuilt from validated strings and frozen; the unit's own object never crosses"
 			}
-			// An opaque origin is granted nothing, and the terminal refuses a
-			// unit that asks for a capability rather than granting silence.
+			// An opaque origin is granted nothing beyond its ports.
 			grants: []
 			note: "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox, never allow-same-origin — the unit runs in an opaque origin and cannot reach this one. Props are delivered with targetOrigin \"*\", which an opaque origin leaves no alternative to, so a hatch is never given a secret"
 		}
-		hatch: worker: {
+		// The agent seat's second role: a presenter, a worker that only
+		// paints. `policy` is the worker script's own Content-Security-Policy,
+		// sent with interpreter/presenter.js by both doors: it refuses every
+		// connection but blob: and every script not of this origin, so the
+		// network and stray code are the browser's to refuse;
+		// interpreter/presenter-realm.js prunes what a policy cannot reach —
+		// storage, locks, channels between contexts, and a nested worker, as
+		// its worker-src is 'self' for the worker's own imports. What the policy's
+		// script-src 'self' still admits is a GET of this origin by a module
+		// import, which arrives as a `Sec-Fetch-Dest` in `scripted`: both doors
+		// answer one from a static file only, never from an upstream, whose
+		// GET may act (a session's sign-in callback). `scripts` are the pinned
+		// libraries a presenter may name, each with its Subresource Integrity:
+		// the terminal fetches them against it, so the page's connect-src
+		// names each file a presenter uses, and the worker evaluates them
+		// before the prune.
+		presenter: {
+			policy: strings.TrimSpace(_presenterPolicy)
+			scripted: ["script", "worker", "sharedworker", "serviceworker"]
+			scripts: [URL=string]: =~"^sha(256|384|512)-"
+			scripts: {
+				"https://cdn.jsdelivr.net/npm/babylonjs@9.31.0/babylon.js":                       "sha384-GbwOam+gaf7GWvN708CvUiGqRFPFMS/lpYod2JfIip04KMa4TIJ8HXRjhwvT9DMC"
+				"https://cdn.jsdelivr.net/npm/babylonjs-loaders@9.31.0/babylonjs.loaders.min.js": "sha384-4Lrx0JNQdcaB2SaX4xPoA2b15Fnq+ZEdBNyjRNds6RUVsA5oVRIh9GoVvIQLwBJ4"
+			}
+		}
+		hatch: agent: {
 			mount: "data-hatch=\"<unit>\", naming an #App.capabilities.vendored entry — the element renders nothing"
 			props: "data-prop-* attributes, delivered as one current-value object, withheld until the unit says it is ready"
 			events: answer: {
@@ -253,7 +327,7 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 		// assets below; see _shellHtmlAsset. design.css isn't listed here —
 		// it's #App's own generated file, nothing omnishell-specific about it.
 		entry: #Path
-		entry: *"shell/index.html" | string
+		entry: *#Render.entry.source | string
 		css: #Path
 		css: *"shell/shell.css" | string
 		boot: #Path
@@ -262,13 +336,13 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 		sw: *"offline-first-sw.js" | string
 
 		assets: {
-			html: strings.Replace(
+			html: strings.Replace(strings.Replace(
 				strings.Replace(
 					strings.Replace(
 						strings.Replace(_shellHtmlAsset, "{description}", T.description, 1),
 						"{language}", T.language, 1),
 					"{direction}", T.direction, 1),
-				"{modulepreload}", _preloadHtml, 1)
+				"{modulepreload}", _preloadHtml, 1), "{sharedstyles}", _sharedStyles, 1)
 			css:  _shellCssAsset
 			boot: *_bootJsAsset | string
 			sw:   _swJsAsset
@@ -306,7 +380,7 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 		// rather than PATH, where a shim is no promise (mise makes none for a
 		// `path:` version). Neither asks the rule which OS it woke up on.
 		_command: {
-			for leaf in ["check markup", "check handlers", "check machines", "check battery", "check i18n"] {
+			for leaf in ["check markup", "check handlers", "check machines", "check battery", "check i18n", "check kinetic"] {
 				(leaf): [
 					if T.surface.runtime != "" {"mise run omnishell -- \(leaf) ."},
 					"use tools.nu [run-mise]; run-mise exec -- omnishell \(leaf) .",
@@ -335,36 +409,54 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 
 		// What a compiler reaches this plugin through, rather than importing
 		// it: the command that prints one app's markup as JSON
-		// (read-markup.ts's header is the contract), and the published
-		// #Machine every chart in that markup is vetted against. Both are
-		// spawned from the app's own directory, so both are app-relative, and
+		// (read-markup.ts's header is the contract), the published #Machine
+		// every chart in that markup is vetted against, and the command that
+		// renders its documents. All are
+		// spawned from the app's own directory, so all are app-relative, and
 		// a consumer that keeps the terminal somewhere else states where by
 		// unifying these — which is the whole reason they are fields and not
 		// paths written into someone's source.
 		markupReader: #Path
 		markupReader: *"../../plugins/omnishell/read-markup.ts" | string
+		documentRenderer: #Path
+		documentRenderer: *"../../plugins/omnishell/render-documents.ts" | string
+		// The config the renderer runs under, whose lock pins everything it
+		// imports: the documents it writes are committed, so a dependency
+		// floating to a new release would change them with no change here.
+		documentConfig: #Path
+		documentConfig: *"../../plugins/omnishell/server/deno.json" | string
+		contentSecurityPolicy: strings.TrimSpace(_cspAsset)
 		machineSchema: #Path
 		machineSchema: *"../../plugins/omnishell/machine.cue" | string
 
 		// The entry page fetches the boot graph in parallel at t=0 instead of
-		// discovering each import a round-trip after its parent executes.
-		// storybook.js loads only under ?storybook and stays lazy; ses/jessie
-		// stay undeclared here too — loaded after first paint; mecha-client,
-		// data-sync, and hatch are deferred so cold first paint loads minimal
-		// paint-critical weight.
+		// discovering each import a round-trip after its parent executes. The
+		// data plane is on that graph: every screen that paints a row waits on
+		// it, so deferring it moves a first paint later by its whole chain.
+		// What stays off loads only on a path a first paint does not take:
+		// storybook.js under ?storybook, ses when a handler first runs,
+		// js-yaml for a shell.yaml config, morphlex when a template changes
+		// under a mounted screen, kinetic, prng and game-inputs for a kinetic
+		// child and its mount, its sound seat, the rollback session, its channel and GGRS for
+		// a duel, and the
+		// presenter's worker script, which no page runs.
 		_preloadSkip: {
-			"storybook.js":           true
-			"vendor/ses.umd.min.js":  true
-			"vendor/js-yaml.js":      true
-			"vendor/mecha-client.js": true
-			"data-sync.js":           true
-			"validate.js":            true
-			"hatch.js":               true
-			"hatch-worker.js":        true
-			"jessie.js":              true
-			"vendor/morphlex.js":     true
-			"kinetic.js":             true
-			"prng.js":                true
+			"presenter.js":                  true
+			"deferred-boot.js":              true
+			"storybook.js":                  true
+			"vendor/ses.umd.min.js":         true
+			"vendor/js-yaml.js":             true
+			"vendor/morphlex.js":            true
+			"kinetic.js":                    true
+			"kinetic-session.js":            true
+			"kinetic-sound.js":              true
+			"kinetic-milestones.js":         true
+			"kinetic-mount.js":              true
+			"rtc-channel.js":                true
+			"vendor/ggrs/ggrs_wasm.js":      true
+			"vendor/ggrs/ggrs_wasm_bg.wasm": true
+			"prng.js":                       true
+			"vendor/game-inputs.js":         true
 		}
 		_preloadHtml: strings.Join([for m in modules if _preloadSkip[m] == _|_ {
 			"<link rel=\"modulepreload\" href=\"/omnishell/interpreter/\(m)\">"
@@ -373,12 +465,20 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 		modules: [...#Path]
 		modules: [
 			"shell.js", "chrome.js", "screen.js", "fragment.js", "data-sync.js", "validate.js", "render.js",
-			"hatch.js", "hatch-worker.js", "storybook.js", "jessie.js", "kinetic.js", "prng.js",
+			"release-plan.js", "preloads.js", "link-prefetch.js", "markup.js", "script-url.js", "deferred-boot.js",
+			"host-dom.js", "hatch.js", "hatch-worker.js", "hatch-presenter.js", "presenter-realm.js", "presenter.js",
+			"storybook.js", "jessie.js", "kinetic.js", "kinetic-milestones.js", "kinetic-session.js", "kinetic-sound.js", "kinetic-mount.js", "rtc-channel.js", "prng.js",
 			"vendor/mecha-client.js", "vendor/js-yaml.js", "vendor/ses.umd.min.js", "vendor/morphlex.js",
-			"vendor/messages.js",
+			"vendor/messages.js", "vendor/game-inputs.js", "vendor/ggrs/ggrs_wasm.js", "vendor/ggrs/ggrs_wasm_bg.wasm",
 		]
 
-		screens: [...{name: string, html: #Path, css: #Path}]
+		screens: [...{name: string, html: #Path, css: #Path, shared: *[] | [...#Path]}]
+		// A stylesheet every screen imports defines the frame before any screen
+		// loads. Route-specific imports remain with their screen.
+		_sharedStyles: strings.Join([for p in shared if len(screens) > 0
+			if len([for s in screens if !list.Contains(s.shared, p) {s.name}]) == 0 {
+				"<link rel=\"stylesheet\" href=\"../\(p)\">"
+			}], "\n")
 
 		handlers: [...#Jessie]
 		handlers: *[] | [...#Jessie]
@@ -406,6 +506,13 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 		validations: [...#Jessie]
 		validations: *[] | [...#Jessie]
 
+		hostDom: *[] | [...#Path]
+
+		// Each kinetic engine's module graph, linked at build time (pronto's
+		// engine-link.ts) and imported by the cage (interpreter/jessie.js
+		// evaluateEngine).
+		engines: *[] | [...#Path]
+
 		// Every file a vendored unit needs served, its own `src` among them:
 		// the wrapper an engineer audited, and whatever that wrapper loads. A
 		// glue script derives its .wasm URL from its own script URL, so a
@@ -418,6 +525,13 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 		messages: [...#Path]
 		messages: *[] | [...#Path]
 
+		// The addresses answered with a document rendered before any request
+		// (render-documents.ts), each at documents<address>/index.html in the
+		// app's tree and served where a door resolving `{path}/index.html`
+		// finds it.
+		documents: [...string]
+		documents: *[] | [...string]
+
 		// Invariants of the terminal's own rendering surface, which no app can
 		// re-derive — the same reason auth and text-formats are published here.
 		// `verb` is the cheapest layer that can answer each. The loop owns this
@@ -426,27 +540,12 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 		verbs: [Name=string]: {verb: "setup" | "generate" | "build" | "launch" | "release", cmds: [...string], note: string}
 		checks: [Name=string]: {verb: "lint" | "test" | "integrate", cmds: [...string], note: string}
 		checks: visual: {
-			let composeProject = (#ComposeProject & {app: T.app}).out
 			// A laid-out page over real content, so the cluster has to be up
-			// however cheap `lint` would look.
+			// however cheap `lint` would look. The runtime comes up fresh in
+			// the runner's own stack, seeded by the app's state, never the
+			// launch stack a person is using.
 			verb: "integrate"
-			cmds: [
-				// --build, because compose reuses any image it already has: a
-				// lint that photographed the previous build reports green for
-				// markup nobody is serving. Under mise exec, because the compose
-				// project name is published in the app's .mise.toml [env], and
-				// the tool-stub sayt runs rules through applies no [env].
-				"mise exec -- docker compose -p \(composeProject) up -d --wait --build launch",
-				// No --force-recreate: it recreates the DEPENDENCIES too, so a
-				// data-backed app starts every run with an empty database and its
-				// rows-first screens never settle. --build is the part that
-				// matters, and it rebuilds without discarding state.
-				// The runtime's own project: under the closure's default, named
-				// after .bayt, a second caddy comes up and collides with the first
-				// on its port — and the runtime the line above started would not
-				// be the one the lint talks to.
-				(#ClosureUp & {project: composeProject, target: "integrate"}).out,
-			]
+			cmds: [(#BkidCheck & {runner: "ci-visual"}).out]
 			note: "DOM checks over every route at two viewports, run in a container beside the app; only critical findings fail"
 		}
 		// The four checks below are COMMANDS: which interpreter runs a
@@ -542,6 +641,8 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 				target: "/srv/\(v)"
 				watch:  true
 			}],
+			[for f in T.surface.hostDom {file: f, target: "/srv/\(f)", watch: true}],
+			[for f in T.surface.engines {file: f, target: "/srv/\(f)", watch: true}],
 			// Unwatched, unlike every other app-authored file here: the watch
 			// list becomes compose develop sync+restart entries, and a unit's
 			// unaudited half is megabytes that would restart the proxy on every
@@ -554,6 +655,11 @@ _swJsAsset:      _ @embed(file="offline-first-sw.js", type=text)
 			[for m in T.surface.messages {
 				file:   m
 				target: "/srv/\(m)"
+				watch:  true
+			}],
+			[for a in T.surface.documents {
+				file:   "documents\(strings.TrimSuffix(a, "/"))/index.html"
+				target: "/srv\(strings.TrimSuffix(a, "/"))/index.html"
 				watch:  true
 			}],
 			// The interpreter is hand-written and edited in the loop, so it is

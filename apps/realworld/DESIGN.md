@@ -1,10 +1,11 @@
 ---
 colors:
   primary: "#16181A"
-  secondary: "#6B7076"
+  secondary: "#646A70"
   accent: "#1D6A4F"
   danger: "#A93226"
   neutral: "#FBFAF7"
+  login-surface: "#FBFAF7"
   surface: "#FFFFFF"
   border: "#E4E1D9"
   surface-muted: "#EFEDE6"
@@ -14,6 +15,7 @@ dark:
   accent: "#63BE95"
   danger: "#E2705F"
   neutral: "#131414"
+  login-surface: "#131414"
   surface: "#1C1E1F"
   border: "#2E3133"
   surface-muted: "#24272A"
@@ -173,3 +175,14 @@ declared above.
   the identity and a single crossing breaks the scan.
 - Don't tint a preview card; the cards are the same, the writing is not.
 - Don't animate longer than 300ms.
+
+## Sign-in
+
+The terminal's door uses the same warm paper and ink as the reading surface.
+A large serif app masthead and a short invitation occupy the left column;
+quiet horizontal rules frame the actions on the right. The Google link is a
+full-width solid-ink control, the passkey action is outlined, and guest access
+is a quieter text control. On small screens the masthead precedes the actions
+in one column. The app-initial monogram is decorative and silent to assistive technology.
+The form takes its accessible name from the masthead, failures are announced,
+and every action has a visible pine focus ring. Dark mode uses the same tokens.

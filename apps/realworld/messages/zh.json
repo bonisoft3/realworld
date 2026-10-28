@@ -1,6 +1,7 @@
 {
-  "chrome_signin_hint": "用通行密钥轻触一下——第一次来?系统会为你新建一个。",
-  "chrome_signin": "继续",
+  "chrome_signin_google": "使用 Google 登录",
+  "chrome_signin_hint": "好故事让我们相聚。阅读、写作，找到志同道合的人。",
+  "chrome_signin": "使用通行密钥继续",
   "chrome_signin_guest": "以访客身份继续",
   "chrome_signin_failed": "没有成功,请再试一次。",
   "chrome_signout": "退出登录",

@@ -54,7 +54,8 @@
           ".bayt/bayt.build.json",
           ".bayt/Taskfile.yml",
           ".bayt/Taskfile.bayt.yml",
-          ".bayt/Taskfile.build.yaml"
+          ".bayt/Taskfile.build.yaml",
+          ".bayt/process-compose.yaml"
         ],
         "exclude": []
       },
@@ -115,7 +116,11 @@
       "outs": {
         "globs": [
           "proto/**",
-          "packages/**"
+          "packages/**",
+          "[m]ise.toml",
+          "[.]mise.toml",
+          "[m]ise.lock",
+          "[.]tool-versions"
         ],
         "exclude": []
       },
@@ -132,7 +137,11 @@
           "dir": "libraries/mecha",
           "outs": {
             "globs": [
-              "packages/**"
+              "packages/**",
+              "[m]ise.toml",
+              "[.]mise.toml",
+              "[m]ise.lock",
+              "[.]tool-versions"
             ],
             "exclude": []
           }

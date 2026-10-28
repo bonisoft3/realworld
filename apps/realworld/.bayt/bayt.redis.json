@@ -55,8 +55,8 @@
     "cmd": null
   },
   "name": "redis",
-  "project": "apps_realworld",
-  "dir": "apps/realworld",
+  "project": "realworld",
+  "dir": ".",
   "activate": "",
   "srcs": {
     "globs": [],
@@ -73,8 +73,8 @@
   "synthetics": {
     "bayt": {
       "name": "redis_bayt",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "activate": "",
       "srcs": {
         "globs": [],
@@ -86,7 +86,8 @@
           ".bayt/Dockerfile.redis",
           ".bayt/bayt.redis.json",
           ".bayt/Taskfile.yml",
-          ".bayt/Taskfile.bayt.yml"
+          ".bayt/Taskfile.bayt.yml",
+          ".bayt/process-compose.yaml"
         ],
         "exclude": []
       },
@@ -102,13 +103,13 @@
         "similar": false
       },
       "upClosure": [
-        "apps/realworld/.bayt/compose.redis.yaml"
+        "./.bayt/compose.redis.yaml"
       ]
     },
     "outs": {
       "name": "redis_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "activate": "",
       "srcs": {
         "globs": [],
@@ -130,7 +131,7 @@
         "similar": false
       },
       "upClosure": [
-        "apps/realworld/.bayt/compose.redis.yaml"
+        "./.bayt/compose.redis.yaml"
       ]
     }
   },
@@ -141,7 +142,7 @@
   "transitiveDeps": [],
   "transitiveCrossDeps": [],
   "upClosure": [
-    "apps/realworld/.bayt/compose.redis.yaml"
+    "./.bayt/compose.redis.yaml"
   ],
   "chainedDeps": [],
   "cmds": [],

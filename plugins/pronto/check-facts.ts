@@ -23,6 +23,7 @@ import {
   mergeFacts,
   nestingFacts,
   scaleFacts,
+  scriptFacts,
   sha256Hex,
   styleFacts,
   vendorFacts,
@@ -66,7 +67,7 @@ const SCHEMA: Record<string, Record<string, string>> = {
   field: { entity: "VARCHAR", name: "VARCHAR", type: "VARCHAR", cel: "VARCHAR" },
   screen: { name: "VARCHAR" },
   reads: { screen: "VARCHAR", entity: "VARCHAR" },
-  chart: { screen: "VARCHAR", table: "VARCHAR", field: "VARCHAR", initial: "VARCHAR" },
+  chart: { screen: "VARCHAR", table: "VARCHAR", field: "VARCHAR", initial: "VARCHAR", machine: "VARCHAR" },
   chart_state: { screen: "VARCHAR", table: "VARCHAR", field: "VARCHAR", state: "VARCHAR" },
   transition: {
     screen: "VARCHAR",
@@ -78,7 +79,7 @@ const SCHEMA: Record<string, Record<string, string>> = {
   },
   enum_value: { entity: "VARCHAR", field: "VARCHAR", value: "VARCHAR" },
   ir_path_accept: { screen: "VARCHAR", name: "VARCHAR", accept: "VARCHAR" },
-  claim: { rung: "VARCHAR", kind: "VARCHAR", id: "VARCHAR", where: "VARCHAR" },
+  claim: { rung: "VARCHAR", kind: "VARCHAR", id: "VARCHAR", where: "VARCHAR", owed: "BOOLEAN" },
   unique_claim: { rung: "VARCHAR", kind: "VARCHAR" },
   pairing: {
     severity: "VARCHAR",
@@ -93,8 +94,8 @@ const SCHEMA: Record<string, Record<string, string>> = {
   artifact: { path: "VARCHAR", sha256: "VARCHAR", derived: "BOOLEAN" },
   // A held seed file judged against its entities under this key (seed.ts).
   seed_vetted: { src: "VARCHAR", key: "VARCHAR" },
-  // How a browser syncs each server entity's table, and why (sync.cue #App.#sync).
-  sync_mode: { entity: "VARCHAR", table: "VARCHAR", mode: "VARCHAR", reason: "VARCHAR" },
+  // How the terminal reads each server entity's table, and why (read.cue #App.#read).
+  read_mode: { entity: "VARCHAR", table: "VARCHAR", mode: "VARCHAR", reason: "VARCHAR" },
   cel_site: { entity: "VARCHAR", col: "VARCHAR", cel: "VARCHAR" },
   cel_ir: { cel: "VARCHAR" },
   owned_token: { token: "VARCHAR" },
@@ -135,6 +136,8 @@ const SCHEMA: Record<string, Record<string, string>> = {
   },
   design_reference: { block: "VARCHAR", token: "VARCHAR", ref: "VARCHAR" },
   served_file: { file: "VARCHAR", target: "VARCHAR" },
+  script_declared: { path: "VARCHAR" },
+  script_platform: { path: "VARCHAR" },
   app_import: { path: "VARCHAR", line: "BIGINT", target: "VARCHAR", resolved: "VARCHAR" },
   ir_route: { id: "VARCHAR", route: "VARCHAR" },
   ir_nest: { id: "VARCHAR", kind: "VARCHAR", inside: "VARCHAR", inside_kind: "VARCHAR" },
@@ -425,11 +428,31 @@ async function convictedOnce(appDir: string, scale: Scale, needles: string[], ow
   return found.length === 1 ? [] : [`${owed} (matched ${found.length})`];
 }
 
+/**
+ * The served-script rule, over four scripts: a Jessie module, a declared
+ * unit's file, the terminal's own, and one that is none of them, which is the
+ * one finding — and a warning, as the rule is.
+ */
+async function scriptFailures(appDir: string): Promise<string[]> {
+  const served = ["shell/handlers/save.js", "shell/units/paint/unit.js", "offline-first-sw.js", "shell/game.js", "shell/game.css"]
+    .map((file) => ({ file, target: `/srv/${file}` }));
+  const facts = mergeFacts(
+    importFacts(served, []),
+    { handler: [{ path: "shell/handlers/save.js", completion: "arrow", role: "handler" }] },
+    scriptFacts(["shell/units/paint/unit.js"], ["offline-first-sw.js"]),
+  );
+  const findings = (await query(`${inlineViews(facts)}\n${await invariants}`, appDir)).filter((f) => f.path.endsWith(".js"));
+  return findings.length === 1 && findings[0].path === "shell/game.js" && findings[0].severity === "warning"
+    ? []
+    : [`want one warning for shell/game.js alone, got ${JSON.stringify(findings)}`];
+}
+
 async function main(appDir: string): Promise<void> {
   const fixture = (await Promise.all([
     fixtureFailures(appDir),
     witnessFailures(appDir),
     provenanceFailures(appDir),
+    scriptFailures(appDir),
   ])).flat();
   if (fixture.length > 0) {
     console.log(JSON.stringify(

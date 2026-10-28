@@ -152,7 +152,7 @@ BEGIN
   CREATE TABLE _f_noforce(id int, scope_id text);
   ALTER TABLE _f_noforce ENABLE ROW LEVEL SECURITY;
   CREATE POLICY tenancy ON _f_noforce AS RESTRICTIVE FOR ALL
-    USING (scope_id = ANY(current_scopes())) WITH CHECK (scope_id = ANY(current_scopes()));
+    USING (scope_id = ANY((SELECT current_scopes())::text[])) WITH CHECK (scope_id = ANY((SELECT current_scopes())::text[]));
   SELECT count(*) INTO n FROM mecha.rls_unprotected WHERE table_name = 'public._f_noforce';
   IF n <> 1 THEN RAISE EXCEPTION '17 audit accepted a table without FORCE'; END IF;
   DROP TABLE _f_noforce;
@@ -161,7 +161,7 @@ BEGIN
   ALTER TABLE _f_rolescoped ENABLE ROW LEVEL SECURITY;
   ALTER TABLE _f_rolescoped FORCE ROW LEVEL SECURITY;
   CREATE POLICY tenancy ON _f_rolescoped AS RESTRICTIVE FOR ALL TO _f_app
-    USING (scope_id = ANY(current_scopes())) WITH CHECK (scope_id = ANY(current_scopes()));
+    USING (scope_id = ANY((SELECT current_scopes())::text[])) WITH CHECK (scope_id = ANY((SELECT current_scopes())::text[]));
   SELECT count(*) INTO n FROM mecha.rls_unprotected WHERE table_name = 'public._f_rolescoped';
   IF n <> 1 THEN RAISE EXCEPTION '18 audit accepted a floor bound to one role'; END IF;
   DROP TABLE _f_rolescoped;
@@ -172,7 +172,7 @@ BEGIN
   ALTER TABLE _f_permissive ENABLE ROW LEVEL SECURITY;
   ALTER TABLE _f_permissive FORCE ROW LEVEL SECURITY;
   CREATE POLICY tenancy ON _f_permissive FOR ALL
-    USING (scope_id = ANY(current_scopes())) WITH CHECK (scope_id = ANY(current_scopes()));
+    USING (scope_id = ANY((SELECT current_scopes())::text[])) WITH CHECK (scope_id = ANY((SELECT current_scopes())::text[]));
   SELECT count(*) INTO n FROM mecha.rls_unprotected WHERE table_name = 'public._f_permissive';
   IF n <> 1 THEN RAISE EXCEPTION '20 audit accepted a permissive policy as the floor'; END IF;
   DROP TABLE _f_permissive;
@@ -183,7 +183,7 @@ BEGIN
   ALTER TABLE _f_selectonly ENABLE ROW LEVEL SECURITY;
   ALTER TABLE _f_selectonly FORCE ROW LEVEL SECURITY;
   CREATE POLICY tenancy ON _f_selectonly AS RESTRICTIVE FOR SELECT
-    USING (scope_id = ANY(current_scopes()));
+    USING (scope_id = ANY((SELECT current_scopes())::text[]));
   SELECT count(*) INTO n FROM mecha.rls_unprotected WHERE table_name = 'public._f_selectonly';
   IF n <> 1 THEN RAISE EXCEPTION '21 audit accepted a SELECT-only floor'; END IF;
   DROP TABLE _f_selectonly;
@@ -199,7 +199,7 @@ BEGIN
   CREATE TABLE _f_forced(id int, scope_id text);
   ALTER TABLE _f_forced FORCE ROW LEVEL SECURITY;
   CREATE POLICY tenancy ON _f_forced AS RESTRICTIVE FOR ALL
-    USING (scope_id = ANY(current_scopes())) WITH CHECK (scope_id = ANY(current_scopes()));
+    USING (scope_id = ANY((SELECT current_scopes())::text[])) WITH CHECK (scope_id = ANY((SELECT current_scopes())::text[]));
   SELECT count(*) INTO n FROM mecha.rls_unprotected WHERE table_name = 'public._f_forced';
   IF n <> 1 THEN RAISE EXCEPTION '23 audit accepted FORCE without ENABLE'; END IF;
   DROP TABLE _f_forced;
@@ -210,7 +210,7 @@ BEGIN
   ALTER TABLE _f_readopen ENABLE ROW LEVEL SECURITY;
   ALTER TABLE _f_readopen FORCE ROW LEVEL SECURITY;
   CREATE POLICY tenancy ON _f_readopen AS RESTRICTIVE FOR ALL
-    USING (true) WITH CHECK (scope_id = ANY(current_scopes()));
+    USING (true) WITH CHECK (scope_id = ANY((SELECT current_scopes())::text[]));
   SELECT count(*) INTO n FROM mecha.rls_unprotected WHERE table_name = 'public._f_readopen';
   IF n <> 1 THEN RAISE EXCEPTION '24 audit accepted a floor that binds writes but not reads'; END IF;
   DROP TABLE _f_readopen;
@@ -222,7 +222,7 @@ BEGIN
   ALTER TABLE _f_updonly ENABLE ROW LEVEL SECURITY;
   ALTER TABLE _f_updonly FORCE ROW LEVEL SECURITY;
   CREATE POLICY tenancy ON _f_updonly AS RESTRICTIVE FOR UPDATE
-    USING (scope_id = ANY(current_scopes())) WITH CHECK (scope_id = ANY(current_scopes()));
+    USING (scope_id = ANY((SELECT current_scopes())::text[])) WITH CHECK (scope_id = ANY((SELECT current_scopes())::text[]));
   SELECT count(*) INTO n FROM mecha.rls_unprotected WHERE table_name = 'public._f_updonly';
   IF n <> 1 THEN RAISE EXCEPTION '25 audit accepted a FOR UPDATE floor'; END IF;
   DROP TABLE _f_updonly;
@@ -237,7 +237,7 @@ BEGIN
   ALTER TABLE _f_shadow FORCE ROW LEVEL SECURITY;
   SET LOCAL search_path = _f_evil, public;
   CREATE POLICY tenancy ON _f_shadow AS RESTRICTIVE FOR ALL
-    USING (scope_id = ANY(current_scopes())) WITH CHECK (scope_id = ANY(current_scopes()));
+    USING (scope_id = ANY((SELECT current_scopes())::text[])) WITH CHECK (scope_id = ANY((SELECT current_scopes())::text[]));
   SET LOCAL search_path = public;
   SELECT count(*) INTO n FROM mecha.rls_unprotected WHERE table_name = 'public._f_shadow';
   IF n <> 1 THEN RAISE EXCEPTION '26 audit accepted a shadowed current_scopes'; END IF;
@@ -329,6 +329,40 @@ BEGIN
   IF current_scopes() <> ARRAY['public:'] THEN
     RAISE EXCEPTION '38 a subjectless request did not hold exactly public:';
   END IF;
+
+  -- A write's response names its transaction, which is how the client
+  -- confirms the write against its shape stream: as the 32-bit xid Electric
+  -- reports, added to the headers already set. A read names none, nor does a
+  -- function call, since naming one assigns it. A fresh cluster's epoch is 0,
+  -- where the xid and the 64-bit xid8 print alike, so 62 reads the hook's own
+  -- text for the narrowing a value cannot show.
+  PERFORM set_config('request.method', 'DELETE', true);
+  PERFORM set_config('request.path', '/_f_public', true);
+  PERFORM set_config('response.headers', '[{"Cache-Control": "no-store"}]', true);
+  PERFORM app_pre_request();
+  IF current_setting('response.headers')::jsonb
+     <> jsonb_build_array(jsonb_build_object('Cache-Control', 'no-store'),
+                          jsonb_build_object('x-txid', pg_current_xact_id()::xid::text))
+     OR (current_setting('response.headers')::jsonb -> 1 ->> 'x-txid')::bigint >= 4294967296 THEN
+    RAISE EXCEPTION '59 a write did not add its 32-bit transaction id: %', current_setting('response.headers');
+  END IF;
+  PERFORM set_config('request.method', 'GET', true);
+  PERFORM set_config('response.headers', '', true);
+  PERFORM app_pre_request();
+  IF current_setting('response.headers') <> '' THEN
+    RAISE EXCEPTION '60 a read named a transaction: %', current_setting('response.headers');
+  END IF;
+  PERFORM set_config('request.method', 'POST', true);
+  PERFORM set_config('request.path', '/rpc/_f_call', true);
+  PERFORM app_pre_request();
+  IF current_setting('response.headers') <> '' THEN
+    RAISE EXCEPTION '61 a function call named a transaction: %', current_setting('response.headers');
+  END IF;
+  IF pg_get_functiondef('public.app_pre_request'::regproc) NOT LIKE '%pg_current_xact_id()::xid::text%' THEN
+    RAISE EXCEPTION '62 the hook names the transaction in another form than the 32-bit xid';
+  END IF;
+  PERFORM set_config('request.path', '', true);
+  PERFORM set_config('request.method', '', true);
 
   -- The floor over a public table. `public:` is a scope like any other, so the
   -- same restrictive policy carries it; what differs is only that every subject
@@ -490,7 +524,21 @@ BEGIN
   IF n <> 0 THEN RAISE EXCEPTION '57 a permissive policy granted to a role was flagged'; END IF;
   DROP TABLE _f_open;
 
-  RAISE WARNING 'rls: 57/57 pass';
+  -- The floor's scopes are a constant of the statement, evaluated once as an
+  -- InitPlan: a bare call in the policy runs once per row the scan reads.
+  SET LOCAL ROLE _f_app;
+  PERFORM set_config('app.scopes', 'household:h1', true);
+  n := 0;
+  FOR msg IN EXECUTE 'EXPLAIN (COSTS OFF) SELECT * FROM _f_posting' LOOP
+    IF msg LIKE '%current_scopes()%' AND msg NOT LIKE '%SELECT current_scopes()%' THEN
+      RAISE EXCEPTION '58 the floor calls current_scopes() per row: %', msg;
+    END IF;
+    IF msg LIKE '%InitPlan%' THEN n := n + 1; END IF;
+  END LOOP;
+  IF n = 0 THEN RAISE EXCEPTION '58 the floor evaluates its scopes without an InitPlan'; END IF;
+  RESET ROLE;
+
+  RAISE WARNING 'rls: 62/62 pass';
 END $$;
 
 DROP TABLE _f_posting, _f_note, _f_denied;

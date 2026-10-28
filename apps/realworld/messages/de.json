@@ -1,6 +1,7 @@
 {
-  "chrome_signin_hint": "Ein Tipp mit deinem Passkey — neu hier, dir wird einer erstellt.",
-  "chrome_signin": "Weiter",
+  "chrome_signin_google": "Mit Google anmelden",
+  "chrome_signin_hint": "Gute Geschichten verbinden uns. Lies, schreib und finde deine Gemeinschaft.",
+  "chrome_signin": "Mit einem Passkey fortfahren",
   "chrome_signin_guest": "Als Gast fortfahren",
   "chrome_signin_failed": "Das hat nicht geklappt. Versuch es noch einmal.",
   "chrome_signout": "abmelden",

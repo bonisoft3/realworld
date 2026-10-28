@@ -5,7 +5,7 @@
     "manual": true,
     "build": {
       "additional_contexts": {
-        "root": "../../.."
+        "plugins_omnishell-runtime-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/omnishell:0.20.2@sha256:0f7d84358244c875a76bf97f13974bf6336e15f639a2f01fa31ad3eb0ce0d8a7}${MONOREPO_COMPOSE_MODE:+:plugins_omnishell-runtime-image}"
       },
       "secrets": [],
       "args": {}
@@ -19,12 +19,13 @@
       "deno run --config tests/deno.json --no-lock --allow-env --allow-read --allow-net --unsafely-ignore-certificate-errors=caddy tests/favorites.ts ."
     ],
     "depends_on": {
-      "apps_realworld-launch": {
+      "realworld-launch": {
         "condition": "service_healthy"
       }
     },
     "environment": {
-      "APP_URL": "https://caddy:8443"
+      "APP_URL": "https://caddy:8443",
+      "ORIGIN": "${ORIGIN:-https://localhost:${CADDY_TLS_HOST_PORT}}"
     },
     "ports": [],
     "volumes": []
@@ -34,7 +35,7 @@
     "preambleCopyContexts": [],
     "from": {
       "ref": ":setup",
-      "name": "apps_realworld-setup"
+      "name": "realworld-setup"
     },
     "add": [],
     "mounts": [],
@@ -44,15 +45,14 @@
     "copy": [
       {
         "from": {
-          "name": "root"
+          "name": "plugins_omnishell-runtime-image"
         },
         "srcs": [
-          "plugins/omnishell",
-          "libraries/mecha"
+          "/"
         ],
-        "dst": "/monorepo/",
+        "dst": "/omnishell",
         "link": true,
-        "parents": true,
+        "parents": false,
         "exclude": []
       }
     ],
@@ -63,9 +63,9 @@
     "cmd": null
   },
   "name": "check-favorites",
-  "project": "apps_realworld",
-  "dir": "apps/realworld",
-  "activate": "",
+  "project": "realworld",
+  "dir": ".",
+  "activate": "mise x --",
   "srcs": {
     "globs": [
       "tests/**"
@@ -79,14 +79,12 @@
   "state": {
     "globs": []
   },
-  "env": {
-    "MISE_ALWAYS_KEEP_DOWNLOAD": "1"
-  },
+  "env": {},
   "synthetics": {
     "bayt": {
       "name": "check-favorites_bayt",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "activate": "",
       "srcs": {
         "globs": [],
@@ -100,7 +98,13 @@
           ".bayt/Taskfile.yml",
           ".bayt/Taskfile.bayt.yml",
           ".bayt/Taskfile.check-favorites.yaml",
-          ".bayt/compose.check-favorites.closure.yaml"
+          ".bayt/compose.check-favorites.closure.yaml",
+          ".bayt/process-compose.yaml",
+          ".bayt/compose.*.yaml",
+          ".bayt/Dockerfile.*",
+          ".bayt/bayt.*.json",
+          ".bayt/Taskfile.*.yaml",
+          "monorepo/${MONOREPO_COMPOSE_MODE:-docker-image}.yaml"
         ],
         "exclude": []
       },
@@ -116,29 +120,25 @@
         "similar": false
       },
       "upClosure": [
-        "apps/realworld/.bayt/compose.check-favorites.yaml",
-        "apps/realworld/.bayt/compose.setup.yaml",
-        ".bayt/compose.setup.yaml",
-        "apps/realworld/.bayt/compose.launch.yaml",
-        "apps/realworld/.bayt/compose.caddy.yaml",
-        "apps/realworld/.bayt/compose.database.yaml",
-        "libraries/mecha/.bayt/compose.database-image.yaml",
-        "apps/realworld/.bayt/compose.crud.yaml",
-        "apps/realworld/.bayt/compose.electric.yaml",
-        "apps/realworld/.bayt/compose.redis.yaml",
-        "apps/realworld/.bayt/compose.mesh-events.yaml",
-        "libraries/mecha/.bayt/compose.mesh-image.yaml",
-        "apps/realworld/.bayt/compose.conduit.yaml",
-        "libraries/mecha/.bayt/compose.conduit-image.yaml",
-        "apps/realworld/.bayt/compose.transform.yaml",
-        "apps/realworld/.bayt/compose.auth.yaml",
-        "libraries/mecha/.bayt/compose.auth-image.yaml"
+        "./.bayt/compose.check-favorites.yaml",
+        "./.bayt/compose.setup.yaml",
+        "./.bayt/compose.launch.yaml",
+        "./.bayt/compose.caddy.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml",
+        "./.bayt/compose.served.yaml",
+        "./.bayt/compose.electric.yaml",
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.mesh-events.yaml",
+        "./.bayt/compose.conduit.yaml",
+        "./.bayt/compose.transform.yaml",
+        "./.bayt/compose.auth.yaml"
       ]
     },
     "outs": {
       "name": "check-favorites_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "activate": "",
       "srcs": {
         "globs": [],
@@ -160,29 +160,25 @@
         "similar": false
       },
       "upClosure": [
-        "apps/realworld/.bayt/compose.check-favorites.yaml",
-        "apps/realworld/.bayt/compose.setup.yaml",
-        ".bayt/compose.setup.yaml",
-        "apps/realworld/.bayt/compose.launch.yaml",
-        "apps/realworld/.bayt/compose.caddy.yaml",
-        "apps/realworld/.bayt/compose.database.yaml",
-        "libraries/mecha/.bayt/compose.database-image.yaml",
-        "apps/realworld/.bayt/compose.crud.yaml",
-        "apps/realworld/.bayt/compose.electric.yaml",
-        "apps/realworld/.bayt/compose.redis.yaml",
-        "apps/realworld/.bayt/compose.mesh-events.yaml",
-        "libraries/mecha/.bayt/compose.mesh-image.yaml",
-        "apps/realworld/.bayt/compose.conduit.yaml",
-        "libraries/mecha/.bayt/compose.conduit-image.yaml",
-        "apps/realworld/.bayt/compose.transform.yaml",
-        "apps/realworld/.bayt/compose.auth.yaml",
-        "libraries/mecha/.bayt/compose.auth-image.yaml"
+        "./.bayt/compose.check-favorites.yaml",
+        "./.bayt/compose.setup.yaml",
+        "./.bayt/compose.launch.yaml",
+        "./.bayt/compose.caddy.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml",
+        "./.bayt/compose.served.yaml",
+        "./.bayt/compose.electric.yaml",
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.mesh-events.yaml",
+        "./.bayt/compose.conduit.yaml",
+        "./.bayt/compose.transform.yaml",
+        "./.bayt/compose.auth.yaml"
       ]
     },
     "srcs": {
       "name": "check-favorites_srcs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "activate": "",
       "srcs": {
         "globs": [],
@@ -190,7 +186,11 @@
       },
       "outs": {
         "globs": [
-          "tests/**"
+          "tests/**",
+          "[m]ise.toml",
+          "[.]mise.toml",
+          "[m]ise.lock",
+          "[.]tool-versions"
         ],
         "exclude": []
       },
@@ -203,17 +203,15 @@
       ],
       "transitiveCrossDeps": [
         {
+          "project": "realworld",
           "name": "setup_srcs",
-          "project": "workspaceroot",
-          "dir": "",
+          "dir": ".",
           "outs": {
             "globs": [
               "[m]ise.toml",
               "[.]mise.toml",
               "[m]ise.lock",
-              "[.]tool-versions",
-              "gradle/libs.versions.toml",
-              "plugins/devserver/dind.sh"
+              "[.]tool-versions"
             ],
             "exclude": []
           }
@@ -226,23 +224,19 @@
         "similar": false
       },
       "upClosure": [
-        "apps/realworld/.bayt/compose.check-favorites.yaml",
-        "apps/realworld/.bayt/compose.setup.yaml",
-        ".bayt/compose.setup.yaml",
-        "apps/realworld/.bayt/compose.launch.yaml",
-        "apps/realworld/.bayt/compose.caddy.yaml",
-        "apps/realworld/.bayt/compose.database.yaml",
-        "libraries/mecha/.bayt/compose.database-image.yaml",
-        "apps/realworld/.bayt/compose.crud.yaml",
-        "apps/realworld/.bayt/compose.electric.yaml",
-        "apps/realworld/.bayt/compose.redis.yaml",
-        "apps/realworld/.bayt/compose.mesh-events.yaml",
-        "libraries/mecha/.bayt/compose.mesh-image.yaml",
-        "apps/realworld/.bayt/compose.conduit.yaml",
-        "libraries/mecha/.bayt/compose.conduit-image.yaml",
-        "apps/realworld/.bayt/compose.transform.yaml",
-        "apps/realworld/.bayt/compose.auth.yaml",
-        "libraries/mecha/.bayt/compose.auth-image.yaml"
+        "./.bayt/compose.check-favorites.yaml",
+        "./.bayt/compose.setup.yaml",
+        "./.bayt/compose.launch.yaml",
+        "./.bayt/compose.caddy.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml",
+        "./.bayt/compose.served.yaml",
+        "./.bayt/compose.electric.yaml",
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.mesh-events.yaml",
+        "./.bayt/compose.conduit.yaml",
+        "./.bayt/compose.transform.yaml",
+        "./.bayt/compose.auth.yaml"
       ]
     }
   },
@@ -265,49 +259,27 @@
     "setup",
     "launch_outs"
   ],
-  "transitiveCrossDeps": [
-    {
-      "name": "setup",
-      "project": "workspaceroot",
-      "dir": "",
-      "outs": {
-        "globs": [
-          "[m]ise.toml",
-          "[.]mise.toml",
-          "[m]ise.lock",
-          "[.]tool-versions",
-          "gradle/libs.versions.toml",
-          "plugins/devserver/dind.sh",
-          ".task/bayt/setup.hash"
-        ],
-        "exclude": []
-      }
-    }
-  ],
+  "transitiveCrossDeps": [],
   "upClosure": [
-    "apps/realworld/.bayt/compose.check-favorites.yaml",
-    "apps/realworld/.bayt/compose.setup.yaml",
-    ".bayt/compose.setup.yaml",
-    "apps/realworld/.bayt/compose.launch.yaml",
-    "apps/realworld/.bayt/compose.caddy.yaml",
-    "apps/realworld/.bayt/compose.database.yaml",
-    "libraries/mecha/.bayt/compose.database-image.yaml",
-    "apps/realworld/.bayt/compose.crud.yaml",
-    "apps/realworld/.bayt/compose.electric.yaml",
-    "apps/realworld/.bayt/compose.redis.yaml",
-    "apps/realworld/.bayt/compose.mesh-events.yaml",
-    "libraries/mecha/.bayt/compose.mesh-image.yaml",
-    "apps/realworld/.bayt/compose.conduit.yaml",
-    "libraries/mecha/.bayt/compose.conduit-image.yaml",
-    "apps/realworld/.bayt/compose.transform.yaml",
-    "apps/realworld/.bayt/compose.auth.yaml",
-    "libraries/mecha/.bayt/compose.auth-image.yaml"
+    "./.bayt/compose.check-favorites.yaml",
+    "./.bayt/compose.setup.yaml",
+    "./.bayt/compose.launch.yaml",
+    "./.bayt/compose.caddy.yaml",
+    "./.bayt/compose.crud.yaml",
+    "./.bayt/compose.database.yaml",
+    "./.bayt/compose.served.yaml",
+    "./.bayt/compose.electric.yaml",
+    "./.bayt/compose.redis.yaml",
+    "./.bayt/compose.mesh-events.yaml",
+    "./.bayt/compose.conduit.yaml",
+    "./.bayt/compose.transform.yaml",
+    "./.bayt/compose.auth.yaml"
   ],
   "chainedDeps": [
     {
       "name": "setup",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []
@@ -315,52 +287,15 @@
     },
     {
       "name": "launch_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "outs": {
         "globs": [],
         "exclude": []
       }
     }
   ],
-  "cmds": [
-    {
-      "srcs": {
-        "globs": [
-          "tests/**",
-          "[m]ise.toml",
-          "[.]mise.toml",
-          "[m]ise.lock",
-          "[.]tool-versions"
-        ],
-        "exclude": [],
-        "defaultGlobs": null,
-        "defaultExclude": null
-      },
-      "do": "mise install",
-      "dockerfile": {
-        "do": "d=/root/.local/share/mise/downloads; s=/mise-tarball-store; mkdir -p \"$d\" \"$s\"; cp -r \"$s\"/. \"$d\"/ 2>/dev/null || true; mise install || exit; cd \"$d\" && for f in */*/*; do [ -f \"$f\" ] || continue; o=\"$s/$f\"; [ -e \"$o\" ] && continue; mkdir -p \"$(dirname \"$o\")\"; t=\"$(mktemp \"$(dirname \"$o\")/.pXXXXXX\")\" && cp \"$f\" \"$t\" && mv -f \"$t\" \"$o\"; done; :",
-        "mounts": [
-          {
-            "type": "cache",
-            "target": "/root/.local/share/mise/downloads",
-            "scope": "project",
-            "required": false
-          },
-          {
-            "type": "cache",
-            "target": "/mise-tarball-store",
-            "scope": "global",
-            "required": false
-          }
-        ],
-        "shell": "sh"
-      },
-      "name": "builtin",
-      "shell": "exec",
-      "stop": false
-    }
-  ],
+  "cmds": [],
   "cache": {
     "full": false,
     "similar": false

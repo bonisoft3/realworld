@@ -1,9 +1,11 @@
-// Auth service: WebAuthn passkey ceremonies plus a guest mint. The token
+// Auth service: WebAuthn passkey ceremonies, provider sign-in (oidc.ts) and a
+// guest mint. The token
 // contract three components share is README.md; endpoints are mounted WITH
 // the /auth prefix (Caddy strips nothing). Stateless: the
 // WebAuthn challenge travels in a short-lived HS256 `state` JWT instead of
 // server-side sessions. app_user is a program entity created by the database
-// migrations; this service only self-migrates webauthn_credential.
+// migrations; this service only self-migrates webauthn_credential and
+// identity_link.
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
@@ -22,6 +24,7 @@ import {
   subsetParams,
   verifyJwt as verify,
 } from "./jwt.ts";
+import { type Links, oidc, type Profile, providersFrom } from "./oidc.ts";
 export { shapeWhere };
 
 function required(name: string): string {
@@ -30,6 +33,10 @@ function required(name: string): string {
   return value;
 }
 const DATABASE_URL = required("DATABASE_URL");
+// auth runs as the owner, which no role setting bounds: its connection carries
+// the clients' statement bound itself.
+const STATEMENT_TIMEOUT_MS = Number(required("AUTH_STATEMENT_TIMEOUT_MS"));
+if (!(STATEMENT_TIMEOUT_MS > 0)) throw new Error(`AUTH_STATEMENT_TIMEOUT_MS is ${STATEMENT_TIMEOUT_MS}, not milliseconds`);
 const JWT_SECRET = required("PGRST_JWT_SECRET");
 /** The dev cluster's door: localhost, on whatever port the host published. */
 const DEV_DOOR = "https://localhost:*";
@@ -68,6 +75,7 @@ export function admittedOrigin(rpId: string, origin: string): string {
 
 const RP_ID = required("WEBAUTHN_RP_ID");
 const ORIGIN = admittedOrigin(RP_ID, required("WEBAUTHN_ORIGIN"));
+const OIDC_PROVIDERS = providersFrom((name) => Deno.env.get(name));
 
 /**
  * The origin a ceremony must have been made on. A configured origin is exact.
@@ -88,7 +96,7 @@ const USER_TOKEN_TTL_S = 7 * 24 * 3600;
 const SHAPE_TOKEN_TTL_S = 900;
 const STATE_TTL_S = 300;
 
-export const sql = postgres(DATABASE_URL);
+export const sql = postgres(DATABASE_URL, { connection: { statement_timeout: STATEMENT_TIMEOUT_MS } });
 
 export async function migrate(): Promise<void> {
   await sql`CREATE TABLE IF NOT EXISTS webauthn_credential (
@@ -101,6 +109,34 @@ export async function migrate(): Promise<void> {
   // it, and the audit is told so rather than left to report it.
   await sql`INSERT INTO mecha.rls_exempt VALUES
     ('public.webauthn_credential', 'the auth service''s own table: read by it alone, on its own connection')
+    ON CONFLICT DO NOTHING`;
+  await sql.begin(async (tx) => {
+    await tx`CREATE TABLE IF NOT EXISTS identity_link (
+      provider text not null,
+      issuer text not null,
+      sub text not null,
+      user_id uuid not null unique references app_user(id) on delete cascade,
+      created_at timestamptz not null default now(),
+      primary key (provider, issuer, sub)
+    )`;
+    await tx`ALTER TABLE identity_link ADD COLUMN IF NOT EXISTS issuer text,
+      ADD COLUMN IF NOT EXISTS name text, ADD COLUMN IF NOT EXISTS picture text`;
+    // A legacy provider label may have named any issuer. Its owner must supply
+    // that issuer before these accounts can safely accept another sign-in.
+    const [legacy] = await tx`SELECT EXISTS (SELECT 1 FROM identity_link WHERE issuer IS NULL) AS unassigned`;
+    if (legacy.unassigned) throw new Error("identity_link has unassigned issuers: add and populate its issuer column from the original identity provider before starting auth");
+    await tx`ALTER TABLE identity_link ALTER COLUMN issuer SET NOT NULL`;
+    await tx`DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint c
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+        WHERE c.conrelid = 'identity_link'::regclass AND c.contype = 'p' AND a.attname = 'issuer') THEN
+        ALTER TABLE identity_link DROP CONSTRAINT identity_link_pkey;
+        ALTER TABLE identity_link ADD PRIMARY KEY (provider, issuer, sub);
+      END IF;
+    END $$`;
+  });
+  await sql`INSERT INTO mecha.rls_exempt VALUES
+    ('public.identity_link', 'the auth service''s own table: read by it alone, on its own connection')
     ON CONFLICT DO NOTHING`;
 }
 
@@ -132,7 +168,7 @@ export function issueUserToken(id: string, handle: string, guest = false): Promi
 
 
 /**
- * Whether the floor reaches this table.
+ * Whether the floor reaches this table and proves every row public.
  *
  * A shape's predicate names `scope_id`, so a table without one cannot carry a
  * scoped shape: Electric answers 400 and the app reads it as a sync fault. The
@@ -140,11 +176,19 @@ export function issueUserToken(id: string, handle: string, guest = false): Promi
  * the floor, and until its scope derivation exists it has no business on a sync
  * path that is supposed to be scoped.
  */
-async function isFloored(table: string): Promise<boolean> {
+async function tableScope(table: string): Promise<{ floored: boolean; publicOnly: boolean }> {
   // The floor's own precondition (has_scope in rls.sql); to_regclass is NULL
   // for a table that does not exist, and NULL has no scope.
-  const rows = await sql`SELECT public.has_scope(to_regclass(${"public." + table})) AS ok`;
-  return rows[0].ok as boolean;
+  const rows = await sql`SELECT public.has_scope(to_regclass(${"public." + table})) AS floored,
+    EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
+      JOIN pg_catalog.pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+      JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+      WHERE a.attrelid = to_regclass(${"public." + table}) AND a.attname = 'scope_id'
+        AND a.attnotnull AND NOT a.attisdropped AND a.attgenerated = 's'
+        AND c.relkind = 'r'
+        AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_inherits i WHERE i.inhparent = a.attrelid)
+        AND pg_catalog.pg_get_expr(d.adbin, d.adrelid) = ${"'public:'::text"}) AS public_only`;
+  return { floored: rows[0].floored, publicOnly: rows[0].public_only };
 }
 
 async function subjectScopes(uid: string | null): Promise<string[]> {
@@ -220,15 +264,17 @@ async function shapeToken(req: Request): Promise<Response> {
     }
     where = rowWhere(key.column, key.value);
   } else {
-    const [floored, scopes] = await Promise.all([isFloored(body.table), subjectScopes(sub)]);
-    if (!floored) {
+    const [scope, scopes] = await Promise.all([tableScope(body.table), subjectScopes(sub)]);
+    if (!scope.floored) {
       return jsonError(
         409,
         `${body.table} carries no scope_id: it is exempt from the tenancy floor, ` +
           `so no shape over it can be scoped`,
       );
     }
-    where = shapeWhere(scopes);
+    // Descendants can store a different generated scope than their parent.
+    // Only a proven public leaf can omit the subject's irrelevant scopes.
+    where = shapeWhere(scope.publicOnly ? scopes.filter((scope) => scope === "public:") : scopes);
   }
   const token = await signJwt({
     typ: "shape",
@@ -589,9 +635,55 @@ async function whoami(req: Request): Promise<Response> {
   return json(200, { id: claims.sub, handle: claims.handle });
 }
 
+export const links: Links = {
+  userFor(p: Profile) {
+    return sql.begin(async (tx) => {
+      // One sign-in at a time per subject, so two tabs signing in at once make
+      // one person, not two.
+      await tx`select pg_advisory_xact_lock(hashtext(${JSON.stringify([p.provider, p.issuer, p.sub])}))`;
+      const [link] = await tx`update identity_link set name = ${p.name}, picture = ${p.picture}
+        where provider = ${p.provider} and issuer = ${p.issuer} and sub = ${p.sub} returning user_id`;
+      if (link) {
+        const [u] = await tx`select handle from app_user where id = ${link.user_id}`;
+        return { id: link.user_id as string, handle: u.handle as string };
+      }
+      const id = crypto.randomUUID();
+      // Generated handles can collide; regenerate and retry — never a user error.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const handle = generateHandle();
+        try {
+          await tx.savepoint((sp) => sp`insert into app_user (id, handle) values (${id}, ${handle})`);
+        } catch (e) {
+          if ((e as { code?: string }).code === "23505") continue;
+          throw e;
+        }
+        await tx`insert into identity_link (provider, issuer, sub, user_id, name, picture)
+          values (${p.provider}, ${p.issuer}, ${p.sub}, ${id}, ${p.name}, ${p.picture})`;
+        return { id, handle };
+      }
+      throw new Error("could not allocate identity");
+    });
+  },
+  async handleOf(provider: string, issuer: string, id: string) {
+    const [u] = await sql`select u.handle from app_user u
+      where u.id = ${id} and exists (select 1 from identity_link l where l.user_id = u.id and l.provider = ${provider} and l.issuer = ${issuer})`;
+    return u ? (u.handle as string) : null;
+  },
+};
+
+const providerSignIn = oidc({
+  secret: JWT_SECRET,
+  origin: (req) => ceremonyOrigin(ORIGIN, req.headers.get("host")),
+  providers: OIDC_PROVIDERS,
+  links,
+  issue: (user) => issueUserToken(user.id, user.handle),
+});
+
 export async function handler(req: Request): Promise<Response> {
   const path = new URL(req.url).pathname;
   try {
+    const signedIn = providerSignIn(req);
+    if (signedIn !== null) return await signedIn;
     if (req.method === "POST" && path === "/auth/register/start") {
       return await registerStart(req);
     }

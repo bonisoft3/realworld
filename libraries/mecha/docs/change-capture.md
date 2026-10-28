@@ -29,7 +29,7 @@ PostgREST ─► PostgreSQL ── publication conduit_pub, slot conduit_slot
 | WAL → Conduit | Conduit v0.14.0, `builtin:postgres` in `logrepl` mode, `snapshotMode: never`, forwarding what its `tables` names. The pipeline is the consumer's template (`meta.conduitTemplate`; mecha's is [`cdc-to-dapr.yaml`](../services/cdc/pipelines/cdc-to-dapr.yaml)), `envsubst`-rendered at every start |
 | Conduit → Dapr | the `standalone:http` connector v0.4.0, baked into `conduit-image` |
 | Dapr → bus | daprd 1.16.1, pubsub component `redis-streams` ([components](../services/mesh/dapr/components/)); the topic is the stream key |
-| bus → pipelines | Redpanda Connect 4.46.0 (`rpk`) reading Redis itself, one consumer group per pipeline; `state.pipelines` in [`cluster.cue`](../cluster.cue) |
+| bus → pipelines | Redpanda Connect 4.112.0 (`rpk`) reading Redis itself, one consumer group per pipeline; `state.pipelines` in [`cluster.cue`](../cluster.cue) |
 
 Dapr holds the publish side: Conduit names a component and a topic, and what
 backs the component is Dapr's configuration. The consumer side is not
@@ -48,6 +48,24 @@ No table, no operation, no before-image: a pipeline hard-codes the table it
 writes (`meta collection = "Hello"`) and sees rows from every captured table. A
 delete has no after-image, and every shipped pipeline drops a record without an
 `id`.
+
+## Transaction traces
+
+The CloudEvent's `traceparent` is conduit's publish, not the write. Where a
+publication carries `mecha.txn_trace` (rls.sql), each writing transaction's
+first change on the bus is its marker, `__table: txn_trace`, holding the
+writer's traceparent or `''`. Every stream the transform runs loads
+[`cdc-trace.yaml`](../services/transform/cdc-trace.yaml) by `-r`: its
+`cdc_trace_join`, among a stream's input processors, drops each marker into a
+per-stream cache entry and stamps every later row's `@traceparent`. Calls send
+it as the `traceparent` header, so PostgREST's `mark_txn` marks the derived
+write's transaction with the same trace and the chain continues through it. A
+call that coalesces a batch (a drain, compute's invalidation) sends the first
+traced transaction's (`cdc_trace_batch`).
+
+The join is ordered for free: Connect runs input processors on one goroutine,
+so a stream's pipeline threads stay parallel. A process that restarts mid-
+transaction knows no trace for that transaction's remaining rows.
 
 ## Routing
 
@@ -82,7 +100,15 @@ Each hop acknowledges upstream only after downstream accepted:
 There is no dead-letter stream: a record every layer refuses stays in its
 group's pending list, retried forever. The `maxRetries`, `redeliverInterval` and
 `processingTimeout` in `redis-streams.yaml` govern Dapr's own subscribers, and
-nothing subscribes through Dapr.
+nothing subscribes through Dapr. Computations use the same direct Redis input
+in [[../services/compute/events.yaml]], forwarding invalidations to compute over
+HTTP. The output waits for completion and resends a refused invalidation with
+exponential backoff; still refused after twelve retries, it crashes the transform process, so
+the stack fails loudly, and the invalidation, still pending, is replayed first
+when it restarts.
+The compute consumer has a stable identity so container replacement also
+recovers pending messages. Delivery is at least once; it provides no version
+fence across concurrent writers.
 
 ## Duplicates
 

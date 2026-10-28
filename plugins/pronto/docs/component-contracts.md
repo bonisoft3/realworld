@@ -39,7 +39,7 @@ unification.
 
 | | state | capabilities | surface | identity |
 |---|---|---|---|---|
-| `#App` | `entities`, `pipelines`, `schedules`, `migrations`, `rawMigrations` | requested: `auth`, `native`, `blobs`, `hatches`, `vendored` | `screens`, `handlers`, `design`, `flows` | `meta`: `name`, `ir`, `targets`, `clocks`, `decisions`, `tests`, `i18n`, `favicon` |
+| `#App` | `entities`, `pipelines`, `drains`, `computations`, `schedules`, `migrations`, `rawMigrations` | requested: `auth`, `native`, `blobs`, `hatches`, `vendored` | `screens`, `handlers`, `design`, `flows` | `meta`: `name`, `ir`, `targets`, `clocks`, `decisions`, `tests`, `i18n`, `favicon` |
 | `#Terminal` | `navigation: true` | offered: `auth`, `text-formats`, `message-arms`, `renderer`, `sensors`, `background`, `hardware`, `os-bridge`, `network-peer`, `isolation`, `hatch`, `floors` | the entry page and its `assets`, the served file lists, `verbs`, `checks`, `statics` | `app`, `description`, `language`, `direction` |
 | `#Cluster` | `migrations`, `pipelines`, `schedules` (names only) | switches: `server`, `auth`, `blobs` | `targets`, `verbs`, `checks` | `meta`: `app`, `images`, the door, `statics` |
 | `#Loop` | — | — | `sources`, `buildCmd`, `testCmd`, `verbs`, `checks`, `sayYaml`, `tasksJson` | `meta.app` |
@@ -55,8 +55,9 @@ schedule exists. The loop and the build graph own no data.
 terminal publishes what it offers as data, the app asks against that
 vocabulary, and `#emit` refuses the mismatch at `cue vet`: an auth mode the
 terminal does not list, a vendored unit whose `isolation` it does not offer,
-a `"group.name"` capability it does not declare, or a unit whose `src` is not
-among its files. The cluster's capabilities are switches, each turning on a
+or a unit whose `src` is not among its files; a unit's `ports` are judged
+against the app's own entities in `#App` and against the screens by the
+terminal's markup check. The cluster's capabilities are switches, each turning on a
 **plane**, mecha's word for the services behind one switch: the data plane
 (`server`), the auth plane and the blob plane. `#DefaultCluster` derives every
 switch from the app, so none is wired by hand.
@@ -98,15 +99,18 @@ runtime's compose network, that waits on the launch aggregate healthy and
 reaches the app at `https://caddy:8443` (`APP_URL`, which omnishell's
 `baseUrl` honours). Caddy's own CA signs the certificate there, so a command
 ignores errors for `caddy`. `#emit` files the rule under `integrate`, under the
-check's `priority`; the rule brings the stack up if it is not, and its verdict
-is the container's exit code. The image is setup's — the trees and the app's
+check's `priority`, running the check's bkid runner `ci-<name>`: the check's
+closure, built and brought up inside a build as a stack of its own,
+`<COMPOSE_PROJECT_NAME>_<name>`, torn down before and after, so a check never
+touches the stack a person launched. The verdict is the container's exit code.
+Each check starts from a fresh database: it seeds what it reads. The image is setup's — the trees and the app's
 pinned toolchain, under `mise x` — or, with `browser: true`, the same toolchain
 on playwright's base. It carries `tests/**`, plus whatever `srcs` names.
 
 ```cue
 build: checks: "favorites": {
 	priority: 1
-	cmds: ["deno run --config tests/deno.json --no-lock --allow-env --allow-read --allow-net --unsafely-ignore-certificate-errors=caddy tests/favorites.ts ."]
+	cmds: ["deno run --config tests/deno.json --lock tests/deno.lock --frozen --allow-env --allow-read --allow-net --unsafely-ignore-certificate-errors=caddy tests/favorites.ts ."]
 	note: "a favourite is counted by the pipelines"
 }
 build: checks: "paint": {
@@ -116,6 +120,67 @@ build: checks: "paint": {
 	note: "the painted colours against the ground truth"
 }
 ```
+
+## Platform pins
+
+An installed app's tests take the platform the way its mirror does: by the raw
+URLs of omnishell's and pronto's mirrors at the tags the app's CUE module
+requires (`.mirror/cue.mod/module.cue`), such as
+`https://raw.githubusercontent.com/bonisoft3/omnishell/v0.19.1/instrument.ts`.
+One module per app, `tests/platform.ts`, re-exports what its tests use, so a
+release train moves the tags of one file, and the tests import it relatively.
+A mirror's tests then resolve anywhere: on a host, in a check image, in a fresh
+clone.
+
+- **The monorepo runs them at HEAD.** `apps/deno.json` is a deno workspace of
+  the installed apps' `tests/` (`copy.bara.sky`'s `installed_app`s). Its
+  `imports` map each pinned prefix to the checkout's tree, and `/omnishell/`,
+  where an app's own modules import the terminal, to omnishell's: a member's
+  `imports` reach its `tests/` alone, so an app's own `/omnishell/` mapping,
+  to the pinned URL for its mirror, never reaches its shell. `just
+  generate-all` writes the file from the pins it finds
+  (the monorepo's `apps/platform_pins.nu write`), and
+  its `check`, in CI's test step, fails when the map, a tree's pins and its
+  CUE module disagree. Compose-mode check images carry `apps/deno.json` with
+  the compiler's sources and resolve to `/monorepo/plugins/`; a mirror's check
+  image fetches the pins, so it needs the network.
+- **Its settings.** The workspace sits in `apps/` rather than at the root,
+  whose `package.json` is mecha's npm workspace: its linking needs
+  `nodeModulesDir` manual, the members want none, and a workspace has one.
+  `"lock": false` there, and every check passes `--lock tests/deno.lock
+  --frozen`, since deno anchors a member's lock at the workspace. A member
+  config declares no `npm:` or `jsr:` import, so the lock has one shape with
+  the workspace and without it. The other deno projects under `apps/` warn that
+  they are no members and ignore it.
+- **Integrity.** The monorepo never fetches a pinned URL, so `platform_pins.nu
+  lock <app>` records two graphs in the one `tests/deno.lock`: the checkout's,
+  for HEAD's own `npm:` and `jsr:` imports, and a copy of the app outside the
+  repository, which fetches every pin as its mirror does. That half needs the
+  tags pushed. A pin may name the release its own train tags: the monorepo
+  never fetches it, so only the lock and the mirror's sync wait for the tag.
+  deno.lock records module imports, not `text` or `bytes` ones
+  (`--unstable-raw-imports`), so a module also imports as code a file it reads
+  as text (SES in `tests/platform.ts`, `hybrid-runtime.js` in
+  `mecha-reducer.ts`); GGRS's wasm is the one file only read as bytes. `check`
+  fails when a lock lacks a module its app imports by pin.
+- **Platform modules load by URL.** What an app's tests reach in omnishell and
+  pronto imports relatively or by full `npm:` and `jsr:` specifiers, reads a
+  neighbouring file by import rather than `Deno.readTextFile(new URL(…,
+  import.meta.url))`, and reaches the other package by its pinned URL:
+  `hybrid-local.ts` and `testdata/hybrid-fixtures.ts` take omnishell at the tag
+  pronto's CUE module requires. pronto's own tests run that release, not the
+  sibling tree: pronto is no member, because its `deno.lock` ships with it and
+  a member's lock moves to the workspace.
+- **Rejected alternatives.** Rewriting `tests/*.json` in `copy.bara.sky` to
+  point at mise's install paths breaks when a check image's `/omnishell` is the
+  runtime image (which omits `instrument.ts`), when pronto's own modules reach
+  omnishell, or when tests run outside the check image. Generating a per-machine
+  Deno config at setup time drifts across host and container environments and
+  hides integrity from `deno.lock`. JSR adds a centralized registry account
+  beside the git mirrors and the CUE registry. `pnpm` `github:` dependencies
+  fail under Deno because Deno refuses to strip TypeScript types under
+  `node_modules` (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`), and
+  `nodeModulesDir: "manual"` forces every `npm:` import through `node_modules`.
 
 ## Web platform envelope
 
@@ -151,10 +216,11 @@ Declared via `meta.manifest: bool | #Manifest` and `meta.themeColor: string`:
 
 Declared via `meta.social: #Social`:
 
-- **Tags emitted**: OpenGraph (`og:title`, `og:description`, `og:type`, `og:image`, `og:image:alt`, `og:url`) and Twitter Card (`twitter:card`, `twitter:title`, `twitter:description`, `twitter:image`, `twitter:site`, `twitter:creator`).
+- **Tags emitted**: OpenGraph (`og:title`, `og:description`, `og:type`, `og:image`, `og:image:alt`) and Twitter Card (`twitter:card`, `twitter:title`, `twitter:description`, `twitter:image`, `twitter:site`, `twitter:creator`).
 - **Defaults**: `title` and `description` inherit from `#App.meta`. `card` defaults to `"summary_large_image"` if `image` is set, else `"summary"`. `type` defaults to `"website"`.
-- **Absolute URLs & local images**: Social card scrapers require absolute image URLs. When `image` is a local asset path, `url` must be declared (refused at compile time otherwise), resolving the image against the origin extracted from `url` and mounting it as a cluster static under `/srv/` (root-hosted in cluster deployments). Protocol-relative URLs (`//`) and path traversal (`..`) are refused at compile time.
-- **Canonical links**: Authored per-route by prerenderers rather than statically in the shared SPA shell to prevent client-routed non-root paths from falsely canonicalizing to root.
+- **The origin is the deployment's**: a card names no address of its own. The app's absolute addresses are spelled against one origin, the deployment's `ORIGIN`, stated beside the auth service's origin ([mecha's proxy](../../../libraries/mecha/docs/proxy.md#the-origin)); the image never holds it. `#Social` has no `url`, so declaring one is a compile error rather than a second statement of the origin that the build would fix into an image every deployment runs.
+- **Local images**: Social card scrapers require absolute image URLs. A local `image` is mounted as a cluster static under `/srv/` and named from the root (`/preview.png`) in the entry; a rendered document spells it absolute against the origin. A remote `https://` or `http://` image is named as written. Protocol-relative URLs (`//`), data URIs and path traversal (`..`) are refused at compile time.
+- **Per address**: the card above is the entry's, spelled for the app, and the entry is the shell every client-routed address is answered with, so it names no `og:url`, as it names no canonical: either would claim the root for every address. A [rendered document](screens.md#how-a-routes-first-document-is-rendered) (`ssg` or `ssr`) states its own canonical, absolute against the deployment's origin, and its card follows it: `og:url` is the canonical (dropped where the address has none), `og:title` and `twitter:title` are the page's title, a local image is absolute; the rest of the card stands. An address meant to be shared with a scraper-readable image is one that is rendered.
 
 ### Crawler & LLM Discovery (`meta.llms`)
 
@@ -172,7 +238,7 @@ Declared via `meta.sitemap: bool | #SitemapConfig`:
 - **Intelligent priority and change frequency**: Root routes (`/`) infer priority `1.0`. Screens with entity reads infer priority `0.8` and `"daily"` change frequency. Static screens infer priority `0.6` and `"weekly"` or `"monthly"` frequency. Screen-level author declarations (`screen.priority`, `screen.changefreq`) override inferred defaults.
 - **Auth conflict refusal**: When `capabilities.auth.required == true`, declaring `sitemap: true` or an enabled sitemap is refused at compile time because all routes are behind authentication and robots.txt declares `Disallow: /`.
 - **Exclusion & Extra routes**: `exclude` (`[...string]`, prefix-matched, must start with `/`) filters screens out of `sitemap.xml`. `extra` (`[...string]`, must start with `/`, `http://`, or `https://`) appends external or unmapped URLs with XML entities properly escaped.
-- **Head injection & robots.txt**: When declared, emits `<link rel="sitemap" type="application/xml" href="/sitemap.xml">` in the document head and advertises `Sitemap: {{$o}}/sitemap.xml` in `robots.txt`. When `sitemap: false`, sitemap generation, statics, and robots.txt declarations are disabled.
+- **Head injection & robots.txt**: When declared, emits `<link rel="sitemap" type="application/xml" href="/sitemap.xml">` in the document head and advertises `Sitemap: {{$o}}/sitemap.xml` in `robots.txt`, `$o` being the deployment's origin as the door holds it. When `sitemap: false`, sitemap generation, statics, and robots.txt declarations are disabled.
 
 ### Platform Well-Knowns (`meta.wellKnown`)
 
@@ -231,19 +297,47 @@ never a clock.
 
 ## Dual planes and the kinetic contract
 
-Pronto separates application state into two planes:
-1. **The relational plane**: Durable entities (`tab`, `device`, `server`, `live`) queryable via PostgREST and synchronized via ElectricSQL shapes. Mutations occur on-demand via forms and pure Jessie handlers.
-2. **The kinetic plane**: Ephemeral high-frequency states living below `tab` (e.g. 35Hz, 60Hz, 120Hz physics loops, 3D simulations, and canvas interactions).
+A program's state lives in two planes, a hierarchy traded on fan-out
+against latency:
 
-Rather than abandoning determinism at the kinetic boundary, Omnishell's runtime provides `createKineticHost` governed by the pure engine contract (see [Kinetic host](../../omnishell/docs/kinetic.md)):
-- **`initState(seed)`**: Returns immutable initial state.
-- **`advanceFrame(state, cmd)`**: Pure fixed-step transition step.
-- **`saveState(state)`** and **`loadState(snapshot)`**: Formally verify the algebraic isomorphism $\text{loadState} \circ \text{saveState} = \text{id}$.
+| | DOM plane | Kinetic plane |
+| --- | --- | --- |
+| State | durable entities (`tab`, `device`, `offline`, `live`, `server`) moved by IVM: the store, Electric shapes, the pipelines | a deterministic engine's frames below `tab`, moved by GGPO-style rollback with prediction |
+| Presented by | HTML and CSS over rows | canvas, in a presenter's worker ([[../../omnishell/docs/terminal#The seats|the seats]]) |
+| Fans out | one to many | few to few: one session's peers |
+| Latency | a round trip per change | none locally; a late input is a rollback |
 
-The kinetic host decouples simulation ticks from variable display refresh rates, maintains an in-memory snapshot ring buffer, and injects a deterministic Mulberry32 PRNG. This extends Pronto's universal time travel from low-frequency database transactions down to frame-by-frame physics scrubbing, rollback networking, and timeline branching.
+The DOM plane composes the kinetic one: a Cortex state hosts a kinetic
+child, and the child reaches rows only by **lifting milestones**, the
+app-level events the engine names (a checkpoint, a stage's end, a duel's
+finish), each at a confirmed frame, with every seat's inputs since the last
+one. Confirmation is the condition and the milestone the trigger, so a
+lifted row is never rolled back and nothing is lifted per frame. Authority
+runs one way: a row can overrule the kinetic plane, never the reverse. A
+reader past the session's peers reads the lifted rows. Scrubbing the DOM
+plane's history to a milestone loads the kinetic host at its frame; between
+milestones the host's ring travels frame by frame.
+
+The engine contract that makes this hold is the kinetic host's
+([Kinetic host](../../omnishell/docs/kinetic.md)): `initState(seed)`,
+`advanceFrame(state, cmd)`, and `saveState`/`loadState` with
+$\text{loadState} \circ \text{saveState} = \text{id}$, checked by its sync
+test on every tick. Why each piece is where it is, and what was rejected, is
+[[decisions/2026-10-23-kinetic-machine|the kinetic-machine record]].
 
 ## Rejected
 
+- **Test configs that name where the platform lives** — written from `mise
+  where`, they carry one machine's absolute paths; rewritten by copybara for
+  each mirror, the mirror runs a config the monorepo never tested, and a
+  rewrite whose text drifted passes as a no-op.
+- **The workspace at the repository's root** — the root's `package.json` is
+  mecha's npm workspace, which needs `nodeModulesDir` manual where the apps'
+  tests need none, and a workspace has one.
+- **JSR for the platform's modules** — publishing needs an account, and the
+  registry is a central service the mirrors do not need.
+- **pnpm `github:` dependencies** — they install into `node_modules`, under
+  which deno refuses to strip TypeScript.
 - **Returned requests as a namespace beside state** — it repeats MVC's
   controller, which collapses what changed into where things live.
 - **Deriving `#emit` by matching field names across the parts** — CUE
@@ -262,7 +356,7 @@ The kinetic host decouples simulation ticks from variable display refresh rates,
   capability: they are the `isolation` axis, which boundary a unit runs behind,
   a different question from which resource it may reach.
 - **`transport` for the unit boundary** — a compartment passes no messages;
-  what varies across compartment, iframe and worker is the boundary, so the
+  what varies across compartment, realm and agent is the boundary, so the
   field is `isolation`.
 - **`pages` for screens** — "screen" is the design-layer word both Apple's and
   Android's guidelines use, while their API class names have changed twice.

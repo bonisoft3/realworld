@@ -4,7 +4,8 @@
     "up": false,
     "manual": false,
     "environment": {
-      "DATABASE_URL": "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-mecha}?sslmode=disable"
+      "DATABASE_URL": "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-mecha}?sslmode=disable",
+      "REQUIRED_TABLES": "schedule"
     },
     "ports": [],
     "volumes": [],
@@ -79,7 +80,8 @@
           ".bayt/Dockerfile.migrate",
           ".bayt/bayt.migrate.json",
           ".bayt/Taskfile.yml",
-          ".bayt/Taskfile.bayt.yml"
+          ".bayt/Taskfile.bayt.yml",
+          ".bayt/process-compose.yaml"
         ],
         "exclude": []
       },
@@ -142,7 +144,10 @@
       "outs": {
         "globs": [
           "services/database/rls/rls.sql",
+          "services/database/role_passwords.sh",
           "services/ticker/schedule.sql",
+          "services/airlock/graphile.sql",
+          "services/airlock/airlock.sql",
           "services/migrate/migrate.sh"
         ],
         "exclude": []
@@ -162,7 +167,10 @@
           "outs": {
             "globs": [
               "services/database/rls/rls.sql",
+              "services/database/role_passwords.sh",
               "services/ticker/schedule.sql",
+              "services/airlock/graphile.sql",
+              "services/airlock/airlock.sql",
               "services/migrate/migrate.sh"
             ],
             "exclude": []

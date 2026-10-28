@@ -1,6 +1,7 @@
 {
-  "chrome_signin_hint": "Gusa mara moja kwa kitufe chako cha usalama — mgeni hapa? kimoja kitatengenezwa kwa ajili yako.",
-  "chrome_signin": "Endelea",
+  "chrome_signin_google": "Ingia kwa Google",
+  "chrome_signin_hint": "Hadithi nzuri hutuunganisha. Soma, andika, na upate jumuiya yako.",
+  "chrome_signin": "Endelea kwa passkey",
   "chrome_signin_guest": "Endelea kama mgeni",
   "chrome_signin_failed": "Hilo halikufanikiwa. Jaribu tena.",
   "chrome_signout": "toka",

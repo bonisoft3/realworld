@@ -5,9 +5,12 @@ services:
       context: ..
       dockerfile: .bayt/Dockerfile.redis
       target: redis
+      tags:
+      - bayt-libraries_mecha-redis:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+      - bayt-libraries_mecha-redis:latest
       args:
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
     healthcheck:
       test:
       - CMD-SHELL
@@ -17,7 +20,7 @@ services:
       retries: 6
       start_period: 10s
       start_interval: 500ms
-    image: bayt-libraries_mecha-redis:${BAYT_IMAGE_TAG:-latest}
+    image: bayt-libraries_mecha-redis:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
     networks:
       default:
         aliases:
@@ -29,6 +32,6 @@ services:
       target: redis_bayt
       args:
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
     image: bayt-libraries_mecha-redis_bayt:latest
     scale: 0

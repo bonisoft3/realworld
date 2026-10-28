@@ -14,23 +14,13 @@
 import { parseHTML } from "npm:linkedom@0.18.4";
 import "npm:fake-indexeddb@6.2.5/auto";
 import { load as parseYaml } from "../interpreter/vendor/js-yaml.js";
-import { embedDeps, parseEmbeds, parseFilter, parseLimit, screenEnv } from "../interpreter/fragment.js";
-import { upsertKey as resolveKey } from "../interpreter/data-sync.js";
-import { batched } from "../interpreter/batched-store.js";
+import { screenEnv } from "../interpreter/fragment.js";
+import { type Call, fakeDataSync, type FakeDataSync } from "./data-sync-fake.ts";
 import "../interpreter/vendor/ses.umd.min.js";
 import { ensureSes } from "../interpreter/jessie.js";
-import { controlProperties } from "./linkedom-controls.ts";
+import { controlProperties } from "../server/linkedom-controls.ts";
 import { compileCatalog } from "../src/messages.ts";
 
-/** data-sync.js is the shipped store, not a typed module: the natural key an
- * upsert resolves against comes from there so there is one resolution and not
- * a second. */
-const upsertKey = resolveKey as (
-  uniques: string[][] | undefined,
-  pk: string,
-  owner: string | undefined,
-  values: Row,
-) => string[] | null;
 
 // The Jessie tier's lockdown, taken once at load: the ses pin is imported
 // first so ensureSes skips script injection (linkedom executes no scripts), and
@@ -39,6 +29,8 @@ const upsertKey = resolveKey as (
 // through console.error; that is the platform booting, and it is over before
 // the seam below exists.
 await ensureSes();
+
+const ORIGIN = "http://app.test";
 
 /** The console seam every silent failure passes through. Lockdown leaves a
  * frozen console on a writable global, so the seam is a console of its own
@@ -94,7 +86,6 @@ export const only = (rows: Row[], what: string): Row => {
   if (rows.length !== 1) throw new Error(`${what}: ${rows.length} rows, not one — ${JSON.stringify(rows)}`);
   return rows[0];
 };
-type Change = { value?: Row; previousValue?: Row };
 
 export type Route = {
   /** The path the screen answers, `:param` segments and all. Absent on a route
@@ -103,6 +94,7 @@ export type Route = {
   /** The same path in each declared locale, on a route carrying a slug. */
   paths?: Record<string, string>;
   screen: string;
+  hatches?: string[];
   files: { html: string; css: string; handlers: string[]; renderers?: string[]; adapters?: string[]; shared?: string[] };
   states?: string[];
 };
@@ -114,72 +106,12 @@ export type I18n = { default: string; locales: Record<string, { path: string }> 
  * of it: the columns, what an integer counts where it counts money, and the
  * table a foreign key refers to. */
 export type Schema = Record<string, {
-  fields: { name: string; type: string; money?: { currency: string; minorUnits: number }; ref?: string }[];
+  fields: { name: string; type: string; default?: string | number | boolean | null; money?: { currency: string; minorUnits: number }; ref?: string }[];
 }>;
 
 /** A catalogue per locale. A value is a sentence or a compile-time AST. */
 export type Catalogs = Record<string, Record<string, unknown>>;
 
-/** One store contact, in the order it was made. `op` is what the store RESOLVED
- * to and not what the markup declared: an upsert lands here as the create or the
- * update it became, which is the fact about the data rather than about the
- * gesture — a test claiming the gesture asserts on the markup. `row` is the
- * values the caller handed over, the patch for an update and the whole row
- * otherwise, so a write can be asked what it CARRIED and not only that it
- * happened. */
-export type Call = { op: string; table: string; id?: string; row?: Row };
-
-export type MemoryStore = {
-  query(table: string, order?: string | null, opts?: Record<string, unknown>): Promise<Row[]>;
-  subscribe(table: string, fn: (changes?: Change[]) => void, opts?: Record<string, unknown>): () => void;
-  create(table: string, values: Row): Promise<void>;
-  upsert(table: string, values: Row): Promise<void>;
-  update(table: string, id: unknown, patch: Row): Promise<void>;
-  put(table: string, row: Row): Promise<void>;
-  // The batch surface the interpreter writes through. A test drives the
-  // singular methods above; the interpreter drives these, and `batched` below
-  // is what keeps the two describing the same store.
-  add(table: string, rows: Row[]): Promise<void>;
-  write(table: string, rows: Row[]): Promise<void>;
-  patch(table: string, edits: { key: string; changes: Row }[]): Promise<void>;
-  drop(table: string, keys: string[]): Promise<void>;
-  dropWhere(table: string, filter: string): Promise<void>;
-  upsertBy(table: string, values: Row): Promise<void>;
-  remove(table: string, id: unknown): Promise<void>;
-  removeWhere(table: string, filter: string): Promise<void>;
-  /** The rows a table holds, as the store holds them. */
-  rows(table: string): Row[];
-  calls: Call[];
-  /** Bumped by every write; the harness's quiet signal. */
-  version: number;
-  /** Wakes scheduled and not yet delivered. */
-  pendingWakes: number;
-};
-
-/**
- * The store's ordering, which is not part of the fragment grammar: a
- * comma-separated `col.dir` list, nulls last on asc and first on desc, JS
- * relational comparison. It mirrors data-sync.js's compareBy, so a column of
- * strings compares lexically here exactly as it does in the browser.
- */
-function compareBy(order?: string | null) {
-  const keys = (order ?? "").split(",").filter(Boolean).map((k) => {
-    const [col, dir] = k.split(".");
-    return { col, sign: dir === "desc" ? -1 : 1 };
-  });
-  return (a: Row, b: Row) => {
-    for (const { col, sign } of keys) {
-      const x = a[col] as never;
-      const y = b[col] as never;
-      if (x == null && y == null) continue;
-      if (x == null) return sign;
-      if (y == null) return -sign;
-      if (x < y) return -sign;
-      if (x > y) return sign;
-    }
-    return 0;
-  };
-}
 
 /** What the cluster fills in that the browser never computes. A mount that
  * omits all of it can still read and create; only upsert needs a key to
@@ -211,287 +143,37 @@ export type Cluster = {
   defaults?: Record<string, Row>;
 };
 
-/**
- * An in-memory store over whole tables. Reads go through the fragment
- * grammar's own parsers, so there is one dialect of filters, caps and selects
- * and this is not a second one; a fragment the grammar cannot state throws
- * rather than widening the read.
- *
- * Wakes carry the change set, coalesced on a macrotask, per subscription —
- * which is what the interpreter's delta path reads to decide which rows a
- * refresh has to reconsider.
- */
 
-export function memoryStore(tables: Record<string, Row[]>, cluster: Cluster = {}): MemoryStore {
-  const data = new Map<string, Row[]>(
-    Object.entries(tables).map(([t, rows]) => [t, rows.map((r) => ({ ...r }))]),
+const shellCache = new Map<string, Promise<Record<string, unknown>>>();
+
+function appShell(appDir: URL): Promise<Record<string, unknown>> {
+  const url = new URL("shell/shell.yaml", appDir).href;
+  const hit = shellCache.get(url);
+  if (hit !== undefined) return hit;
+  const loaded = Deno.readTextFile(new URL(url)).then(
+    (text) => parseYaml(text) as Record<string, unknown>,
+    (err) => {
+      shellCache.delete(url);
+      throw err;
+    },
   );
-  type Sub = { fn: (changes?: Change[]) => void; batch: Change[]; scheduled: boolean };
-  const subs = new Map<string, Set<Sub>>();
-  const minted = new Map<string, number>();
-  const mintId = (table: string) => {
-    const n = (minted.get(table) ?? 0) + 1;
-    minted.set(table, n);
-    return `${table}-${n}`;
-  };
-  const store = {
-    calls: [] as Call[],
-    version: 0,
-    pendingWakes: 0,
-  } as MemoryStore;
-
-  const of = (table: string) => {
-    const rows = data.get(table);
-    if (rows === undefined) throw new Error(`no table "${table}" in this store`);
-    return rows;
-  };
-  const keyOf = (table: string) => cluster.keys?.[table] ?? "id";
-  // The policies the cluster enforces, so a fixture seeded with rows the
-  // reader could not fetch does not render here and vanish in a browser.
-  const visible = (table: string, row: Row): boolean => {
-    const a = cluster.access?.[table];
-    if (a === undefined || cluster.me === undefined) return true;
-    if (a.scope === "public") return true;
-    if (a.scope === "internal") return false;
-    if (a.scope === "private") {
-      if (row[a.owner as string] === cluster.me) return true;
-      if (a.shared === undefined) return false;
-      const pk = row[keyOf(table)];
-      return (data.get(a.shared.via) ?? []).some(
-        (sh) => sh[a.shared!.on] === pk && sh[a.shared!.user] === cluster.me,
-      );
-    }
-    const parent = a.parent as string;
-    const p = (data.get(parent) ?? []).find((r) => r[keyOf(parent)] === row[a.on as string]);
-    return p !== undefined && visible(parent, p);
-  };
-  // Comparing the key's string form matches a row whose key is absent to a
-  // lookup for nothing, so a keyless row would answer for every id.
-  const indexOf = (table: string, rows: Row[], id: unknown) => {
-    const key = keyOf(table);
-    if (id === undefined) throw new Error(`${table}: a row is addressed by its ${key}, and none was given`);
-    return rows.findIndex((r) => {
-      if (r[key] === undefined) throw new Error(`${table}: a row carries no ${key}`);
-      return String(r[key]) === String(id);
-    });
-  };
-
-  // PostgREST names an embed by its relation OR by the foreign key column that
-  // reaches it, and the grammar reports whichever the markup wrote. Only the
-  // table set can tell them apart, so resolution happens here, against the
-  // tables this store actually holds.
-  const relationOf = (named: string) => {
-    if (data.has(named)) return named;
-    const stripped = named.replace(/_id$/, "");
-    if (data.has(stripped)) return stripped;
-    throw new Error(
-      `embed "${named}" names neither a table nor a foreign key into one; the store holds ${
-        [...data.keys()].join(", ")
-      }`,
-    );
-  };
-
-  const note = (table: string, change: Change) => {
-    store.version++;
-    for (const sub of subs.get(table) ?? []) {
-      sub.batch.push(change);
-      if (sub.scheduled) continue;
-      sub.scheduled = true;
-      store.pendingWakes++;
-      setTimeout(() => {
-        sub.scheduled = false;
-        store.pendingWakes--;
-        const changes = sub.batch;
-        sub.batch = [];
-        sub.fn(changes);
-      }, 0);
-    }
-  };
-
-  store.rows = (table) => of(table);
-
-  store.query = async (table, order, opts = {}) => {
-    store.calls.push({ op: "query", table });
-    const preds = parseFilter(opts.filter);
-    if (preds === null) throw new Error(`filter outside the grammar for ${table}: ${opts.filter}`);
-    // What the shipped store hands to PostgREST, short of a hint, a spread,
-    // a base column list or a column renamed, cast or computed, which no
-    // read here may widen.
-    const tree = parseEmbeds(opts.select);
-    type Embed = { hints: string[]; spread: boolean; cols: string[]; embeds: Embed[] };
-    const plain = (e: Embed): boolean =>
-      e.hints.length === 0 && !e.spread && e.cols.every((c) => /^[a-z_][a-z0-9_]*$/.test(c)) &&
-      e.embeds.every(plain);
-    if (tree === null || tree.cols.some((c: string) => c !== "*") || !tree.embeds.every(plain)) {
-      throw new Error(`select outside the grammar for ${table}: ${opts.select}`);
-    }
-    const embeds = tree.embeds;
-    const sorted = of(table)
-      .filter((r: Row) => visible(table, r) && preds.every((p: (row: Row) => boolean) => p(r)))
-      .sort(compareBy(order ?? (opts.order as string | undefined)));
-    const limit = parseLimit(opts.filter);
-    const capped = limit === undefined ? sorted : sorted.slice(0, limit);
-    return capped.map((row: Row) => embedInto(table, row, { ...row }, embeds));
-  };
-
-  // An embed names either a foreign-key column of the row's table or the table
-  // one points at; without the schema's refs, the column is `<alias>_id`.
-  // deno-lint-ignore no-explicit-any
-  const embedInto = (table: string, row: Row, out: Row, embeds: any[]): Row => {
-    const refs: Record<string, string> = Object.fromEntries(
-      (cluster.schema?.[table]?.fields ?? []).flatMap((f) => f.ref === undefined ? [] : [[f.name, f.ref]]),
-    );
-    for (const { alias, rel, cols, embeds: inner } of embeds) {
-      const named = refs[rel] !== undefined ? [rel] : Object.keys(refs).filter((c) => refs[c] === rel);
-      if (named.length > 1) throw new Error(`embed "${rel}" on ${table} is ambiguous: ${named.join(", ")}`);
-      const col = named[0] ?? `${alias}_id`;
-      const t = named[0] === undefined ? relationOf(rel) : refs[col];
-      const target = of(t).find((r) => String(r[keyOf(t)]) === String(row[col]));
-      // A joined row that does not resolve binds null, never omitted:
-      // PostgREST under RLS answers the same way.
-      out[alias] = target === undefined
-        ? null
-        : embedInto(t, target, Object.fromEntries(cols.map((c: string) => [c, target[c]])), inner);
-    }
-    return out;
-  };
-
-  // Per table, not per read: the shipped store maintains a view over the
-  // region's own filter and wakes only when that view moves. Waking on the
-  // whole table is a superset — the extra pass costs a re-read and the delta
-  // set still names the rows that moved — so a region here never misses a
-  // wake it would get in the browser.
-  store.subscribe = (table, fn, opts = {}) => {
-    of(table);
-    const sub: Sub = { fn, batch: [], scheduled: false };
-    // The shipped store watches the region's embedded tables beside its own,
-    // so an edit to a joined row reaches the region that renders it. Row
-    // visibility is the part not modelled: every seeded row is readable here.
-    const watched = [table, ...embedDeps(opts.select as string | undefined, table, cluster.schema)]
-      .filter((t) => data.has(t));
-    for (const t of watched) {
-      const set = subs.get(t) ?? new Set<Sub>();
-      subs.set(t, set);
-      set.add(sub);
-    }
-    return () => {
-      for (const t of watched) subs.get(t)?.delete(sub);
-    };
-  };
-
-  store.create = async (table, values) => {
-    // The shipped store mints the key when the form does not carry one
-    // (data-sync.js: retries are idempotent only because the id travels with
-    // every attempt), so a fake that refused would fail writes the browser
-    // accepts. Minted from the mount's seeded entropy, not crypto, so a
-    // created row's id is the same on every run.
-    const given = owned(table, values);
-    const row = given?.id === undefined ? { id: mintId(table), ...given } : given;
-    store.calls.push({ op: "create", table, id: String(row.id), row: { ...row } });
-    const rows = of(table);
-    if (rows.some((r) => String(r[keyOf(table)]) === String(row[keyOf(table)]))) {
-      throw new Error(`create ${table}: ${row[keyOf(table)]} is already there`);
-    }
-    const value = { ...row };
-    rows.push(value);
-    note(table, { value });
-  };
-
-  // The owner column is DEFAULT auth_uid() and materialises server-side, so a
-  // row the reader writes carries it while the values the form submitted do
-  // not. A mount that names no reader leaves it to the app's own fixtures.
-  const owned = (table: string, values: Row): Row => {
-    const filled = { ...cluster.defaults?.[table], ...values };
-    const owner = cluster.owners?.[table];
-    if (owner === undefined || cluster.me === undefined || filled[owner] !== undefined) return filled;
-    return { ...filled, [owner]: cluster.me };
-  };
-
-  store.upsert = async (table, values) => {
-    const keys = upsertKey(cluster.uniques?.[table], keyOf(table), cluster.owners?.[table], values);
-    if (keys === null) {
-      throw new Error(`upsert ${table}: no natural key covers ${Object.keys(values).join(",")}`);
-    }
-    const row = owned(table, values);
-    const at = (r: Row, c: string) => String(r[c] ?? "");
-    const wanted = keys.map((c) => at(row, c));
-    const existing = of(table).find((r) => keys.every((c, i) => at(r, c) === wanted[i]));
-    if (existing === undefined) return store.create(table, row);
-    return store.update(table, existing[keyOf(table)], row);
-  };
-
-  store.update = async (table, id, patch) => {
-    store.calls.push({ op: "update", table, id: String(id), row: { ...patch } });
-    const rows = of(table);
-    const i = indexOf(table, rows, id);
-    if (i < 0) throw new Error(`update ${table}: no row ${id}`);
-    const previousValue = rows[i];
-    const value = { ...previousValue, ...patch };
-    rows[i] = value;
-    note(table, { value, previousValue });
-  };
-
-  store.put = async (table, row) => {
-    const key = keyOf(table);
-    if (row?.[key] === undefined) throw new Error(`put ${table}: the row carries no ${key}`);
-    store.calls.push({ op: "put", table, id: String(row[key]), row: { ...row } });
-    const rows = of(table);
-    const i = rows.findIndex((r) => String(r[keyOf(table)]) === String(row[keyOf(table)]));
-    if (i < 0) {
-      const value = { ...row };
-      rows.push(value);
-      note(table, { value });
-      return;
-    }
-    // A row states its fields and leaves the rest alone; the key is the
-    // caller's own, so the same conclusion reached twice is the same row.
-    const previousValue = rows[i];
-    const value = { ...previousValue, ...row };
-    rows[i] = value;
-    note(table, { value, previousValue });
-  };
-
-  store.remove = async (table, id) => {
-    store.calls.push({ op: "remove", table, id: String(id) });
-    const rows = of(table);
-    const i = indexOf(table, rows, id);
-    if (i < 0) throw new Error(`remove ${table}: no row ${id}`);
-    const [previousValue] = rows.splice(i, 1);
-    note(table, { previousValue });
-  };
-
-  store.removeWhere = async (table, filter) => {
-    store.calls.push({ op: "removeWhere", table });
-    // A cap on a delete states a row count the server cannot honour, so the
-    // shipped store refuses the filter rather than deleting what it matches.
-    if (parseLimit(filter) !== undefined) throw new Error(`delete filter carries a limit: ${filter}`);
-    const preds = parseFilter(filter);
-    if (preds === null) throw new Error(`filter outside the grammar for ${table}: ${filter}`);
-    const doomed = of(table).filter((r: Row) => preds.every((p: (row: Row) => boolean) => p(r)));
-    for (const row of doomed) await store.remove(table, row[keyOf(table)]);
-  };
-
-  // The harness keeps its own upsert and removeWhere: tests drive them
-  // directly and they model natural-key resolution the adapter cannot.
-  const wrapped = batched(store) as MemoryStore;
-  wrapped.upsertBy = store.upsert;
-  wrapped.dropWhere = store.removeWhere;
-  return wrapped;
+  shellCache.set(url, loaded);
+  return loaded;
 }
 
 /** Every route the app ships, in the order shell.yaml lists them — what a
  * driver that has no screen in mind walks. */
 export async function appRoutes(appDir: URL): Promise<Route[]> {
-  const shell = parseYaml(await Deno.readTextFile(new URL("shell/shell.yaml", appDir))) as {
+  const shell = await appShell(appDir) as {
     routes?: Route[];
   };
-  return shell.routes ?? [];
+  return [...(shell.routes ?? [])];
 }
 
 /** The locales the app declares, or undefined where it declares none — which
  * is what decides whether a composed href wears a locale prefix. */
 export async function appI18n(appDir: URL): Promise<I18n | undefined> {
-  const shell = parseYaml(await Deno.readTextFile(new URL("shell/shell.yaml", appDir))) as {
+  const shell = await appShell(appDir) as {
     i18n?: I18n;
   };
   return shell.i18n;
@@ -506,11 +188,11 @@ export async function appRoute(appDir: URL, screen: string): Promise<Route> {
 }
 
 /** Every collection the app declares: the browser tier's `local:` and the
- * cluster's `tables:`. memoryStore refuses a read of a table it was not given,
+ * cluster's `tables:`. fakeDataSync refuses a read of a table it was not given,
  * so a driver that does not know which collections a screen touches states
  * them all — empty, which is where a visit starts. */
 export async function appCollections(appDir: URL): Promise<string[]> {
-  const shell = parseYaml(await Deno.readTextFile(new URL("shell/shell.yaml", appDir))) as {
+  const shell = await appShell(appDir) as {
     local?: Record<string, unknown>;
     tables?: string[];
   };
@@ -557,18 +239,26 @@ export type El = {
 
 /** A vendored unit, as shell.yaml declares it and as the interpreter resolves
  * a `data-hatch` name against. */
-export type Unit = { isolation: string; capabilities: string[]; src: string };
+export type Unit = {
+  isolation: string;
+  ports: { reads: string[]; raises: string[] };
+  /** An agent's memo as the terminal performs it: the table, the key and the
+   * columns an answer fills. */
+  memo?: { table: string; key: string[]; columns: string[] };
+  src: string;
+};
 
 type Interpreter = {
   interpretScreen(
     mount: El,
     base: string,
     route: Route,
-    store: MemoryStore,
+    store: FakeDataSync,
     params: Record<string, string>,
     opts: {
       units: Record<string, Unit>;
       mountUnits: boolean;
+      mountHostDom: boolean;
       messages?: Catalogs;
       locale?: string;
       routes?: Route[];
@@ -595,7 +285,7 @@ async function interpreter(search: string): Promise<Interpreter> {
     return engine;
   }
   knobs = search;
-  global.location = new URL(`http://screen.test/${search}`);
+  global.location = new URL(`${ORIGIN}/${search}`);
   engine = import("../interpreter/screen.js") as unknown as Promise<Interpreter>;
   await engine;
   if (global.__prontoClock === undefined) {
@@ -611,7 +301,7 @@ const macrotask = () => new Promise((r) => setTimeout(r, 0));
 export type Mounted = {
   mount: El;
   screen: El;
-  store: MemoryStore;
+  store: FakeDataSync;
   rows(table: string): Row[];
   /** The one element the selector names; absent or ambiguous is an error. */
   one(selector: string): El;
@@ -653,8 +343,8 @@ export type MountSpec = {
   tables: Record<string, Row[]>;
   seed: number;
   params?: Record<string, string>;
-  /** Table milliseconds per clock step. A hundred at a time, not a beat at a
-   * time: a screen wears states between its beats. */
+  /** Minimum table milliseconds per clock advance while settling; waits due
+   * further out jump straight to the soonest queued wait. */
   step?: number;
   /** Table milliseconds one settle may spend before the screen is declared
    * unable to stop. */
@@ -674,12 +364,18 @@ export type MountSpec = {
    * itself still needs its boundary faked — a real Worker answers off the held
    * clock, where settle() cannot see it. */
   units?: Record<string, Unit>;
+  /** The kinetic children a `data-kinetic` may name (shell.yaml `kinetic:`),
+   * resolved at mount as a unit is; mounted only where units are. */
+  kinetic?: Record<string, unknown>;
   /** Whether a resolved unit is also mounted. The machine walker declares
    * false: linkedom has neither a Worker nor a frame, and a unit renders
    * nothing and declares no machine, so mounting one adds nothing to a walk. */
   mountUnits?: boolean;
+  hostDom?: Record<string, { src: string; note: string }>;
+  mountHostDom?: boolean;
   messages?: Catalogs;
   locale?: string;
+  timeZone?: string;
   /** The whole route table, because a link names a route and the binder
    * composes its href from that table — the screen under test links to screens
    * it is not. mountApp reads it from the app's own shell.yaml; a hand-built
@@ -869,7 +565,7 @@ export async function mountScreen(spec: MountSpec): Promise<Mounted> {
   const { interpretScreen } = await interpreter(
     `?clock=manual&seed=${spec.seed}${spec.epoch === undefined ? "" : `&epoch=${spec.epoch}`}`,
   );
-  const clock = global.__prontoClock as { advance(ms: number): number };
+  const clock = global.__prontoClock as { advance(ms: number): number; due(): { in: number }[] };
 
   // The Event class has to be linkedom's own: the platform's seals fields
   // linkedom's dispatchEvent assigns.
@@ -901,7 +597,7 @@ export async function mountScreen(spec: MountSpec): Promise<Mounted> {
   };
   (globalThis as unknown as EventTarget).addEventListener("unhandledrejection", onEscape as EventListener);
 
-  const base = "http://app.test/";
+  const base = `${ORIGIN}/`;
   global.fetch = (url: unknown) => {
     const path = new URL(String(url), base).pathname.replace(/^\//, "");
     const source = spec.files[path];
@@ -923,7 +619,7 @@ export async function mountScreen(spec: MountSpec): Promise<Mounted> {
     (globalThis as unknown as EventTarget).removeEventListener("unhandledrejection", onEscape as EventListener);
   };
 
-  const store = memoryStore(spec.tables, spec.cluster ?? {});
+  const store = fakeDataSync(spec.tables, spec.cluster ?? {});
   const mount = document.getElementById("shell");
   // A mount that never resolves hands back no stop(), so it disarms here: a
   // seam left collecting into it would swallow every later report, and the
@@ -933,11 +629,12 @@ export async function mountScreen(spec: MountSpec): Promise<Mounted> {
     if (mount === null) throw new Error("the harness document has no mount");
     handle = await interpretScreen(mount, base, spec.route, store, spec.params ?? {}, screenEnv(spec, {
       mountUnits: spec.mountUnits ?? true,
+      mountHostDom: spec.mountHostDom ?? true,
       messages: spec.messages,
       locale: spec.locale,
       // A case asserts on rendered text, so the zone is the harness's and not
       // the machine's — see storybook.js for the same pin.
-      timeZone: "UTC",
+      timeZone: spec.timeZone ?? "UTC",
     }));
   } catch (err) {
     disarm();
@@ -989,8 +686,9 @@ export async function mountScreen(spec: MountSpec): Promise<Mounted> {
         if (spent >= cap) {
           throw new Error(`the screen never stopped: waits still queued after ${spent}ms of table time`);
         }
-        clock.advance(step);
-        spent += step;
+        const next = Math.min(Math.max(step, clock.due()[0]?.in ?? 0), cap - spent);
+        clock.advance(next);
+        spent += next;
         continue;
       }
       // An empty queue is not a stopped screen. A machine arms its `after`
@@ -1126,6 +824,14 @@ export async function appMessages(appDir: URL): Promise<Record<string, Record<st
 export async function mountApp(
   spec: Omit<MountSpec, "route" | "files"> & { appDir: URL; screen: string },
 ): Promise<Mounted> {
+  // The shell syncs only the tables the app declares, so a write to any other
+  // fails in the browser with no collection; a table handed in here would
+  // hide that.
+  const collections = new Set(await appCollections(spec.appDir));
+  const stray = Object.keys(spec.tables).filter((t) => !collections.has(t));
+  if (stray.length > 0) {
+    throw new Error(`the app syncs no collection for ${stray.join(", ")}: a screen writing one fails in the browser`);
+  }
   const routes = await appRoutes(spec.appDir);
   const route = await appRoute(spec.appDir, spec.screen);
   const declared = await appCluster(spec.appDir);
@@ -1145,6 +851,8 @@ export async function mountApp(
     tables: { ...(await appSeed(spec.appDir)), ...spec.tables },
     cluster: { ...declared, ...spec.cluster },
     units: { ...(await appUnits(spec.appDir)), ...spec.units },
+    kinetic: spec.kinetic ?? await appKinetic(spec.appDir),
+    hostDom: { ...(await appHostDom(spec.appDir)), ...spec.hostDom },
     schema: spec.schema ?? await appSchema(spec.appDir),
     endowments: spec.endowments ?? await appEndowments(spec.appDir),
   });
@@ -1152,7 +860,7 @@ export async function mountApp(
 
 /** The manifest-granted platform endowments an app declares (shell.yaml `endowments:`). */
 export async function appEndowments(appDir: URL): Promise<Record<string, string[]> | undefined> {
-  const shell = parseYaml(await Deno.readTextFile(new URL("shell/shell.yaml", appDir))) as {
+  const shell = await appShell(appDir) as {
     endowments?: Record<string, string[]>;
   };
   return shell.endowments;
@@ -1161,19 +869,34 @@ export async function appEndowments(appDir: URL): Promise<Record<string, string[
 /** The entity projection an app emits (shell.yaml `schema:`), which is what a
  * money binding resolves its column's currency and scale against. */
 export async function appSchema(appDir: URL): Promise<Schema | undefined> {
-  const shell = parseYaml(await Deno.readTextFile(new URL("shell/shell.yaml", appDir))) as {
+  const shell = await appShell(appDir) as {
     schema?: Schema;
   };
   return shell.schema;
 }
 
+export async function appHostDom(appDir: URL): Promise<Record<string, { src: string; note: string }>> {
+  const shell = await appShell(appDir) as {
+    hostDom?: Record<string, { src: string; note: string }>;
+  };
+  return shell.hostDom ?? {};
+}
+
 /** The vendored units an app declares (shell.yaml `units:`), which is what a
  * `data-hatch` name resolves against. */
 export async function appUnits(appDir: URL): Promise<Record<string, Unit>> {
-  const shell = parseYaml(await Deno.readTextFile(new URL("shell/shell.yaml", appDir))) as {
+  const shell = await appShell(appDir) as {
     units?: Record<string, Unit>;
   };
   return shell.units ?? {};
+}
+
+/** The kinetic children an app declares (shell.yaml `kinetic:`). */
+export async function appKinetic(appDir: URL): Promise<Record<string, unknown>> {
+  const shell = await appShell(appDir) as {
+    kinetic?: Record<string, unknown>;
+  };
+  return shell.kinetic ?? {};
 }
 
 /** The rows a browser tier holds before anyone writes one (shell.yaml
@@ -1181,16 +904,18 @@ export async function appUnits(appDir: URL): Promise<Record<string, Unit>> {
  * A test that states the table itself is stating a later world than the seed's
  * and keeps it whole. */
 export async function appSeed(appDir: URL): Promise<Record<string, Row[]>> {
-  const shell = parseYaml(await Deno.readTextFile(new URL("shell/shell.yaml", appDir))) as {
+  const shell = await appShell(appDir) as {
     seed?: Record<string, Row[]>;
   };
-  return shell.seed ?? {};
+  return Object.fromEntries(
+    Object.entries(shell.seed ?? {}).map(([k, rows]) => [k, rows.map((r) => ({ ...r }))]),
+  );
 }
 
 /** The cluster facts an app declares about itself: the natural keys of
  * `uniques:` and the owner column of each owned entity in `access:`. */
 export async function appCluster(appDir: URL): Promise<Cluster> {
-  const shell = parseYaml(await Deno.readTextFile(new URL("shell/shell.yaml", appDir))) as {
+  const shell = await appShell(appDir) as {
     uniques?: Record<string, string[][]>;
     access?: Cluster["access"];
     keys?: Record<string, string>;

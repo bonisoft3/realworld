@@ -75,6 +75,44 @@ Deno.test("several fields on one line are each stamped, and a seed row that open
   assert.deepEqual(out.includes('seed: [{name: "label", id: "x"}]'), true);
 });
 
+Deno.test("space-indented entity blocks and spaced field braces are stamped", () => {
+  const spaced = [
+    "    Row: {",
+    '        table: "row"',
+    "        fields: [",
+    '            { name: "id", type: "text", pk: true },',
+    '            { name: "label", type: "text" },',
+    "        ]",
+    "    }",
+  ].join("\n");
+  const out = stampCue(spaced, bare, "0xc75ee275aaa2d971");
+  assert.deepEqual(out.split("\n")[1], '        id: "0xc75ee275aaa2d971"');
+  assert.deepEqual(out.includes('{ ordinal: 1, name: "id", type: "text", pk: true }'), true);
+  assert.deepEqual(out.includes('{ ordinal: 2, name: "label", type: "text" }'), true);
+});
+
+Deno.test("mint ignores a nested fields example before the entity's own fields", () => {
+  const example = [
+    "        _example: {",
+    "            fields: [",
+    '                {name: "id"}, {name: "label"}',
+    "            ]",
+    "        }",
+  ].join("\n");
+  const source = [
+    "    Row: {",
+    example,
+    "// Helpers are outside the entity field list.",
+    '        table: "row"',
+    '        fields: [{name: "id", type: "string"}, {name: "label", type: "string"}]',
+    "    }",
+  ].join("\n");
+  const out = stampCue(source, bare, "0xc75ee275aaa2d971");
+  assert.equal(out.includes(example), true);
+  assert.equal(out.split("\n")[1], '        id: "0xc75ee275aaa2d971"');
+  assert.equal(out.includes('fields: [{ordinal: 1, name: "id", type: "string"}, {ordinal: 2, name: "label", type: "string"}]'), true);
+});
+
 // A field mint cannot see would be skipped and leave a gap under the next one.
 Deno.test("a field declared in a shape mint does not read is refused, not skipped", () => {
   const multiline = cue.replace('{name: "label", type: "text"},', '{\n\t\t\t\t\tname: "label"\n\t\t\t\t\ttype: "text"\n\t\t\t\t},');
@@ -87,4 +125,12 @@ Deno.test("the ir is stamped where it has a section and agrees afterwards", () =
   assert.deepEqual(irDisagreements(stamped, [row]), []);
   assert.deepEqual(irDisagreements(stamped.replace("<td>label</td>", "<td>title</td>"), [row]).length, 1);
   assert.deepEqual(stampIr(stamped, row), stamped);
+});
+
+// An app started by copying another's ir.html carries that app's type ids;
+// before any snapshot exists the program's ids are the only ones recorded.
+Deno.test("a fresh app's ir takes the program's type id over a copied one", () => {
+  const copied = '<section id="Row" data-kind="entity" data-durability="tab" data-type-id="0x8000000000000001">\n<tr><td>id</td></tr>\n</section>';
+  assert.deepEqual(irDisagreements(stampIr(copied, row), [row]).length, 1);
+  assert.deepEqual(irDisagreements(stampIr(copied, row, true), [row]), []);
 });

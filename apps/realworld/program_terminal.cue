@@ -3,9 +3,11 @@
 package realworld
 
 terminal: surface: {
-  runtime: "../../plugins/omnishell/runtime"
-  interpreterRoot: "../../plugins/omnishell/interpreter"
-  componentsRoot: "../../plugins/omnishell/components"
-  markupReader: "../../plugins/omnishell/read-markup.ts"
-  machineSchema: "../../plugins/omnishell/machine.cue"
+  runtime: ""
+  interpreterRoot: "interpreter"
+  componentsRoot: "components"
+  markupReader: "read-markup.ts"
+  documentRenderer: "render-documents.ts"
+  documentConfig: "server/deno.json"
+  machineSchema: "machine.cue"
 }

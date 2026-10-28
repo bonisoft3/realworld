@@ -1,0 +1,1634 @@
+{
+  "version": 1,
+  "types": {
+    "types": {
+      "string": {
+        "pg": "text",
+        "column": "plain",
+        "subset": true,
+        "base": [
+          "text",
+          "varchar",
+          "bpchar",
+          "tsvector"
+        ],
+        "json": "string",
+        "refuse": "\\x00",
+        "order": "text",
+        "beyond": [
+          "scalar-values"
+        ]
+      },
+      "bool": {
+        "pg": "boolean",
+        "column": "plain",
+        "subset": true,
+        "base": [
+          "bool",
+          "boolean"
+        ],
+        "json": "boolean",
+        "order": "boolean",
+        "beyond": []
+      },
+      "int32": {
+        "pg": "integer",
+        "column": "plain",
+        "subset": true,
+        "base": [
+          "int2",
+          "int4",
+          "integer",
+          "smallint"
+        ],
+        "json": "number",
+        "min": -2147483648,
+        "max": 2147483647,
+        "order": "number",
+        "beyond": []
+      },
+      "int64": {
+        "pg": "bigint",
+        "column": "domain",
+        "subset": false,
+        "sql": "portable_int64",
+        "base": [
+          "int8",
+          "bigint"
+        ],
+        "json": "string",
+        "pattern": "^(0|-?[1-9][0-9]*)$",
+        "order": "integer",
+        "beyond": [
+          "int64-range"
+        ]
+      },
+      "double": {
+        "pg": "double precision",
+        "column": "checked",
+        "subset": true,
+        "base": [
+          "float4",
+          "float8",
+          "double precision",
+          "real"
+        ],
+        "json": "number",
+        "order": "number",
+        "beyond": []
+      },
+      "bytes": {
+        "pg": "bytea",
+        "column": "domain",
+        "subset": false,
+        "sql": "portable_bytes",
+        "base": [
+          "bytea"
+        ],
+        "json": "string",
+        "pattern": "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+        "order": "none",
+        "beyond": []
+      },
+      "uuid": {
+        "pg": "uuid",
+        "column": "plain",
+        "subset": true,
+        "base": [
+          "uuid"
+        ],
+        "json": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        "order": "text",
+        "beyond": []
+      },
+      "timestamp": {
+        "pg": "timestamptz",
+        "column": "domain",
+        "subset": false,
+        "sql": "portable_timestamp",
+        "base": [
+          "timestamptz",
+          "timestamp with time zone"
+        ],
+        "json": "string",
+        "pattern": "^(000[1-9]|00[1-9][0-9]|0[1-9][0-9]{2}|[1-9][0-9]{3})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{6}Z$",
+        "order": "text",
+        "beyond": [
+          "calendar"
+        ]
+      },
+      "duration": {
+        "pg": "interval",
+        "column": "domain",
+        "subset": false,
+        "sql": "portable_duration",
+        "base": [
+          "interval"
+        ],
+        "json": "string",
+        "pattern": "^PT(0|[1-9][0-9]*)(\\.[0-9]{0,5}[1-9])?S$",
+        "order": "duration",
+        "beyond": [
+          "duration-range"
+        ]
+      },
+      "decimal": {
+        "pg": "numeric",
+        "column": "domain",
+        "subset": false,
+        "base": [
+          "numeric",
+          "decimal"
+        ],
+        "json": "string",
+        "pattern": "^(0|-?[1-9][0-9]*|-?(0|[1-9][0-9]*)\\.[0-9]*[1-9])$",
+        "order": "decimal",
+        "beyond": [
+          "decimal-profile"
+        ]
+      },
+      "date": {
+        "pg": "date",
+        "column": "checked",
+        "subset": true,
+        "base": [
+          "date"
+        ],
+        "json": "string",
+        "pattern": "^(000[1-9]|00[1-9][0-9]|0[1-9][0-9]{2}|[1-9][0-9]{3})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
+        "order": "text",
+        "beyond": [
+          "calendar"
+        ]
+      },
+      "time": {
+        "pg": "time(6)",
+        "column": "domain",
+        "subset": false,
+        "sql": "portable_time",
+        "base": [
+          "time",
+          "time without time zone"
+        ],
+        "json": "string",
+        "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{6}$",
+        "order": "text",
+        "beyond": []
+      },
+      "timezone": {
+        "pg": "text",
+        "column": "checked",
+        "subset": true,
+        "base": [
+          "text"
+        ],
+        "json": "string",
+        "pattern": "^[A-Za-z0-9+_/-]+$",
+        "order": "none",
+        "beyond": [
+          "tzdb"
+        ]
+      },
+      "json": {
+        "pg": "json",
+        "column": "checked",
+        "subset": false,
+        "base": [
+          "json",
+          "jsonb"
+        ],
+        "json": "value",
+        "order": "none",
+        "beyond": [
+          "scalar-values",
+          "finite-numbers"
+        ]
+      },
+      "geojson": {
+        "pg": "json",
+        "column": "checked",
+        "subset": false,
+        "base": [
+          "json",
+          "jsonb",
+          "geometry",
+          "geography"
+        ],
+        "json": "value",
+        "order": "none",
+        "beyond": [
+          "scalar-values",
+          "finite-numbers",
+          "ring-closure"
+        ]
+      }
+    },
+    "aliases": {
+      "text": "string",
+      "int": "int32",
+      "bigint": "int64",
+      "timestamptz": "timestamp",
+      "tsvector": "string"
+    }
+  },
+  "entities": {
+    "AppUser": {
+      "access": {
+        "scope": "public"
+      },
+      "name": "AppUser",
+      "ir": "AppUser",
+      "read": "eager",
+      "table": "app_user",
+      "id": "0xffeeef2f0457cd0c",
+      "fields": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "retired": false,
+          "type": "uuid",
+          "pk": true,
+          "required": true
+        },
+        {
+          "name": "handle",
+          "ordinal": 2,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": true,
+          "unique": true,
+          "cel": "this.size() > 0"
+        },
+        {
+          "name": "display_name",
+          "ordinal": 3,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": false,
+          "cel": "this.size() <= 60"
+        },
+        {
+          "name": "bio",
+          "ordinal": 4,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": false,
+          "cel": "this.size() <= 300"
+        },
+        {
+          "name": "image_url",
+          "ordinal": 5,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": false,
+          "cel": "this.size() <= 2048"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 6,
+          "retired": false,
+          "type": "timestamp",
+          "pk": false,
+          "required": true,
+          "default": "now()"
+        }
+      ],
+      "seed": [],
+      "durability": "server",
+      "level": "replicated",
+      "server": true,
+      "writers": [
+        {
+          "by": "settings",
+          "kind": "form",
+          "ops": [
+            "update"
+          ]
+        }
+      ],
+      "cel": {
+        "checks": {
+          "handle": "char_length(handle) > 0",
+          "display_name": "char_length(display_name) <= 60",
+          "bio": "char_length(bio) <= 300",
+          "image_url": "char_length(image_url) <= 2048"
+        },
+        "enums": {},
+        "bounds": {
+          "handle": {
+            "sizeMin": 1
+          },
+          "display_name": {
+            "sizeMax": 60
+          },
+          "bio": {
+            "sizeMax": 300
+          },
+          "image_url": {
+            "sizeMax": 2048
+          }
+        }
+      },
+      "uniques": [],
+      "validations": {}
+    },
+    "Me": {
+      "access": {
+        "scope": "private",
+        "owner": "id"
+      },
+      "name": "Me",
+      "ir": "Me",
+      "read": "eager",
+      "table": "me",
+      "id": "0xa590918c3d7bc870",
+      "fields": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "retired": false,
+          "type": "uuid",
+          "pk": true,
+          "required": true,
+          "ref": "app_user"
+        },
+        {
+          "name": "handle",
+          "ordinal": 2,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": true,
+          "cel": "this.size() > 0"
+        }
+      ],
+      "seed": [],
+      "durability": "live",
+      "level": "compensable",
+      "server": true,
+      "writers": [],
+      "cel": {
+        "checks": {
+          "handle": "char_length(handle) > 0"
+        },
+        "enums": {},
+        "bounds": {
+          "handle": {
+            "sizeMin": 1
+          }
+        }
+      },
+      "uniques": [],
+      "validations": {}
+    },
+    "Article": {
+      "access": {
+        "scope": "public"
+      },
+      "name": "Article",
+      "ir": "Article",
+      "read": "eager",
+      "table": "article",
+      "id": "0x899a3c66fba1e59d",
+      "fields": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "retired": false,
+          "type": "uuid",
+          "pk": true,
+          "required": true,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "author_id",
+          "ordinal": 2,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true,
+          "ref": "app_user",
+          "default": "auth_uid()"
+        },
+        {
+          "name": "title",
+          "ordinal": 3,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": true,
+          "cel": "this.trim().size() > 0 && this.size() <= 200"
+        },
+        {
+          "name": "description",
+          "ordinal": 4,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": false,
+          "cel": "this.size() <= 300"
+        },
+        {
+          "name": "body",
+          "ordinal": 5,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": true,
+          "cel": "this.trim().size() > 0"
+        },
+        {
+          "name": "tags",
+          "ordinal": 6,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": false,
+          "cel": "this.size() <= 200"
+        },
+        {
+          "name": "cover_url",
+          "ordinal": 7,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": false,
+          "cel": "this.size() <= 2048"
+        },
+        {
+          "name": "cover_credit",
+          "ordinal": 8,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": false,
+          "cel": "this.size() <= 120"
+        },
+        {
+          "name": "slug",
+          "ordinal": 9,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": true,
+          "unique": true,
+          "generated": "coalesce(nullif(btrim(left(regexp_replace(lower(title), '[^a-z0-9]+', '-', 'g'), 80), '-'), ''), 'article') || '-' || left(id::text, 8)",
+          "cel": "this.size() > 0"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 10,
+          "retired": false,
+          "type": "timestamp",
+          "pk": false,
+          "required": true,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "ordinal": 11,
+          "retired": false,
+          "type": "timestamp",
+          "pk": false,
+          "required": true,
+          "default": "now()"
+        },
+        {
+          "name": "search",
+          "ordinal": 12,
+          "retired": false,
+          "type": "tsvector",
+          "pk": false,
+          "required": true,
+          "generated": "to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(description,'') || ' ' || coalesce(body,''))"
+        },
+        {
+          "name": "reading_minutes",
+          "ordinal": 13,
+          "retired": false,
+          "type": "int32",
+          "pk": false,
+          "required": true,
+          "generated": "greatest(1, ceil(coalesce(array_length(regexp_split_to_array(btrim(body), '\\s+'), 1), 0) / 220.0)::int)"
+        }
+      ],
+      "seed": [],
+      "durability": "server",
+      "level": "replicated",
+      "server": true,
+      "writers": [
+        {
+          "by": "editor",
+          "kind": "form",
+          "ops": [
+            "create"
+          ]
+        },
+        {
+          "by": "article",
+          "kind": "form",
+          "ops": [
+            "delete"
+          ]
+        },
+        {
+          "by": "edit-article",
+          "kind": "form",
+          "ops": [
+            "update"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "on": "created_at",
+          "using": "btree"
+        },
+        {
+          "on": "author_id",
+          "using": "btree"
+        },
+        {
+          "on": "search",
+          "using": "gin"
+        }
+      ],
+      "cel": {
+        "checks": {
+          "title": "char_length(regexp_replace(title, '^[\\s\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+|[\\s\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+$', '', 'g')) > 0 AND char_length(title) <= 200",
+          "description": "char_length(description) <= 300",
+          "body": "char_length(regexp_replace(body, '^[\\s\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+|[\\s\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+$', '', 'g')) > 0",
+          "tags": "char_length(tags) <= 200",
+          "cover_url": "char_length(cover_url) <= 2048",
+          "cover_credit": "char_length(cover_credit) <= 120",
+          "slug": "char_length(slug) > 0"
+        },
+        "enums": {},
+        "bounds": {
+          "title": {
+            "sizeMin": 1,
+            "sizeMax": 200
+          },
+          "description": {
+            "sizeMax": 300
+          },
+          "body": {
+            "sizeMin": 1
+          },
+          "tags": {
+            "sizeMax": 200
+          },
+          "cover_url": {
+            "sizeMax": 2048
+          },
+          "cover_credit": {
+            "sizeMax": 120
+          },
+          "slug": {
+            "sizeMin": 1
+          }
+        }
+      },
+      "uniques": [],
+      "validations": {}
+    },
+    "ArticleTag": {
+      "access": {
+        "scope": "public"
+      },
+      "name": "ArticleTag",
+      "ir": "ArticleTag",
+      "read": "lazy",
+      "table": "article_tag",
+      "id": "0xed76a04d0fffe5e4",
+      "fields": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "retired": false,
+          "type": "uuid",
+          "pk": true,
+          "required": true,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "article_id",
+          "ordinal": 2,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true,
+          "ref": "article"
+        },
+        {
+          "name": "tag",
+          "ordinal": 3,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": true,
+          "cel": "this.size() > 0 && this.size() <= 40"
+        }
+      ],
+      "seed": [],
+      "durability": "server",
+      "level": "replicated",
+      "server": true,
+      "writers": [],
+      "indexes": [
+        {
+          "on": "tag",
+          "using": "btree"
+        }
+      ],
+      "cel": {
+        "checks": {
+          "tag": "char_length(tag) > 0 AND char_length(tag) <= 40"
+        },
+        "enums": {},
+        "bounds": {
+          "tag": {
+            "sizeMin": 1,
+            "sizeMax": 40
+          }
+        }
+      },
+      "uniques": [
+        {
+          "name": "uq_article_tag_pair",
+          "cols": [
+            "article_id",
+            "tag"
+          ]
+        }
+      ],
+      "validations": {}
+    },
+    "Comment": {
+      "access": {
+        "scope": "public"
+      },
+      "name": "Comment",
+      "ir": "Comment",
+      "read": "lazy",
+      "table": "comment",
+      "id": "0xc11aa0c88f8ccab7",
+      "fields": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "retired": false,
+          "type": "uuid",
+          "pk": true,
+          "required": true,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "article_id",
+          "ordinal": 2,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true,
+          "ref": "article"
+        },
+        {
+          "name": "author_id",
+          "ordinal": 3,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true,
+          "ref": "app_user",
+          "default": "auth_uid()"
+        },
+        {
+          "name": "body",
+          "ordinal": 4,
+          "retired": false,
+          "type": "string",
+          "pk": false,
+          "required": true,
+          "cel": "this.trim().size() > 0 && this.size() <= 2000"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 5,
+          "retired": false,
+          "type": "timestamp",
+          "pk": false,
+          "required": true,
+          "default": "now()"
+        }
+      ],
+      "seed": [],
+      "durability": "server",
+      "level": "replicated",
+      "server": true,
+      "writers": [
+        {
+          "by": "article",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "on": "article_id",
+          "using": "btree"
+        }
+      ],
+      "cel": {
+        "checks": {
+          "body": "char_length(regexp_replace(body, '^[\\s\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+|[\\s\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+$', '', 'g')) > 0 AND char_length(body) <= 2000"
+        },
+        "enums": {},
+        "bounds": {
+          "body": {
+            "sizeMin": 1,
+            "sizeMax": 2000
+          }
+        }
+      },
+      "uniques": [],
+      "validations": {}
+    },
+    "Favorite": {
+      "access": {
+        "scope": "private",
+        "owner": "user_id"
+      },
+      "name": "Favorite",
+      "ir": "Favorite",
+      "read": "eager",
+      "table": "favorite",
+      "id": "0x98c341a47aacae19",
+      "fields": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "retired": false,
+          "type": "uuid",
+          "pk": true,
+          "required": true,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "ordinal": 2,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true,
+          "ref": "app_user",
+          "default": "auth_uid()"
+        },
+        {
+          "name": "article_id",
+          "ordinal": 3,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true,
+          "ref": "article"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 4,
+          "retired": false,
+          "type": "timestamp",
+          "pk": false,
+          "required": true,
+          "default": "now()"
+        },
+        {
+          "name": "deleted_at",
+          "ordinal": 5,
+          "retired": false,
+          "type": "timestamp",
+          "pk": false,
+          "required": false
+        }
+      ],
+      "seed": [],
+      "durability": "server",
+      "level": "replicated",
+      "server": true,
+      "writers": [
+        {
+          "by": "home",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "feed",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "reading-list",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "older",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "feed-older",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "article",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "profile",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "profile-favorites",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "tag",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "search",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "home",
+          "kind": "screen",
+          "ops": [
+            "upsert"
+          ]
+        },
+        {
+          "by": "feed",
+          "kind": "screen",
+          "ops": [
+            "upsert"
+          ]
+        },
+        {
+          "by": "reading-list",
+          "kind": "screen",
+          "ops": [
+            "upsert"
+          ]
+        },
+        {
+          "by": "older",
+          "kind": "screen",
+          "ops": [
+            "upsert"
+          ]
+        },
+        {
+          "by": "feed-older",
+          "kind": "screen",
+          "ops": [
+            "upsert"
+          ]
+        },
+        {
+          "by": "article",
+          "kind": "screen",
+          "ops": [
+            "upsert"
+          ]
+        },
+        {
+          "by": "profile",
+          "kind": "screen",
+          "ops": [
+            "upsert"
+          ]
+        },
+        {
+          "by": "profile-favorites",
+          "kind": "screen",
+          "ops": [
+            "upsert"
+          ]
+        },
+        {
+          "by": "tag",
+          "kind": "screen",
+          "ops": [
+            "upsert"
+          ]
+        },
+        {
+          "by": "search",
+          "kind": "screen",
+          "ops": [
+            "upsert"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "on": "article_id",
+          "using": "btree"
+        }
+      ],
+      "cel": {
+        "checks": {},
+        "enums": {},
+        "bounds": {}
+      },
+      "uniques": [
+        {
+          "name": "uq_favorite_pair",
+          "cols": [
+            "user_id",
+            "article_id"
+          ]
+        }
+      ],
+      "validations": {
+        "own-article": {
+          "machine": "FavoriteRules",
+          "name": "own-article",
+          "on": [
+            "insert",
+            "update"
+          ],
+          "order": {
+            "insert": [
+              0,
+              0
+            ],
+            "update": [
+              0,
+              0
+            ]
+          },
+          "ir": "own-article",
+          "src": "shell/validations/own-article.js",
+          "via": [
+            "article_id"
+          ],
+          "note": "a reader cannot favorite what they wrote",
+          "edges": [
+            {
+              "table": "article",
+              "key": "id",
+              "from": "article_id"
+            }
+          ],
+          "module": {
+            "statements": "// A reader may not favorite what they wrote. `state.rows.article` is the one\n// referenced article, or empty where the reference dangles and the FK will\n// refuse after this does.\n",
+            "completion": "(state, event) => state.rows.article.every((a) => a.author_id !== event.row.user_id)"
+          }
+        }
+      }
+    },
+    "Bookmark": {
+      "access": {
+        "scope": "private",
+        "owner": "user_id"
+      },
+      "name": "Bookmark",
+      "ir": "Bookmark",
+      "read": "eager",
+      "table": "bookmark",
+      "id": "0x9f9da42612642009",
+      "fields": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "retired": false,
+          "type": "uuid",
+          "pk": true,
+          "required": true,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "ordinal": 2,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true,
+          "ref": "app_user",
+          "default": "auth_uid()"
+        },
+        {
+          "name": "article_id",
+          "ordinal": 3,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true,
+          "ref": "article"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 4,
+          "retired": false,
+          "type": "timestamp",
+          "pk": false,
+          "required": true,
+          "default": "now()"
+        }
+      ],
+      "seed": [],
+      "durability": "server",
+      "level": "replicated",
+      "server": true,
+      "writers": [
+        {
+          "by": "home",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "feed",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "reading-list",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "older",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "feed-older",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "article",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "profile",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "profile-favorites",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "tag",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "search",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "on": "article_id",
+          "using": "btree"
+        }
+      ],
+      "cel": {
+        "checks": {},
+        "enums": {},
+        "bounds": {}
+      },
+      "uniques": [
+        {
+          "name": "uq_bookmark_pair",
+          "cols": [
+            "user_id",
+            "article_id"
+          ]
+        }
+      ],
+      "validations": {}
+    },
+    "Follow": {
+      "access": {
+        "scope": "private",
+        "owner": "follower_id"
+      },
+      "name": "Follow",
+      "ir": "Follow",
+      "read": "eager",
+      "table": "follow",
+      "id": "0xd0b18b1f685bdf9c",
+      "fields": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "retired": false,
+          "type": "uuid",
+          "pk": true,
+          "required": true,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "follower_id",
+          "ordinal": 2,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true,
+          "ref": "app_user",
+          "default": "auth_uid()"
+        },
+        {
+          "name": "followed_id",
+          "ordinal": 3,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true,
+          "ref": "app_user"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 4,
+          "retired": false,
+          "type": "timestamp",
+          "pk": false,
+          "required": true,
+          "default": "now()"
+        }
+      ],
+      "seed": [],
+      "durability": "server",
+      "level": "replicated",
+      "server": true,
+      "writers": [
+        {
+          "by": "article",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "profile",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "by": "profile-favorites",
+          "kind": "form",
+          "ops": [
+            "create",
+            "delete"
+          ]
+        }
+      ],
+      "invariant": {
+        "cel": "this.follower_id != this.followed_id",
+        "check": "follower_id <> followed_id"
+      },
+      "cel": {
+        "checks": {},
+        "enums": {},
+        "bounds": {}
+      },
+      "uniques": [
+        {
+          "name": "uq_follow_pair",
+          "cols": [
+            "follower_id",
+            "followed_id"
+          ]
+        }
+      ],
+      "validations": {}
+    },
+    "FavoriteCount": {
+      "access": {
+        "scope": "private",
+        "owner": "user_id"
+      },
+      "name": "FavoriteCount",
+      "ir": "FavoriteCount",
+      "read": "eager",
+      "table": "favorite_count",
+      "id": "0xa8012732a778199b",
+      "fields": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "retired": false,
+          "type": "string",
+          "pk": true,
+          "required": true
+        },
+        {
+          "name": "user_id",
+          "ordinal": 2,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true
+        },
+        {
+          "name": "article_id",
+          "ordinal": 3,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true
+        },
+        {
+          "name": "mine_counted",
+          "ordinal": 4,
+          "retired": false,
+          "type": "int32",
+          "pk": false,
+          "required": true,
+          "cel": "this >= 0 && this <= 1"
+        },
+        {
+          "name": "total_at_read",
+          "ordinal": 5,
+          "retired": false,
+          "type": "int32",
+          "pk": false,
+          "required": true,
+          "cel": "this >= 0"
+        },
+        {
+          "name": "as_of_txid",
+          "ordinal": 6,
+          "retired": false,
+          "type": "int64",
+          "pk": false,
+          "required": false
+        }
+      ],
+      "seed": [],
+      "durability": "live",
+      "level": "compensable",
+      "server": true,
+      "writers": [
+        {
+          "by": "favorite-count",
+          "kind": "pipeline",
+          "ops": [
+            "upsert"
+          ]
+        },
+        {
+          "by": "favorite-recount",
+          "kind": "pipeline",
+          "ops": [
+            "upsert"
+          ]
+        }
+      ],
+      "cel": {
+        "checks": {
+          "mine_counted": "mine_counted >= 0 AND mine_counted <= 1",
+          "total_at_read": "total_at_read >= 0"
+        },
+        "enums": {},
+        "bounds": {
+          "mine_counted": {
+            "intMin": 0,
+            "intMax": 1
+          },
+          "total_at_read": {
+            "intMin": 0
+          }
+        }
+      },
+      "uniques": [
+        {
+          "name": "uq_favorite_count_pair",
+          "cols": [
+            "user_id",
+            "article_id"
+          ]
+        }
+      ],
+      "validations": {}
+    },
+    "ArticleStats": {
+      "access": {
+        "scope": "public"
+      },
+      "name": "ArticleStats",
+      "ir": "ArticleStats",
+      "read": "lazy",
+      "table": "article_stats",
+      "id": "0x9a91dc318d94d5ee",
+      "fields": [
+        {
+          "name": "article_id",
+          "ordinal": 1,
+          "retired": false,
+          "type": "uuid",
+          "pk": true,
+          "required": true
+        },
+        {
+          "name": "favorite_count",
+          "ordinal": 2,
+          "retired": false,
+          "type": "int32",
+          "pk": false,
+          "required": true,
+          "cel": "this >= 0"
+        },
+        {
+          "name": "counted_txid",
+          "ordinal": 3,
+          "retired": false,
+          "type": "int64",
+          "pk": false,
+          "required": true,
+          "cel": "this >= 0"
+        }
+      ],
+      "seed": [],
+      "durability": "live",
+      "level": "compensable",
+      "server": true,
+      "writers": [
+        {
+          "by": "favorite-recount",
+          "kind": "pipeline",
+          "ops": [
+            "upsert"
+          ]
+        }
+      ],
+      "cel": {
+        "checks": {
+          "favorite_count": "favorite_count >= 0",
+          "counted_txid": "counted_txid >= 0"
+        },
+        "enums": {},
+        "bounds": {
+          "favorite_count": {
+            "intMin": 0
+          },
+          "counted_txid": {
+            "intMin": 0
+          }
+        }
+      },
+      "uniques": [],
+      "validations": {}
+    },
+    "TagCount": {
+      "access": {
+        "scope": "public"
+      },
+      "name": "TagCount",
+      "ir": "TagCount",
+      "read": "lazy",
+      "table": "tag_count",
+      "id": "0x86d7de1cf29fee6f",
+      "fields": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "retired": false,
+          "type": "string",
+          "pk": true,
+          "required": true,
+          "cel": "this.size() > 0"
+        },
+        {
+          "name": "article_count",
+          "ordinal": 2,
+          "retired": false,
+          "type": "int32",
+          "pk": false,
+          "required": true,
+          "cel": "this >= 0"
+        }
+      ],
+      "seed": [],
+      "durability": "live",
+      "level": "compensable",
+      "server": true,
+      "writers": [
+        {
+          "by": "tag-recount",
+          "kind": "pipeline",
+          "ops": [
+            "upsert"
+          ]
+        }
+      ],
+      "cel": {
+        "checks": {
+          "id": "char_length(id) > 0",
+          "article_count": "article_count >= 0"
+        },
+        "enums": {},
+        "bounds": {
+          "id": {
+            "sizeMin": 1
+          },
+          "article_count": {
+            "intMin": 0
+          }
+        }
+      },
+      "uniques": [],
+      "validations": {}
+    },
+    "FavoriteIndex": {
+      "access": {
+        "scope": "public"
+      },
+      "name": "FavoriteIndex",
+      "ir": "FavoriteIndex",
+      "read": "lazy",
+      "table": "favorite_index",
+      "id": "0x9826a4461b100e6d",
+      "fields": [
+        {
+          "name": "id",
+          "ordinal": 1,
+          "retired": false,
+          "type": "string",
+          "pk": true,
+          "required": true,
+          "cel": "this.size() > 0"
+        },
+        {
+          "name": "user_id",
+          "ordinal": 2,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true,
+          "ref": "app_user"
+        },
+        {
+          "name": "article_id",
+          "ordinal": 3,
+          "retired": false,
+          "type": "uuid",
+          "pk": false,
+          "required": true
+        },
+        {
+          "name": "active",
+          "ordinal": 4,
+          "retired": false,
+          "type": "bool",
+          "pk": false,
+          "required": true
+        },
+        {
+          "name": "favorited_at",
+          "ordinal": 5,
+          "retired": false,
+          "type": "timestamp",
+          "pk": false,
+          "required": true
+        }
+      ],
+      "seed": [],
+      "durability": "live",
+      "level": "compensable",
+      "server": true,
+      "writers": [
+        {
+          "by": "favorite-index",
+          "kind": "pipeline",
+          "ops": [
+            "upsert"
+          ]
+        }
+      ],
+      "cel": {
+        "checks": {
+          "id": "char_length(id) > 0"
+        },
+        "enums": {},
+        "bounds": {
+          "id": {
+            "sizeMin": 1
+          }
+        }
+      },
+      "uniques": [],
+      "validations": {}
+    }
+  },
+  "hybrids": {},
+  "hatches": {},
+  "rawMigrations": [
+    {
+      "name": "011_owner_writes.sql",
+      "src": "services/database/sql/011_owner_writes.sql"
+    },
+    {
+      "name": "012_me_readonly.sql",
+      "src": "services/database/sql/012_me_readonly.sql"
+    },
+    {
+      "name": "013_article_tag_sync.sql",
+      "src": "services/database/sql/013_article_tag_sync.sql"
+    },
+    {
+      "name": "014_me_provision.sql",
+      "src": "services/database/sql/014_me_provision.sql"
+    },
+    {
+      "name": "015_default_privileges.sql",
+      "src": "services/database/sql/015_default_privileges.sql"
+    }
+  ],
+  "duckstreams": {}
+}

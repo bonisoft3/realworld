@@ -1,22 +1,39 @@
 {
   "_generated_from": "bayt.cue (do not edit)",
+  "dockerfile": {
+    "preamble": [],
+    "preambleCopyContexts": [],
+    "from": {
+      "ref": ":generate",
+      "name": "realworld-generate"
+    },
+    "add": [],
+    "mounts": [],
+    "secrets": {},
+    "extra_hosts": [],
+    "epilogue": [],
+    "copy": [],
+    "healthcheck": null,
+    "expose": [],
+    "entrypoint": null,
+    "incremental": false,
+    "cmd": null
+  },
   "name": "lint",
-  "project": "apps_realworld",
-  "dir": "apps/realworld",
+  "project": "realworld",
+  "dir": ".",
   "activate": "mise x --",
   "srcs": {
     "globs": [
-      "*.cue",
-      "bayt.json",
-      "DESIGN.md",
-      "[p]ipelines/*.blobl",
-      "[m]essages/*.json",
-      "[s]hell/boot.js",
-      "brief.html",
-      "ir.html",
-      "acceptance.md"
+      "**",
+      ".bayt/checks.yaml",
+      ".pronto/facts.json"
     ],
-    "exclude": []
+    "exclude": [
+      "mise.local.lock",
+      "**/node_modules/**",
+      ".task/**"
+    ]
   },
   "outs": {
     "globs": [],
@@ -26,40 +43,232 @@
     "globs": []
   },
   "env": {},
+  "synthetics": {
+    "bayt": {
+      "name": "lint_bayt",
+      "project": "realworld",
+      "dir": ".",
+      "activate": "",
+      "srcs": {
+        "globs": [],
+        "exclude": []
+      },
+      "outs": {
+        "globs": [
+          ".bayt/compose.lint.yaml",
+          ".bayt/Dockerfile.lint",
+          ".bayt/bayt.lint.json",
+          ".bayt/Taskfile.yml",
+          ".bayt/Taskfile.bayt.yml",
+          ".bayt/Taskfile.lint.yaml",
+          ".bayt/process-compose.yaml"
+        ],
+        "exclude": []
+      },
+      "env": {},
+      "visibility": "internal",
+      "deps": [],
+      "transitiveDeps": [],
+      "transitiveCrossDeps": [],
+      "chainedDeps": [],
+      "cmds": [],
+      "cache": {
+        "full": false,
+        "similar": false
+      },
+      "upClosure": [
+        "./.bayt/compose.lint.yaml",
+        "./.bayt/compose.generate.yaml",
+        "./.bayt/compose.setup.yaml"
+      ]
+    },
+    "outs": {
+      "name": "lint_outs",
+      "project": "realworld",
+      "dir": ".",
+      "activate": "",
+      "srcs": {
+        "globs": [],
+        "exclude": []
+      },
+      "outs": {
+        "globs": [],
+        "exclude": []
+      },
+      "env": {},
+      "visibility": "internal",
+      "deps": [],
+      "transitiveDeps": [],
+      "transitiveCrossDeps": [],
+      "chainedDeps": [],
+      "cmds": [],
+      "cache": {
+        "full": false,
+        "similar": false
+      },
+      "upClosure": [
+        "./.bayt/compose.lint.yaml",
+        "./.bayt/compose.generate.yaml",
+        "./.bayt/compose.setup.yaml"
+      ]
+    },
+    "srcs": {
+      "name": "lint_srcs",
+      "project": "realworld",
+      "dir": ".",
+      "activate": "",
+      "srcs": {
+        "globs": [],
+        "exclude": []
+      },
+      "outs": {
+        "globs": [
+          "**",
+          ".bayt/checks.yaml",
+          ".pronto/facts.json",
+          "[m]ise.toml",
+          "[.]mise.toml",
+          "[m]ise.lock",
+          "[.]tool-versions"
+        ],
+        "exclude": [
+          "mise.local.lock",
+          "**/node_modules/**",
+          ".task/**"
+        ]
+      },
+      "env": {},
+      "visibility": "internal",
+      "deps": [],
+      "transitiveDeps": [
+        "generate_srcs",
+        "lint-inputs_srcs",
+        "setup_srcs"
+      ],
+      "transitiveCrossDeps": [
+        {
+          "project": "realworld",
+          "name": "generate_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "**"
+            ],
+            "exclude": [
+              ".bayt/**",
+              ".pronto/proto-baseline.json",
+              "mise.local.lock",
+              "**/node_modules/**",
+              ".task/**",
+              "tests/**"
+            ]
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "setup_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "[m]ise.toml",
+              "[.]mise.toml",
+              "[m]ise.lock",
+              "[.]tool-versions"
+            ],
+            "exclude": []
+          }
+        }
+      ],
+      "chainedDeps": [],
+      "cmds": [],
+      "cache": {
+        "full": false,
+        "similar": false
+      },
+      "upClosure": [
+        "./.bayt/compose.lint.yaml",
+        "./.bayt/compose.generate.yaml",
+        "./.bayt/compose.setup.yaml"
+      ]
+    }
+  },
   "taskfile": {
     "run": "always",
     "incremental": true,
     "preconditions": []
   },
   "visibility": "internal",
-  "emitsSrcs": false,
-  "deps": [],
-  "sameProjectDeps": [],
-  "transitiveDeps": [],
+  "emitsSrcs": true,
+  "deps": [
+    "generate",
+    "lint-inputs"
+  ],
+  "sameProjectDeps": [
+    "generate",
+    "lint-inputs"
+  ],
+  "transitiveDeps": [
+    "generate",
+    "lint-inputs",
+    "setup"
+  ],
   "transitiveCrossDeps": [],
-  "upClosure": [],
-  "chainedDeps": [],
+  "upClosure": [
+    "./.bayt/compose.lint.yaml",
+    "./.bayt/compose.generate.yaml",
+    "./.bayt/compose.setup.yaml"
+  ],
+  "chainedDeps": [
+    {
+      "name": "generate",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [],
+        "exclude": []
+      }
+    },
+    {
+      "name": "lint-inputs",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [],
+        "exclude": []
+      }
+    },
+    {
+      "name": "setup",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [],
+        "exclude": []
+      }
+    }
+  ],
   "cmds": [
     {
       "srcs": {
         "globs": [
-          "*.cue",
-          "bayt.json",
-          "DESIGN.md",
-          "[p]ipelines/*.blobl",
-          "[m]essages/*.json",
-          "[s]hell/boot.js",
-          "brief.html",
-          "ir.html",
-          "acceptance.md"
+          "**",
+          ".bayt/checks.yaml",
+          ".pronto/facts.json"
         ],
-        "exclude": [],
+        "exclude": [
+          "mise.local.lock",
+          "**/node_modules/**",
+          ".task/**"
+        ],
         "defaultGlobs": null,
         "defaultExclude": null
       },
-      "do": "cue vet ./...",
+      "do": "^nu -I (^mise where github:bonisoft3/sayt | str trim) -c 'use task-leaf.nu; with-env {PRONTO_PROTO_BASELINE: (open --raw .pronto/proto-baseline.json)} { task-leaf lint }'",
+      "shell": "nu",
+      "dockerfile": {
+        "do": "cue vet -c ./..."
+      },
       "name": "builtin",
-      "shell": "exec",
       "stop": false
     }
   ],

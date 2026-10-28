@@ -14,17 +14,23 @@
 // Caddyfile, pipelines. Names are bare and so are `depends_on` keys; #Runtime
 // lowers the targets into a bayt project, which is what keeps `crud:3000` and
 // `@database:5432` resolving.
+@extern(embed)
 package cluster
 
 import (
 	"encoding/json"
 	"list"
 	"path"
+	"regexp"
 	"strings"
 
 	bayt "bonisoft.org/plugins/bayt/core:bayt"
 	grammar "bonisoft.org/libraries/mecha/pgroll"
 )
+
+_electricPatch: _ @embed(file="services/electric/patch.exs", type=text)
+_computeEvents: _ @embed(file="services/compute/events.yaml", type=text)
+_cdcTrace:      _ @embed(file="services/transform/cdc-trace.yaml", type=text)
 
 // Where postgres applies what an image carries, in name order, on a fresh data
 // directory.
@@ -33,6 +39,8 @@ import (
 // Where the migrate image holds the pgroll migrations it applies, as
 // <name>.json.
 #PgRollDir: "/pgroll"
+
+#ConduitSlot: {app: string, name: "\(strings.Replace(app, "-", "_", -1))_conduit_slot"}
 
 // The tenancy floor's migration, which ships with the image whatever emitted
 // the tables above it. It need not follow a caller's grants: it grants only to
@@ -46,10 +54,178 @@ import (
 // only when it turns on what the step serves.
 #StagedDir: "/usr/share/mecha/initdb"
 
-// The ticker's table, placed where a schedule is declared. Its name places it
-// after a caller's grants, whose reach it revokes, and before the seed the
-// caller names after it.
-#ScheduleMigration: "020_schedule.sql"
+// The ticker's table, placed where a schedule is declared, and carried inside
+// the airlock's step where an effect is (bayt.cue). Its name places it after
+// a caller's grants, whose reach it revokes, and before the seed the caller
+// names after it.
+//
+// Initdb prefixes are split three ways: a caller's own steps hold 000-799,
+// the framework's (mecha's and pronto's) 800-899, and a caller's seed 900.
+// One file per prefix, so the framework keeps out of the range an app
+// numbers its steps in, and pronto refuses an app step in 8xx.
+_scheduleSql: _ @embed(file="services/ticker/schedule.sql", type=text)
+_machineTimersSql: _ @embed(file="services/ticker/machine-timers.sql", type=text)
+#MachineTimersSql: _scheduleSql + "\n" + _machineTimersSql
+
+#ScheduleMigration: "800_schedule.sql"
+
+// Staged in the database image at 020 for compatibility with the published
+// bonitao/mecha-database:0.8.0 image, and placed in initdb at 800.
+#ScheduleStaged: "020_schedule.sql"
+
+// Sets the electric and authenticator roles' passwords from the database's
+// ELECTRIC_PASSWORD and AUTHENTICATOR_PASSWORD, placed where a server is: the
+// schema grants both LOGIN and leaves their passwords to the deployment. A
+// framework prefix past every step that could create the roles.
+#RolePasswordsStep: "899_role_passwords.sh"
+
+// Canonical PostgreSQL options for both container and process-compose runtimes.
+#PostgresArgs: [
+	"-c", "wal_level=logical",
+	"-c", "fsync=off",
+	"-c", "synchronous_commit=off",
+	"-c", "full_page_writes=off",
+	"-c", "shared_buffers=32MB",
+	"-c", "max_connections=200",
+]
+
+// Graphile Worker's schema and the airlock's tables, placed where an effect
+// is declared, on the first digits after the steps a caller opens with
+// (pronto's 000-010: extensions, roles, grants, types, tables, policies,
+// publication, validations, and the machines, whose guards are plpgsql and
+// resolve add_job and the ledger only when they run). Every caller step that
+// can write a row, a held seed included, is numbered above them, since a row
+// written into an invoking state claims the ledger and enqueues as it is
+// written; a caller step on these digits is refused where effects are
+// declared, as any two steps sharing digits are. The ledger's schema is its
+// own (services/airlock/airlock.sql), so no grant over `public`, made before
+// these steps or after, reaches it.
+#GraphileMigration: "011_graphile_worker.sql"
+#AirlockMigration:  "012_airlock.sql"
+
+#AirlockUpgradeSql: """
+	SET LOCAL lock_timeout = '5s';
+	SET LOCAL statement_timeout = '60s';
+	LOCK TABLE airlock.external_effect_ledger IN ACCESS EXCLUSIVE MODE;
+	DO $upgrade$
+	BEGIN
+	  IF EXISTS (SELECT FROM information_schema.columns WHERE table_schema = 'airlock' AND table_name = 'external_effect_ledger' AND column_name = 'request') THEN
+	    ALTER TABLE airlock.external_effect_ledger RENAME COLUMN request TO input;
+	  END IF;
+	  PERFORM input FROM airlock.external_effect_ledger LIMIT 0;
+	END $upgrade$;
+	"""
+
+// What a sink may be: an https origin whose host is a DNS name of at least
+// two labels, the last opening with a letter. This is spelling only: a
+// single-label host (`database`) or an IP literal is refused here; a name that
+// resolves inward, which spelling cannot see, is not, since the daprd dials
+// what its binding names (pronto's external effects record, "The wall is the
+// allowlist").
+#OriginPattern: "^https://([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]([a-z0-9-]*[a-z0-9])?(:[0-9]{1,5})?$"
+#Origin:        =~#OriginPattern
+
+// A DNS label, which an effect's name is because its Dapr endpoint's is.
+#EffectName: "^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$"
+
+// What a computation's or an effect's module may be endowed with past the
+// language, each only where its declaration names it, as pronto endows an
+// omnishell module with Intl. services/compute/language.ts holds the same
+// list (ENDOWABLE), and cluster_test.ts holds them to each other.
+#CageEndowments: ["Crypto", "TextEncoder", "TextDecoder", "URL", "URLSearchParams", "Cheerio"]
+#CageEndowment:  or(#CageEndowments)
+
+// An environment variable's name: where a secret reaches the airlock.
+#SecretName: "^[A-Z][A-Z0-9_]*$"
+
+// A server a bridge dials: a DNS name of two labels or more and its port.
+// Spelling only, as #OriginPattern is; the bridge refuses a name that
+// resolves inward at the address it connected (services/airlock/mail.ts).
+#ServerPattern: "^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]([a-z0-9-]*[a-z0-9])?:[0-9]{1,5}$"
+
+// An Airlock endpoint supplied by a container hatch. The role grants no
+// database credential or protocol-specific confinement.
+#Bridge: {
+	name:   =~#EffectName
+	container: =~#EffectName
+	port:      *8080 | int & >=1 & <=65535
+}
+
+// Mecha's SMTP implementation, reusable as an ordinary container target.
+#MailContainer: M={
+	image:     #From
+	server: =~#ServerPattern
+	tls:    *"starttls" | "none"
+	domain: =~"^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]([a-z0-9-]*[a-z0-9])?$"
+	user?:     =~#SecretName
+	password?: =~#SecretName
+	if M.user != _|_ {password: =~#SecretName}
+	if M.password != _|_ {user: =~#SecretName}
+	target: bayt.healthcheck.tcp & {
+		cmd: "builtin": null
+		activate: ""
+		healthcheck: {
+			port:           #BridgePort
+			interval:       "5s"
+			start_interval: "500ms"
+			start_period:   "30s"
+		}
+		dockerfile: {
+			from: (_from & {in: M.image}).out
+			workdir: "/app/airlock"
+			cmd: ["run", "--frozen", "--allow-net=0.0.0.0:\(#BridgePort),\(M.server)", "--allow-env=\(strings.Join(_bridgeEnv, ","))", "--allow-sys=hostname", "mail.ts"]
+		}
+		compose: {
+			environment: {
+				MAIL_SMTP:              M.server
+				MAIL_TLS:               M.tls
+				MAIL_MESSAGE_ID_DOMAIN: M.domain
+				if M.user != _|_ {
+					MAIL_USER:     "${\(M.user):?\(M.user) is required: mail container's user}"
+					MAIL_PASSWORD: "${\(M.password):?\(M.password) is required: mail container's password}"
+				}
+			}
+			restart: "on-failure"
+		}
+	}
+}
+
+// What the mail bridge may read of its environment.
+_bridgeEnv: ["MAIL_SMTP", "MAIL_TLS", "MAIL_MESSAGE_ID_DOMAIN", "MAIL_USER", "MAIL_PASSWORD", "ETHEREAL_API", "ETHEREAL_API_KEY", "ETHEREAL_CACHE", "ETHEREAL_WEB"]
+
+// The mail container's HTTP port.
+#BridgePort: 8080
+
+// An external effect as the cluster places it: its name, the one origin it
+// may reach or the bridge it reaches through, and where the app keeps its
+// handler and its binding.
+#Effect: E={
+	name: =~#EffectName
+	{origin: #Origin} | {bridge: =~#EffectName}
+	handler:  *"effects/\(E.name).js" | string
+	endpoint: *"services/airlock/dapr/\(E.name).yaml" | string
+	// The environment variables whose values the handler is handed.
+	secrets?: [...=~#SecretName]
+}
+
+// The networks around the airlock. `airlock`, internal, holds the airlock, the
+// database and the airlock's daprd, so the airlock reaches the world only
+// through that daprd; `airlock-out`, internal, holds the daprd and the
+// bridges, which no other service reaches. What goes out leaves on a network
+// of its own, which nothing else joins: `airlock-egress` for the daprd's
+// declared bindings, and `bridge-<name>-egress` for each bridge's one server.
+// `airlock-wake`, internal, holds the airlock and the ticker alone, so the
+// ticker's wake reaches the airlock's health port and nothing of its daprd.
+// None of them stands on the default network, where every other service is,
+// so no service there reaches the daprd's bindings API or a bridge. A consumer
+// declares the networks at the top of its compose model, which bayt does not
+// write; `surface.networks` is what it declares.
+#AirlockNetworks: {
+	airlock: internal:        true
+	"airlock-out": internal:  true
+	"airlock-wake": internal: true
+	"airlock-egress": {}
+}
 
 // A health wait states no `restart`: bayt adds `restart: true` to every one
 // (plugins/bayt/core/gen_compose.cue), so a dependency recreated inside an
@@ -89,6 +265,8 @@ _devJwtSecret: "mecha-dev-secret-please-override-32ch"
 // The query parameter caddy adds after the gate and electric checks; one
 // literal, so the two cannot be given different ones by a slip.
 _devElectricSecret: "dev-electric-secret"
+_devElectricPassword: "dev-electric-password"
+_devAuthenticatorPassword: "dev-authenticator-password"
 
 #Cluster: X={
 	state: {
@@ -102,11 +280,26 @@ _devElectricSecret: "dev-electric-secret"
 		// Numeric programs over the lake (services/compute/main.ts states the
 		// contract): a module each, the tables it alone writes (`to`),
 		// and the wasm modules its jobs call, shipped by their file names.
-		computations: [...{name: string, file: string, every: int & >0, to: [...string] & [_, ...], wasm: [...string]}]
+		computations: [...{name: string, file: string, to: [...string] & [_, ...], wasm: [...string], onComplete?: string & =~"^[a-z_][a-z0-9_]{0,62}$", endowments: *[] | [...#CageEndowment]}]
 		// Names only: the cluster needs to know whether any schedule exists,
 		// never what it says. One brings the ticker, its clock and the table
 		// they sweep (#ScheduleMigration); the caller's migrations seed it.
 		schedules: [...string]
+		// Timed machines share the ticker; their migrations install #MachineTimersSql.
+		timers: *[] | [...string]
+		if len(timers) > 0 {timerCheck: string & !=""}
+
+		// The external effects (services/airlock/README.md states the
+		// contract). One brings the airlock, the daprd it goes out through,
+		// the ticker and clock that wake it, and the tables they keep
+		// (#GraphileMigration, #AirlockMigration, the schedule table inside
+		// the latter).
+		effects: [...#Effect]
+		// Current claim triggers are refreshed with the ledger in one transaction.
+		if len(effects) > 0 {effectInterpreters: string & !=""}
+
+		// The container endpoints those effects reach through (#Bridge).
+		bridges: *[] | [...#Bridge]
 	}
 
 	capabilities: {
@@ -120,24 +313,44 @@ _devElectricSecret: "dev-electric-secret"
 		server: *true | bool
 		// The auth plane: a WebAuthn auth service issuing app_user JWTs, JWT
 		// validation on crud, and the service token on transform. Off, the
-		// stack is the pre-auth one, byte for byte. Identity is a row the
-		// cluster keeps, so it presupposes `server`.
+		// stack is the pre-auth one, byte for byte, but for crud verifying
+		// the service token where a wake needs it (_serviceToken). Identity
+		// is a row the cluster keeps, so it presupposes `server`.
 		auth: *false | bool
 		if auth {
 			server: true
 		}
 
+		// The providers a person may sign in through besides a passkey
+		// (services/auth/oidc.ts), each with the settings the program gives it.
+		// The deployment's OIDC_<NAME>_<SETTING> wins over each, so the program
+		// may name another issuer in the provider's place and an environment
+		// another still; a provider whose client neither gives refuses to start.
+		// A secret is the deployment's alone. A provider signs a person in, so
+		// it presupposes `auth`.
+		signIn: [("google")]: {
+			[("issuer" | "internal" | "client" | "scope" | "params")]: string & !="" & !~"[$}]"
+		}
+		if len(signIn) > 0 {
+			auth: true
+		}
+
 		// The change feed: conduit reading the WAL onto the bus (redis, behind
 		// the mesh-events sidecar) and transform running the pipelines off it.
-		// A pipeline or a schedule turns it on, and refuses it off: the
+		// A pipeline, computation or schedule turns it on, and refuses it off: the
 		// pipeline would never run, and the ticker's wake is addressed to that
 		// sidecar. Off otherwise, since nothing in the cluster reads the feed.
 		// The WAL is the data plane's, so it presupposes `server`.
 		capture: *false | bool
-		if len(X.state.pipelines) > 0 || len(X.state.schedules) > 0 {
+		if len(X.state.pipelines)+len(X.state.computations)+len(X.state.schedules) > 0 {
 			capture: true
 		}
 		if capture {
+			server: true
+		}
+
+		// An effect runs from the database's queue and settles in its ledger.
+		if len(X.state.effects) > 0 {
 			server: true
 		}
 
@@ -152,17 +365,24 @@ _devElectricSecret: "dev-electric-secret"
 	}
 
 	// Every step postgres runs at initdb, keyed by the three digits its name
-	// opens with: the image's floor, the step the cluster places for a
-	// schedule, and the caller's migrations. Postgres globs the directory in
-	// its locale's order and a replay sorts it by byte; digits no other step
-	// holds, then `_`, put both in one order. The database copies the caller's
+	// opens with: the image's floor, the steps the cluster places for a
+	// server, a schedule and effects, and the caller's migrations. Postgres globs
+	// the directory in its locale's order and a replay sorts it by byte;
+	// digits no other step holds, then `_`, put both in one order. The database copies the caller's
 	// steps out of this, so a name it refuses fails the cluster where it is
 	// built.
 	_initdb: [K=string]: =~"(^|/)[0-9]{3}_[^/]*$" & =~"(^|/)\(K)_[^/]*$"
 	_initdb: {
 		(strings.SliceRunes(#TenancyMigration, 0, 3)): #TenancyMigration
+		if X.capabilities.server {
+			(strings.SliceRunes(#RolePasswordsStep, 0, 3)): #RolePasswordsStep
+		}
 		if len(X.state.schedules) > 0 {
 			(strings.SliceRunes(#ScheduleMigration, 0, 3)): #ScheduleMigration
+		}
+		if len(X.state.effects) > 0 {
+			(strings.SliceRunes(#GraphileMigration, 0, 3)): #GraphileMigration
+			(strings.SliceRunes(#AirlockMigration, 0, 3)):  #AirlockMigration
 		}
 		for m in X.state.migrations {(strings.SliceRunes(path.Base(m, path.Unix), 0, 3)): m}
 	}
@@ -175,7 +395,6 @@ _devElectricSecret: "dev-electric-secret"
 		activate: ""
 	}
 
-
 	// What a service that reads the schema waits on: the database, and the
 	// migrations that carry it forward when there are any. A migration that
 	// fails therefore stops every reader from starting, rather than leaving
@@ -183,12 +402,76 @@ _devElectricSecret: "dev-electric-secret"
 	_schemaReady: {
 		database: _healthy
 		if len(X.state.pgroll) > 0 {migrate: _completed}
+		if len(X.state.effects) > 0 {"airlock-upgrade": _completed}
+		if len(X.state.timers) > 0 {"timer-check": _completed}
 	}
+
+	// The effects as every target reads them. A field's pattern is checked
+	// when the field is exported, not when an interpolation reads it, so each
+	// is matched here; one refused leaves an index out of range in every
+	// command line and path built from it.
+	_effects: [for e in X.state.effects {
+		name:     [if regexp.Match(#EffectName, e.name) {e.name}][0]
+		handler:  e.handler
+		endpoint: e.endpoint
+	}]
+	// The origins and the bridges the effects reach, read from the
+	// declaration as the signing keys are, so a refused origin or a bridge no
+	// one declared fails the export rather than dropping out of a list.
+	_origins: [for e in X.state.effects if e.origin != _|_ {[if regexp.Match(#OriginPattern, e.origin) {e.origin}][0]}]
+	_reached: [for e in X.state.effects if e.bridge != _|_ {[if list.Contains(_bridgeNames, e.bridge) {e.bridge}][0]}]
+	_bridgeNames: [for b in X.state.bridges {b.name}]
+	_bridges: [for b in X.state.bridges {
+		name:   [if regexp.Match(#EffectName, b.name) {b.name}][0]
+		container: [if regexp.Match(#EffectName, b.container) {b.container}][0]
+		port: b.port
+	}]
+
+	// The secrets, each matched like the fields above. Read from the
+	// declaration, so a refused name fails the export instead of silently
+	// leaving the airlock without it.
+	_secrets: [for e in X.state.effects if e.secrets != _|_ for s in e.secrets {[if regexp.Match(#SecretName, s) {s}][0]}]
+
+	// The steps the database image stages and this cluster places.
+	// A schedule or an effect is woken by the ticker: a declared schedule by
+	// its cadence, an effect by the one-shot row its interpreter re-arms, so a
+	// cluster scaled to zero comes up for what was enqueued meanwhile.
+	_wakes: len(X.state.schedules) > 0 || len(X.state.effects) > 0 || len(X.state.timers) > 0
+	// The ticker reads and writes through crud as `service`, the role PostgREST
+	// switches to on the token's claim and the one the schedule tables admit:
+	// crud verifies the service token wherever something wakes, with or without
+	// the auth plane. The token is a claim, not a peer identity, which is why no
+	// transport credential stands in for it: without it every call is anon's.
+	_serviceToken: X.capabilities.auth || X._wakes
+	// The schedule table reaches an effect's cluster inside the airlock's
+	// step (bayt.cue), ahead of any caller step.
+	_staged: list.Concat([
+		[if X.capabilities.server {{src: #RolePasswordsStep, dst: #RolePasswordsStep}}],
+		[if len(X.state.schedules) > 0 {{src: #ScheduleStaged, dst: #ScheduleMigration}}],
+		[if len(X.state.effects) > 0 for m in [#GraphileMigration, #AirlockMigration] {{src: m, dst: m}}],
+	])
 
 	let databaseUrl = "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-\(X.meta.app)}"
 	let jwtSecret = "${PGRST_JWT_SECRET:-\(_devJwtSecret)}"
 
+	// The role's password and the userinfo of electric's DATABASE_URL at once,
+	// so it must need no percent-encoding.
+	let electricPassword = "${ELECTRIC_PASSWORD:-\(_devElectricPassword)}"
+
+	// PostgREST's, likewise.
+	let authenticatorPassword = "${AUTHENTICATOR_PASSWORD:-\(_devAuthenticatorPassword)}"
+
+	// The scheme and host a reader reaches the door at, stated by the
+	// deployment and never read off a request: the door answers any Host. Its
+	// default is the door's own name for a person's browser (the Caddyfile's)
+	// on the port it binds, which bayt fills into `${<door.env>}`.
+	let origin = "${ORIGIN:-\(X.meta.door.scheme)://localhost:${\(X.meta.door.env)}}"
+
 	surface: {
+		// What the app's absolute addresses are spelled against
+		// (docs/proxy.md, "The origin").
+		"origin": origin
+
 		// How a client on the cluster's network reaches its database, and the
 		// secret crud and auth verify a session token under.
 		if X.capabilities.server {
@@ -227,6 +510,15 @@ _devElectricSecret: "dev-electric-secret"
 				}
 			}
 		}
+
+		// The networks a consumer declares at the top of its compose model;
+		// the targets below join them by name.
+		if len(X.state.effects) > 0 {
+			networks: {
+				#AirlockNetworks
+				for b in X._bridges {"bridge-\(b.name)-egress": {}}
+			}
+		}
 		targets: [string]: _
 		targets: {
 			if X.capabilities.server {
@@ -237,22 +529,28 @@ _devElectricSecret: "dev-electric-secret"
 						start_interval: "100ms"
 						start_period:   "5m"
 					}
+					expose: pg: port: 5432
+					entrypoint: {
+						do:  "docker-entrypoint.sh postgres \(strings.Join(#PostgresArgs, " "))"
+						env: compose.environment
+					}
 					srcs: globs: X.state.migrations
 					dockerfile: {
 						from: (_from & {in: X.meta.images.database}).out
 						// The image carries the extensions and the tenancy floor,
-						// and stages the ticker's table, placed only where a
-						// schedule is declared; the app's migrations join them in
+						// and stages the ticker's table and the airlock's steps,
+						// placed only where a schedule or an effect is declared;
+						// the app's migrations join them in
 						// the initdb directory, which postgres runs in name order
 						// on a fresh data directory. That directory lives on the
 						// container's writable layer, which `--force-recreate`
 						// discards with it.
 						copy: list.Concat([
-							[{srcs: [for _, m in X._initdb if m != #TenancyMigration && m != #ScheduleMigration {m}], dst: "\(#InitdbDir)/"}],
-							[if len(X.state.schedules) > 0 {
+							[{srcs: [for _, m in X._initdb if m != #TenancyMigration && !list.Contains([for s in X._staged {s.dst}], m) {m}], dst: "\(#InitdbDir)/"}],
+							[for s in X._staged {
 								from: (_from & {in: X.meta.images.database}).out
-								srcs: ["\(#StagedDir)/\(#ScheduleMigration)"]
-								dst:  "\(#InitdbDir)/\(#ScheduleMigration)"
+								srcs: ["\(#StagedDir)/\(s.src)"]
+								dst:  "\(#InitdbDir)/\(s.dst)"
 							}],
 						])
 					}
@@ -262,6 +560,8 @@ _devElectricSecret: "dev-electric-secret"
 							POSTGRES_USER:        "${POSTGRES_USER:-postgres}"
 							POSTGRES_PASSWORD:    "${POSTGRES_PASSWORD:-postgres}"
 							POSTGRES_DB:          "${POSTGRES_DB:-\(X.meta.app)}"
+							ELECTRIC_PASSWORD:      electricPassword
+							AUTHENTICATOR_PASSWORD: authenticatorPassword
 							// ORDER BY on text reaches a reader, so it sorts the way a
 							// dictionary does, not by byte: bytes put every accent past all
 							// of ASCII and split the alphabet by case, so "ana" follows "Zoe".
@@ -278,6 +578,7 @@ _devElectricSecret: "dev-electric-secret"
 						// One rebuild entry per migration: the list is the consumer's, and
 						// mecha's own stack keeps a fixture outside the migrations directory.
 						develop: watch: [for m in X.state.migrations {action: "rebuild", path: "../\(m)", target: "/docker-entrypoint-initdb.d"}]
+						if len(X.state.effects) > 0 {networks: ["default", "airlock"]}
 					}
 				}
 				// Only a cluster given pgroll migrations gets a runner: one with
@@ -302,7 +603,57 @@ _devElectricSecret: "dev-electric-secret"
 						}
 						compose: {
 							depends_on: database: _healthy
-							environment: DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-\(X.meta.app)}?sslmode=disable"
+							environment: {
+								DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-\(X.meta.app)}?sslmode=disable"
+								// The schedule step is initdb's alone, so a volume older
+								// than the cluster's first schedule lacks its table.
+								if len(X.state.schedules) > 0 {REQUIRED_TABLES: "schedule"}
+							}
+						}
+					}
+				}
+				if len(X.state.effects) > 0 {
+					"airlock-upgrade": X._image & {
+						dockerfile: {
+							from: (_from & {in: X.meta.images.database}).out
+							entrypoint: ["psql"]
+							cmd: ["-X", "--set=ON_ERROR_STOP=1", "--single-transaction", "--file=/airlock-upgrade.sql"]
+							epilogue: ["COPY <<'AIRLOCK' /airlock-upgrade.sql\n\(#AirlockUpgradeSql)\n\(X.state.effectInterpreters)\nAIRLOCK"]
+						}
+						compose: {
+							depends_on: {
+								database: _healthy
+								if len(X.state.pgroll) > 0 {migrate: _completed}
+							}
+							environment: {
+								PGHOST:     "database"
+								PGUSER:     "${POSTGRES_USER:-postgres}"
+								PGPASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+								PGDATABASE: "${POSTGRES_DB:-\(X.meta.app)}"
+							}
+						}
+					}
+				}
+				if len(X.state.timers) > 0 {
+					"timer-check": X._image & {
+						dockerfile: {
+							from: (_from & {in: X.meta.images.database}).out
+							entrypoint: ["psql"]
+							cmd: ["-X", "--set=ON_ERROR_STOP=1", "--single-transaction", "--file=/timer-check.sql"]
+							epilogue: ["COPY <<'TIMERS' /timer-check.sql\n\(X.state.timerCheck)\nTIMERS"]
+						}
+						compose: {
+							depends_on: {
+								database: _healthy
+								if len(X.state.pgroll) > 0 {migrate: _completed}
+								if len(X.state.effects) > 0 {"airlock-upgrade": _completed}
+							}
+							environment: {
+								PGHOST: "database"
+								PGUSER: "${POSTGRES_USER:-postgres}"
+								PGPASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+								PGDATABASE: "${POSTGRES_DB:-\(X.meta.app)}"
+							}
 						}
 					}
 				}
@@ -314,13 +665,23 @@ _devElectricSecret: "dev-electric-secret"
 						start_period:   "30s"
 					}
 					dockerfile: {
-						from: name: "postgrest/postgrest:v12.2.3@sha256:0a46780309a604cdc8b56c776c6e5e15788ce58174d709e40459ab5a2d44d228"
-						cmd: ["postgrest"]
+						from: name: "postgrest/postgrest:v16.4@sha256:d155c6718ed9a9f990d159a2ab7c0a3f16944dbb6d0a0344557421042acfe0df"
+					}
+					expose: {
+						http:  port: 3000
+						admin: port: 3001
+					}
+					entrypoint: {
+						do:  "postgrest"
+						env: compose.environment
+						after: database: "healthy"
 					}
 					compose: {
 						depends_on: X._schemaReady
 						environment: {
-							PGRST_DB_URI:       databaseUrl
+							// Not postgres: PostgREST applies a token role's settings (its
+							// statement_timeout among them) only to roles granted to its login.
+							PGRST_DB_URI:       "postgres://authenticator:\(authenticatorPassword)@database:5432/${POSTGRES_DB:-\(X.meta.app)}"
 							PGRST_DB_SCHEMA:    "public"
 							PGRST_DB_ANON_ROLE: "anon"
 							// Called once per request, in the request's transaction, after the
@@ -331,7 +692,7 @@ _devElectricSecret: "dev-electric-secret"
 							PGRST_SERVER_HOST:       "*"
 							PGRST_SERVER_PORT:       "3000"
 							PGRST_ADMIN_SERVER_PORT: "3001"
-							if X.capabilities.auth {
+							if X._serviceToken {
 								PGRST_JWT_SECRET: jwtSecret
 							}
 						}
@@ -345,16 +706,35 @@ _devElectricSecret: "dev-electric-secret"
 						// deno runs `main.ts` from the working directory, and bayt
 						// sets one per stage.
 						workdir: "/app"
+						epilogue: ["RUN mkdir -p /monorepo"]
+					}
+					expose: http: port: 9999
+					entrypoint: {
+						do:    "deno run --allow-net --allow-env --config /app/deno.json /app/main.ts"
+						env:   compose.environment
+						after: database: "healthy"
 					}
 					compose: {
 						depends_on: X._schemaReady
 						environment: {
-							DATABASE_URL:     databaseUrl
-							PGRST_JWT_SECRET: jwtSecret
-							WEBAUTHN_RP_ID:   "${WEBAUTHN_RP_ID:-localhost}"
+							DATABASE_URL:              databaseUrl
+							AUTH_STATEMENT_TIMEOUT_MS: "\(X.meta.bounds.authStatementMs)"
+							PGRST_JWT_SECRET:          jwtSecret
+							WEBAUTHN_RP_ID:            "${WEBAUTHN_RP_ID:-localhost}"
 							// The door's port is the host's pick; auth reads this
 							// default as whichever port the request came through.
 							WEBAUTHN_ORIGIN: "${WEBAUTHN_ORIGIN:-https://localhost:*}"
+							OIDC_PROVIDERS:  strings.Join([for p, _ in X.capabilities.signIn {p}], ",")
+							for p, d in X.capabilities.signIn {
+								let k = "OIDC_\(strings.ToUpper(p))_CLIENT_ID"
+								if d.client == _|_ {
+									(k): "${\(k):?\(k) is required: the cluster signs in through \(p)}"
+								}
+								for o, v in {client: "CLIENT_ID", issuer: "ISSUER", internal: "INTERNAL", secret: "CLIENT_SECRET", scope: "SCOPE", params: "AUTHORIZE_PARAMS"} if o != "client" || d.client != _|_ {
+									let e = "OIDC_\(strings.ToUpper(p))_\(v)"
+									(e): "${\(e):-\(*d[o] | "")}"
+								}
+							}
 						}
 					}
 				}
@@ -380,10 +760,22 @@ _devElectricSecret: "dev-electric-secret"
 				// directory.
 				srcs: globs: list.Concat([
 					[X.meta.caddyfile],
-					[for s in X.meta.statics if !strings.HasPrefix(s.file, X.meta.runtime) {s.file}],
+					[if X.meta.served == _|_ for s in X.meta.statics if !strings.HasPrefix(s.file, X.meta.runtime) {s.file}],
 				])
+				if X.meta.served != _|_ {deps: ["\(X.meta.served.ref):outs"]}
 				dockerfile: {
-					from: name: "caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0"
+					// The root an app static's target mirrors its path under, or "".
+					let _under = [for s in X.meta.statics {[
+						if !strings.HasPrefix(s.file, X.meta.runtime) if strings.HasSuffix(s.target, "/\(s.file)") {strings.TrimSuffix(s.target, s.file)},
+						"",
+					][0]}]
+
+					// Runs of consecutive statics under one root; any other static
+					// is a run of its own.
+					let _prev = list.Concat([[null], _under])
+					let _starts = [for i, u in _under if u == "" || _prev[i] != u {i}]
+					let _end = {for r, i in _starts {"\(i)": [if r+1 < len(_starts) {_starts[r+1]}, len(_under)][0]}}
+					from: name: "caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f"
 					copy: list.Concat([
 						[{srcs: [X.meta.caddyfile], dst: "/etc/caddy/Caddyfile"}],
 						// mkcert's pair, where `sayt setup` issued one on this host;
@@ -391,36 +783,62 @@ _devElectricSecret: "dev-electric-secret"
 						// what makes it optional: a context without .certs copies
 						// nothing, and the door then serves Caddy's own CA.
 						[{srcs: [".cert[s]"], dst: "/certs/"}],
-						[for s in X.meta.statics {
+						// A release's tree: its runtime half where the terminal is
+						// served from, the rest under /srv, and the scripts the
+						// policy names beside the config.
+						[if X.meta.served != _|_ for c in [
+							{srcs: ["\(X.meta.served.tree)/omnishell/"], dst: "/omnishell/"},
+							{srcs: ["\(X.meta.served.tree)/"], dst: "/srv/"},
+							{srcs: [X.meta.served.scripts], dst: "/etc/caddy/release-scripts"},
+						] {c & {from: ref: X.meta.served.ref}}],
+						// One COPY, so one image layer, per run: the image stays
+						// under the overlay depth limit however many statics an
+						// app serves, and runs keep their order for overwrites.
+						[if X.meta.served == _|_ for i, s in X.meta.statics if _end["\(i)"] != _|_ {[
 							if strings.HasPrefix(s.file, X.meta.runtime) {
-								from: {name: "root"}
-								srcs: [strings.TrimPrefix(s.file, X.meta.root)]
-							}
-							if !strings.HasPrefix(s.file, X.meta.runtime) {
-								srcs: [s.file]
-							}
-							dst: s.target
-						}],
+								{from: {name: "root"}, srcs: [strings.TrimPrefix(s.file, X.meta.root)], dst: s.target}
+							},
+							if _under[i] != "" {
+								{srcs: [for t in list.Slice(X.meta.statics, i, _end["\(i)"]) {t.file}], dst: _under[i], parents: true}
+							},
+							{srcs: [s.file], dst: s.target},
+						][0]}],
 					])
+				}
+				// One published door. For an app it is h2 over TLS; the plain
+				// listener still exists inside the container — the healthcheck
+				// above uses it — but is deliberately NOT published: the
+				// browser's six-connections-per-origin cap only exists on
+				// HTTP/1.1, and a second front door is a path that only ever
+				// runs on a laptop (docs/proxy.md).
+				expose: door: {
+					port: X.meta.door.port
+					publish: environment: X.meta.door.env
+					if X.meta.door.host != _|_ {host: X.meta.door.host}
+				}
+				let validators = #"set -e -o pipefail; roots=$(caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile | tr , '\n' | grep -o '"root":"[^"]*"' | cut -d'"' -f4 | sort -u); if [ -n "$roots" ]; then find $roots -type f ! -name '*.etag' -exec sh -c 'set -e; q=$1; shift; for f do h=$(sha256sum < "$f"); printf "$q%s$q" "${h%% *}" > "$f.etag"; done' sh '"' {} +; fi; "#
+
+				// An ORIGIN that is no origin stops the door as it starts: a
+				// template writes it into markup as it stands.
+				let admitted = #"case "${ORIGIN#http://}" in "$ORIGIN") h=${ORIGIN#https://};; *) h=${ORIGIN#http://};; esac; case "$h" in "$ORIGIN"|""|*[!A-Za-z0-9.:-]*) echo "ORIGIN '$ORIGIN' is no origin: set it to the scheme and host readers reach the door at, as https://app.example" >&2; exit 1;; esac; "#
+				let scripts = [if X.meta.served != _|_ {"PRONTO_RELEASE_SCRIPTS=$(cat /etc/caddy/release-scripts 2>/dev/null || true); export PRONTO_RELEASE_SCRIPTS; "}, ""][0]
+				entrypoint: {
+					do: "\(admitted)\(validators)\(scripts)if [ -f /certs/localhost.pem ]; then export CADDY_TLS='/certs/localhost.pem /certs/localhost-key.pem'; fi; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"
+					shell: "sh"
+					env:   compose.environment
+					if X.capabilities.server {
+						after: crud: "healthy"
+					}
 				}
 				compose: {
 					build: additional_contexts: root: strings.TrimSuffix("../\(X.meta.root)", "/")
-					// One published door. For an app it is h2 over TLS; the plain
-					// listener still exists inside the container — the healthcheck
-					// above uses it — but is deliberately NOT published: the
-					// browser's six-connections-per-origin cap only exists on
-					// HTTP/1.1, and a second front door is a path that only ever
-					// runs on a laptop (docs/proxy.md).
-					ports: [X.meta.door]
 					// The Caddyfile substitutes this into the electric route, which is
 					// the only place the secret is added. Same default as the electric
 					// service reads, and both are overridden together or neither.
-					environment: ELECTRIC_SECRET: "${ELECTRIC_SECRET:-\(_devElectricSecret)}"
-
-					// The Caddyfile's door serves CADDY_TLS: the baked pair when the
-					// host issued one, Caddy's own CA otherwise, so the stack comes up
-					// before any mkcert step. The rest is the image's own command.
-					command: ["sh", "-c", "if [ -f /certs/localhost.pem ]; then export CADDY_TLS='/certs/localhost.pem /certs/localhost-key.pem'; fi; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"]
+					environment: {
+						ELECTRIC_SECRET: "${ELECTRIC_SECRET:-\(_devElectricSecret)}"
+						ORIGIN:          origin
+					}
 					// Watch paths are from .bayt/ too, hence the ../ on each.
 					develop: watch: list.Concat([
 						[{action: "sync+restart", path: "../\(X.meta.caddyfile)", target: "/etc/caddy/Caddyfile"}],
@@ -430,23 +848,32 @@ _devElectricSecret: "dev-electric-secret"
 						// Honoured, not assumed: a static that says it is not watched is
 						// one whose edit is a rebuild — a generated file, or a vendored
 						// unit whose megabytes would restart the proxy on every launch.
-						[for s in X.meta.statics if s.watch {action: "sync+restart", path: "../\(s.file)", target: s.target}],
+						// A release is rebuilt whole, since every entry names it.
+						[for s in X.meta.statics if s.watch {
+							path:   "../\(s.file)"
+							target: s.target
+							action: [if X.meta.served == _|_ {"sync+restart"}, "rebuild"][0]
+						}],
 					])
 				}
 			}
 			if X.capabilities.server {
 				electric: X._image & {
-					dockerfile: from: name: "docker.io/bonitao/electric:1.8.0@sha256:7b6aed2d5fd356a5e5edd5290eeec0b19859ab798d3cbdb7d9d223fbb872a5ab"
+					dockerfile: {
+						from: name: "docker.io/electricsql/electric:1.8.1@sha256:efb6fa43859d67cb8c73439e0c8bc0f7a3daa467500fb06f2a924bcb2070c139"
+						// Initialization must retain requests already waiting for the snapshot.
+						preamble: ["COPY <<'ELIXIR' /tmp/electric-patch.exs\n\(_electricPatch)\nELIXIR"]
+						epilogue: ["RUN DATABASE_URL=postgresql://compile:compile@localhost/compile ELECTRIC_SECRET=compile-only /app/bin/entrypoint eval 'Code.eval_file(\"/tmp/electric-patch.exs\")' && rm /tmp/electric-patch.exs"]
+					}
 					compose: {
 						depends_on: X._schemaReady
 						environment: {
 							// Its own role, holding BYPASSRLS as a stated attribute: without it
 							// current_scopes() is empty and every shape syncs empty, silently.
-							// The role's password is the roles migration's literal, and the
-							// database trusts every password here (initdb --auth=trust); a
-							// deployment sets the role's password and this URL together,
-							// outside this file.
-							DATABASE_URL: "postgresql://electric:electric@database:5432/${POSTGRES_DB:-\(X.meta.app)}?sslmode=disable"
+							// Its password is the one the database's initdb step sets
+							// (#RolePasswordsStep): another container's connection
+							// authenticates by scram, as initdb trusts only loopback.
+							DATABASE_URL: "postgresql://electric:\(electricPassword)@database:5432/${POSTGRES_DB:-\(X.meta.app)}?sslmode=disable"
 							// The proxy is the only way in: caddy runs forward_auth against the
 							// gatekeeper and then adds this, so a request that reaches electric
 							// without passing the gate has no secret to present.
@@ -568,21 +995,29 @@ _devElectricSecret: "dev-electric-secret"
 					}
 				}
 			}
-			if len(X.state.pipelines) > 0 {
+			if len(X.state.pipelines)+len(X.state.computations) > 0 {
 				transform: X._image & {
 					srcs: globs: [for p in X.state.pipelines {p.file}]
 					dockerfile: {
-						from: name: "redpandadata/connect:4.46.0@sha256:f84ebd666931dc667b8b33c70900ff49a34c73d1811b096f668e360d66a05d4c"
+						from: name: "redpandadata/connect:4.114.0@sha256:481e8df48ed733f080623ae67f0dccc82d29ae509dfb3f957347a9e900e74910"
 						copy: [for p in X.state.pipelines {srcs: [p.file], dst: "/pipelines/\(p.name).yaml"}]
-						cmd: list.Concat([["streams", "--no-api"], [for p in X.state.pipelines {"/pipelines/\(p.name).yaml"}]])
+						epilogue: list.Concat([
+							["COPY <<'CDCTRACE' /cdc-trace.yaml\n\(_cdcTrace)\nCDCTRACE"],
+							[if len(X.state.computations) > 0 {"COPY <<'COMPUTE' /compute-events.yaml\n\(_computeEvents)\nCOMPUTE"}],
+						])
+						cmd: list.Concat([["streams", "--no-api", "-r", "/cdc-trace.yaml"], [for p in X.state.pipelines {"/pipelines/\(p.name).yaml"}], [if len(X.state.computations) > 0 {"/compute-events.yaml"}]])
 					}
 					compose: {
 						depends_on: {redis: _healthy, crud: _healthy}
+						if len(X.state.computations) > 0 {
+							depends_on: compute: _healthy
+						}
 						environment: {
 							// Straight to PostgREST: the proxy's client-facing Prefer
 							// injection would clobber the pipelines' merge-duplicates upserts.
 							CRUD_URL:  "http://crud:3000"
 							REDIS_URL: "redis://redis:6379"
+							if len(X.state.computations) > 0 {COMPUTE_GROUP: "\(X.meta.app)-compute"}
 							if X.capabilities.auth {
 								SERVICE_JWT: "${SERVICE_JWT:-\(_devServiceJwt)}"
 							}
@@ -598,6 +1033,7 @@ _devElectricSecret: "dev-electric-secret"
 					}
 				}
 			}
+
 			// The numeric stage: an app's computations, each reading the lake
 			// the service publishes from Postgres, writing back through crud
 			// as the service role, the path every pipeline writes by.
@@ -605,7 +1041,16 @@ _devElectricSecret: "dev-electric-secret"
 				// Two computations may share a wasm module; it ships once.
 				let _wasm = [for w, _ in {for c in X.state.computations for w in c.wasm {(w): true}} {file: w, target: "/app/computations/\(path.Base(w, path.Unix))"}]
 				let _target = {for w in _wasm {(w.file): w.target}}
-				compute: X._image & {
+
+				// Healthy once it serves: its port opens after the bootstrap run, and an
+				// invalidation refused while that runs would spend its retries.
+				compute: bayt.healthcheck.tcp & X._image & {
+					healthcheck: {
+						port:           9997
+						interval:       "5s"
+						start_interval: "1s"
+						start_period:   "15m"
+					}
 					srcs: globs: list.Concat([[for c in X.state.computations {c.file}], [for w in _wasm {w.file}]])
 					dockerfile: {
 						from: (_from & {in: X.meta.images.compute}).out
@@ -615,17 +1060,19 @@ _devElectricSecret: "dev-electric-secret"
 						])
 					}
 					compose: {
-						depends_on: {X._schemaReady, crud: _healthy}
+						depends_on: {X._schemaReady, crud: _healthy, conduit: _healthy}
 						environment: {
 							CRUD_URL:     "http://crud:3000"
 							DATABASE_URL: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-\(X.meta.app)}"
 							LAKE_DIR:     "/lake"
+							CDC_SLOT:     (#ConduitSlot & {app: X.meta.app}).name
 							COMPUTATIONS: json.Marshal([for c in X.state.computations {
-								name:  c.name
-								file:  "/app/computations/\(c.name).js"
-								every: c.every
-								to:    c.to
+								name: c.name
+								file: "/app/computations/\(c.name).js"
+								to:   c.to
 								wasm: [for w in c.wasm {_target[w]}]
+								endowments: c.endowments
+								if c.onComplete != _|_ {onComplete: c.onComplete}
 							}])
 							if X.capabilities.auth {
 								SERVICE_JWT: "${SERVICE_JWT:-\(_devServiceJwt)}"
@@ -647,9 +1094,11 @@ _devElectricSecret: "dev-electric-secret"
 					}
 				}
 			}
-			// Only an app that declares a schedule gets a clock. A ticker with
-			// nothing to sweep is a container answering pokes nobody sends.
-			if len(X.state.schedules) > 0 {
+
+			// A schedule, effect or machine timer requires a clock. A
+			// ticker with nothing to sweep is a container answering pokes nobody
+			// sends.
+			if X._wakes {
 				ticker: X._image & {
 					dockerfile: {
 						from: (_from & {in: X.meta.images.ticker}).out
@@ -659,13 +1108,20 @@ _devElectricSecret: "dev-electric-secret"
 						depends_on: crud: _healthy
 						environment: {
 							// Straight to PostgREST, like the pipelines above.
-							CRUD_URL: "http://crud:3000"
-							// mesh-events, never mesh: the wake has to reach the
-							// daprd bundled with the WAL reader and the pipeline
-							// worker, which is the unit asleep at cloud tier.
-							MESH_URL:    "http://mesh-events:3500"
+							CRUD_URL:        "http://crud:3000"
+							CALL_TIMEOUT_MS: "\(X.meta.bounds.tickerCallMs)"
+							// The units a tick needs up, each asleep at cloud tier:
+							// mesh-events, never mesh, the daprd bundled with the WAL
+							// reader and the pipeline worker; and the airlock, for the
+							// job an interpreter enqueued.
+							WAKE_URLS: strings.Join(list.Concat([
+								[if X.capabilities.capture {"http://mesh-events:3500/v1.0/healthz/outbound"}],
+								[if len(X.state.effects) > 0 {"http://airlock:9997/healthz"}],
+							]), ",")
 							SERVICE_JWT: "${SERVICE_JWT:-\(_devServiceJwt)}"
 						}
+						// The airlock's health port, on a network holding the two alone.
+						if len(X.state.effects) > 0 {networks: ["default", "airlock-wake"]}
 						restart: "on-failure"
 					}
 				}
@@ -676,6 +1132,7 @@ _devElectricSecret: "dev-electric-secret"
 					compose: {
 						depends_on: ticker: _started
 						environment: {
+							POKE_URL:      "http://ticker:9998"
 							POKE_INTERVAL: "${POKE_INTERVAL:-60s}"
 							POKE_CALLER:   "compose"
 							SERVICE_JWT:   "${SERVICE_JWT:-\(_devServiceJwt)}"
@@ -684,6 +1141,100 @@ _devElectricSecret: "dev-electric-secret"
 					}
 				}
 			}
+
+			// Only an app that declares an effect gets an airlock, as only one
+			// that declares a schedule gets a ticker. The airlock reaches the
+			// database and its daprd (#AirlockNetworks); the daprd offers the
+			// bindings API alone (services/airlock/dapr.yaml), and its bindings
+			// are the program's declarations, so the only traffic leaving for the
+			// world is a call of a declared binding. Nothing pokes it: its
+			// worker hears an interpreter's enqueue at the interpreter's commit
+			// (services/airlock/airlock.ts), and the instance is up whenever
+			// the cluster is.
+			if len(X.state.effects) > 0 {
+				airlock: bayt.healthcheck.tcp & X._image & {
+					// The port opens once every handler is admitted and the worker
+					// runs; it serves nothing.
+					healthcheck: {
+						port:           9997
+						interval:       "5s"
+						start_interval: "500ms"
+						start_period:   "30s"
+					}
+					srcs: globs: list.Concat([[X.meta.airlock], [for e in X._effects {e.handler}]])
+					dockerfile: {
+						from: (_from & {in: X.meta.images.airlock}).out
+						workdir: "/app/airlock"
+						// Delivered where the manifest names them: AIRLOCK_DIR's
+						// effects.json, and effects/<name>.js beside it.
+						copy: list.Concat([
+							[{srcs: [X.meta.airlock], dst: "/airlock/effects.json"}],
+							[for e in X._effects {srcs: [e.handler], dst: "/airlock/effects/\(e.name).js"}],
+						])
+						// Its own reach, besides the network's: the database, its
+						// daprd and the health port. Reads are unscoped because Graphile's
+						// config search stats every directory up to `/`. A handler
+						// runs in a worker with no permissions at all (handler.ts).
+						cmd: ["run", "--frozen", "--unstable-worker-options", "--allow-net=database:5432,airlock-mesh:3500,0.0.0.0:9997", "--allow-read", "--allow-env", "--allow-sys", "main.ts"]
+					}
+					compose: {
+						depends_on: {X._schemaReady, "airlock-mesh": _healthy}
+						environment: {
+							// The owner, not `service`: the ledger is closed to every
+							// other role, and Graphile's migrate check, run at every
+							// start, alters its own schema after an upgrade.
+							DATABASE_URL: databaseUrl
+							MESH_URL:     "http://airlock-mesh:3500"
+							AIRLOCK_DIR:  "/airlock"
+							// A secret has no default: compose refuses to start without
+							// it rather than hand a handler a guessable one.
+							for k in X._secrets {
+								(k): "${\(k):?\(k) is required: an effect declares it}"
+							}
+						}
+						networks: ["airlock", "airlock-wake"]
+						restart: "on-failure"
+						develop: watch: list.Concat([
+							[{action: "sync+restart", path: "../\(X.meta.airlock)", target: "/airlock/effects.json"}],
+							[for e in X._effects {action: "sync+restart", path: "../\(e.handler)", target: "/airlock/effects/\(e.name).js"}],
+						])
+					}
+				}
+				// The airlock's daprd: one output binding per effect and nothing
+				// else, no Redis component and no resiliency policy, so a call is
+				// made once and the ledger's `entered` counts every attempt; and
+				// the bindings API alone, so no invoke reaches a full URL.
+				"airlock-mesh": bayt.healthcheck.tcp & X._image & {
+					healthcheck: {
+						port:           3500
+						interval:       "5s"
+						start_interval: "500ms"
+						start_period:   "30s"
+					}
+					srcs: globs: [for e in X._effects {e.endpoint}]
+					dockerfile: {
+						from: (_from & {in: X.meta.images.mesh}).out
+						copy: list.Concat([
+							[{from: (_from & {in: X.meta.images.airlock}).out, srcs: ["/app/airlock/dapr.yaml"], dst: "/dapr/config.yaml"}],
+							[for e in X._effects {srcs: [e.endpoint], dst: "/dapr/airlock/\(e.name).yaml"}],
+						])
+						entrypoint: ["/daprd", "--app-id", "airlock", "--dapr-listen-addresses", "0.0.0.0", "--resources-path", "/dapr/airlock", "--config", "/dapr/config.yaml", "--dapr-http-port", "3500", "--log-level", "info"]
+					}
+					compose: {
+						depends_on: {for b in X._bridges if list.Contains(X._reached, b.name) {(b.container): _started}}
+						// What this daprd may reach, on the container where an operator
+						// looks (daprd reads neither): the declared origins and bridges.
+						environment: {
+							AIRLOCK_ORIGINS: strings.Join(X._origins, " ")
+							AIRLOCK_BRIDGES: strings.Join([for b in X._bridges {b.name}], " ")
+						}
+						networks: ["airlock", "airlock-out", "airlock-egress"]
+						restart: "on-failure"
+						develop: watch: [for e in X._effects {action: "sync+restart", path: "../\(e.endpoint)", target: "/dapr/airlock/\(e.name).yaml"}]
+					}
+				}
+						}
+
 			// The aggregate a consumer brings up: a container that does nothing
 			// but wait on everything else, so `up --wait launch` returns when
 			// the whole plane is healthy.
@@ -705,11 +1256,11 @@ _devElectricSecret: "dev-electric-secret"
 							"mesh-events": _healthy
 							conduit:       _healthy
 						}
-						if len(X.state.pipelines) > 0 {
+						if len(X.state.pipelines)+len(X.state.computations) > 0 {
 							transform: _started
 						}
 						if len(X.state.computations) > 0 {
-							compute: _started
+							compute: _healthy
 						}
 						if X.capabilities.auth {
 							auth: _started
@@ -718,10 +1269,14 @@ _devElectricSecret: "dev-electric-secret"
 							"rclone-s3": _healthy
 							imgproxy:    _healthy
 						}
+
 						// A clock absent from here is a clock nothing starts. It
 						// pulls the ticker in behind it.
-						if len(X.state.schedules) > 0 {
+						if X._wakes {
 							clock: _started
+						}
+						if len(X.state.effects) > 0 {
+							airlock: _healthy
 						}
 
 						// Consumer-added services (escape hatches) gate here by
@@ -755,9 +1310,10 @@ _devElectricSecret: "dev-electric-secret"
 			// 6 KB on one line, so it goes to the null device, which nu spells
 			// per host and offers no constant for: `| ignore` would drop the
 			// exit status along with it, and the status is the verdict. The
-			// secret placeholder has to hold something for the line to parse;
-			// compose sets it at runtime, and this is not runtime.
-			cmds: ["with-env {ELECTRIC_SECRET: lint} { mise exec -- caddy adapt --config \(X.meta.caddyfile) --adapter caddyfile out> (if $nu.os-info.name == \"windows\" { \"NUL\" } else { \"/dev/null\" }) }"]
+			// secret and origin placeholders have to hold something for their
+			// lines to parse; compose sets them at runtime, and this is not
+			// runtime.
+			cmds: ["with-env {ELECTRIC_SECRET: lint, ORIGIN: lint} { mise exec -- caddy adapt --config \(X.meta.caddyfile) --adapter caddyfile out> (if $nu.os-info.name == \"windows\" { \"NUL\" } else { \"/dev/null\" }) }"]
 			note: "checks the cluster's own proxy config parses"
 		}
 		// The door is h2, h2 needs TLS, and TLS needs a certificate the
@@ -808,14 +1364,41 @@ _devElectricSecret: "dev-electric-secret"
 			ticker:   #From
 			clock:    #From
 			compute:  #From
+			airlock:  #From
 		}
+		// The program's effects.json (services/airlock/README.md), relative to
+		// the app dir.
+		airlock: *"services/airlock/effects.json" | string
+		// The consumer's bounds on the clients mecha's services hold, in
+		// milliseconds: auth's statements, which run as the owner and so under
+		// no role's setting, and each ticker call to crud, which has to outlast
+		// the service role's statement or the next tick repeats a write.
+		bounds: {authStatementMs: int & >0, tickerCallMs: int & >0}
 		// The proxy's config, relative to the app dir.
 		caddyfile: *"docker/Caddyfile" | string
-		// The one published door, in compose's `host:container` form.
-		door: *"${CADDY_TLS_HOST_PORT:-0}:8443" | string
+		// The one published door: the port the proxy listens on, the scheme
+		// it serves, and the host variable that moves it. Unset, the host port
+		// is `host` where people type it, else the project's own
+		// (bayt's #port.publish); only what a person brings up binds it.
+		door: {
+			port:   *8443 | int
+			scheme: *"https" | "http"
+			env:    *"CADDY_TLS_HOST_PORT" | string
+			host?:  int
+		}
 		// The conduit pipeline, an envsubst template, relative to the app dir.
 		conduitTemplate: *"docker/conduit-pipeline.yaml" | string
 		statics: [...#Static]
+		// Where the door's tree is built as a release rather than copied file
+		// by file: a target of the consumer's whose image holds the statics,
+		// each at its URL's path under `tree`, and the inline scripts their
+		// documents run in `scripts`, which the door's policy names as
+		// $PRONTO_RELEASE_SCRIPTS.
+		served?: {
+			ref:     string
+			tree:    string
+			scripts: string
+		}
 		// The workspace root and the runtime's directory, as paths from the
 		// app dir: the monorepo's unless the app states its own layout.
 		root:    *"../../" | string
@@ -831,7 +1414,9 @@ _devElectricSecret: "dev-electric-secret"
 // wait on. Rebuilt field by field rather than unified: unifying a qualified
 // `depends_on` onto the bare one would keep both key sets. A target nulled
 // by a hatch is dropped, and a wait on a name no target answers to fails
-// here rather than at `up`.
+// here rather than at `up`. A target joins the networks its compose block
+// names, under its bare name on each, and the default network only when it
+// names none.
 #Runtime: R={
 	project: string
 	cluster: #Cluster
@@ -840,22 +1425,42 @@ _devElectricSecret: "dev-electric-secret"
 	// What a target waits on; a target that waits on nothing has no field.
 	_waits: W={
 		t: _
-		out: [if W.t.compose.depends_on != _|_ {W.t.compose.depends_on}, {}][0]
+		out: {
+			if W.t.compose != _|_ if W.t.compose.depends_on != _|_ {for k, v in W.t.compose.depends_on {(k): v}}
+			if W.t.entrypoint != _|_ if W.t.entrypoint.after != _|_ {
+				for k, _ in W.t.entrypoint.after {(k): _healthy}
+			}
+		}
+	}
+	_networks: N={
+		name: string
+		t: _
+		_bridges: [for b in R.cluster.state.bridges if b.container == N.name {b}]
+		_base: [if N.t.compose.networks != _|_ {N.t.compose.networks}, if len(_bridges) > 0 {[]}, ["default"]][0]
+		out: [for nw, _ in {for n in list.Concat([_base, [if len(_bridges) > 0 {"airlock-out"}], [for b in _bridges {"bridge-\(b.name)-egress"}]]) {(n): true}} {nw}]
 	}
 	targets: {
+		for b in R.cluster.state.bridges {
+			let source = R._live[b.container].dockerfile.from
+			(b.container): dockerfile: from: [if source.name != _|_ {source}, if source.ref != _|_ {source}][0]
+		}
 		for n, t in R._live {
 			(n): {
 				for f, v in t if f != "compose" && f != "deps" {(f): v}
-				deps: [for k, _ in (R._waits & {"t": t}).out {":\(k):outs"}]
+
+				// What it waits on, and an image it copies from (a `from.ref`
+				// copy, which bayt does not read as a dependency).
+				deps: list.Concat([[for k, _ in (R._waits & {"t": t}).out {":\(k):outs"}], [if t.deps != _|_ for d in t.deps {d}]])
 				compose: {
-					for f, v in t.compose if f != "depends_on" {(f): v}
+					for f, v in t.compose if f != "depends_on" && f != "networks" {(f): v}
 					depends_on: {for k, v in (R._waits & {"t": t}).out {("\(R.project)-\(k)"): v}}
-					networks: default: aliases: [n]
+					networks: {for nw in (R._networks & {name: n, "t": t}).out {(nw): aliases: [n]}}
 				}
 			}
 		}
 	}
 	_dangling: [
+		for b in R.cluster.state.bridges if !list.Contains([for m, _ in R._live {m}], b.container) {"bridge \(b.name) references missing container \(b.container)"},
 		for n, t in R._live for k, _ in (R._waits & {"t": t}).out
 		if !list.Contains([for m, _ in R._live {m}], k) {"\(n) waits on \(k)"},
 	]

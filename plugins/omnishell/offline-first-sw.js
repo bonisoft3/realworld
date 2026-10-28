@@ -1,120 +1,96 @@
-// Precached immutable shell assets required for cold offline boot.
-const STATIC_CACHE = "pronto-static-v3";
-const RUNTIME_CACHE = "pronto-runtime-v3";
+// A release is its entry (pronto's release-addresses.ts): every file a page
+// runs is named by its content address in the entry's map, and an addressed
+// file never changes. So an address is answered from this worker's copy
+// forever, and a navigation from the copy of the entry it kept, revalidated
+// behind it: a kept entry names only addresses, so painting it is coherent,
+// and offline it is the page. The worker holds no release state; the page
+// learns of a newer entry itself (shell.js) and drops the kept one to take it.
+const ADDRESSED_CACHE = "pronto-addressed-v1";
+const ENTRY_CACHE = "pronto-entries-v1";
 
-const PRECACHE_ASSETS = [
-  "/shell/index.html",
-  "/shell/shell.css",
-  "/shell/design.css",
-  "/shell/boot.js",
-];
-
-// Protocol boundaries: sync streams, mutations, and auth sessions must never
-// be cached by an HTTP service worker.
+const ADDRESSED = /\/_immutable-[0-9a-f]{64}-[^/]*$/;
 const BYPASS_PREFIXES = ["/electric/", "/crud/", "/auth/", "/events/"];
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE_ASSETS)),
-  );
-  self.skipWaiting();
-});
+// A document's request-only reads are current only as it arrives
+// (interpreter/data-sync.js), so the copy kept for a later paint goes
+// without them, and a shell taking that copy over asks the network. The copy
+// says it is one, so the page painted from it asks whether a deployment
+// landed since (shell.js) and one painted from the network does not.
+const SERVED_READS = /<script type="application\/json" id="pronto-reads">[\s\S]*?<\/script>/;
+const HEAD = /<head\b[^>]*>/;
+
+async function keptCopy(response) {
+  const html = await response.text();
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  return new Response(html.replace(SERVED_READS, "").replace(HEAD, (head) => `${head}<meta name="pronto-kept">`), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+self.addEventListener("install", () => self.skipWaiting());
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((k) => k !== STATIC_CACHE && k !== RUNTIME_CACHE)
-          .map((k) => caches.delete(k)),
-      )
-    ).then(() => self.clients.claim()),
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== ADDRESSED_CACHE && k !== ENTRY_CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
   );
 });
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
-
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
   if (BYPASS_PREFIXES.some((p) => url.pathname.startsWith(p))) return;
+  if (req.cache === "no-store") return;
 
-  // Stale-While-Revalidate for shell, screen templates, styles, and interpreter assets.
-  // Serves from cache immediately for 0ms offline boot, while revalidating against
-  // the server in the background. If a template or stylesheet has updated, the SW
-  // caches the new response and posts a message to active client windows to morph
-  // the DOM or hot-reload styles in-place without page reload.
-  if (url.pathname.startsWith("/shell/") || url.pathname.startsWith("/omnishell/")) {
-    event.respondWith(
-      caches.open(STATIC_CACHE).then(async (cache) => {
-        const cached = await cache.match(req);
-
-        const revalidatePromise = fetch(req)
-          .then(async (res) => {
-            if (!res.ok) return res;
-            if (!cached) {
-              // A first fetch is not an update: the requester is handed this very
-              // response, and a morph to it would strip the state a screen mounted.
-              await cache.put(req, res.clone());
-              return res;
-            }
-            const newText = await res.clone().text();
-            if (newText !== await cached.clone().text()) {
-              await cache.put(req, res.clone());
-              const clients = await self.clients.matchAll({ type: "window" });
-              for (const client of clients) {
-                if (url.pathname.endsWith(".html")) {
-                  client.postMessage({
-                    type: "PRONTO_SKELETON_UPDATED",
-                    url: req.url,
-                    pathname: url.pathname,
-                    html: newText,
-                  });
-                } else if (url.pathname.endsWith(".css")) {
-                  client.postMessage({
-                    type: "PRONTO_STYLE_UPDATED",
-                    url: req.url,
-                    pathname: url.pathname,
-                    css: newText,
-                  });
-                }
-              }
-            }
-            return res;
-          })
-          .catch(() => {
-            // Network failure / offline: cached response already served
-          });
-
-        if (cached) {
-          return cached;
-        }
-        return revalidatePromise;
-      }),
-    );
+  if (ADDRESSED.test(url.pathname)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(ADDRESSED_CACHE);
+      const cached = await cache.match(req, { ignoreSearch: true });
+      if (cached) return cached;
+      const fresh = await fetch(req);
+      if (fresh.ok) event.waitUntil(cache.put(url.pathname, fresh.clone()));
+      else if (fresh.status === 404 || fresh.status === 410) {
+        event.waitUntil(caches.delete(ENTRY_CACHE));
+      }
+      return fresh;
+    })());
     return;
   }
 
-  // SWR for navigation: serve cached entry document immediately if known,
-  // revalidating in background. Unvisited routes offline fail loudly.
-  if (req.mode === "navigate") {
-    event.respondWith(
-      caches.open(RUNTIME_CACHE).then(async (cache) => {
-        const cached = await cache.match(req);
-        const fetchPromise = fetch(req).then((res) => {
-          const cc = res.headers.get("Cache-Control") || "";
-          if (res.ok && !cc.includes("no-store") && !cc.includes("private")) {
-            cache.put(req, res.clone());
-          }
-          return res;
-        });
-        if (cached) {
-          fetchPromise.catch(() => {});
-          return cached;
-        }
-        return fetchPromise;
-      }),
-    );
+  if (req.mode !== "navigate") return;
+  event.respondWith((async () => {
+    const cache = await caches.open(ENTRY_CACHE);
+    const cached = await cache.match(req);
+    const update = (async () => {
+      let fresh;
+      try {
+        fresh = await fetch(req);
+      } catch (error) {
+        if (cached) return cached;
+        throw error;
+      }
+      const cc = fresh.headers.get("Cache-Control") || "";
+      const keepable = !cc.includes("no-store") && !cc.includes("private");
+      if (fresh.ok && keepable) event.waitUntil(keptCopy(fresh.clone()).then((copy) => cache.put(req, copy)));
+      else if (fresh.status === 404 || fresh.status === 410 || (fresh.ok && !keepable)) event.waitUntil(cache.delete(req));
+      return fresh;
+    })();
+    if (cached) {
+      event.waitUntil(update);
+      return cached;
+    }
+    return update;
+  })());
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data === "pronto:purge-entries" || event.data?.type === "pronto:purge-entries") {
+    event.waitUntil(caches.delete(ENTRY_CACHE));
   }
 });

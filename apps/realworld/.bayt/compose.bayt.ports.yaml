@@ -1,0 +1,5 @@
+# generated from bayt.cue — do not edit
+services:
+  realworld-caddy:
+    ports:
+    - ${CADDY_TLS_HOST_PORT:-17995}:8443

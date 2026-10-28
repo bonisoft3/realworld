@@ -3,20 +3,21 @@ services:
   libraries_mecha-caddy:
     build:
       additional_contexts:
+        libraries_mecha-crud: service:libraries_mecha-crud
         root: ../../..
       context: ..
       dockerfile: .bayt/Dockerfile.caddy
       target: caddy
+      tags:
+      - bayt-libraries_mecha-caddy:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+      - bayt-libraries_mecha-caddy:latest
       args:
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-    command:
-    - sh
-    - -c
-    - >-
-      if [ -f /certs/localhost.pem ]; then export CADDY_TLS='/certs/localhost.pem
-      /certs/localhost-key.pem'; fi; exec caddy run --config /etc/caddy/Caddyfile
-      --adapter caddyfile
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    depends_on:
+      libraries_mecha-crud:
+        condition: service_healthy
+        restart: true
     develop:
       watch:
       - action: sync+restart
@@ -27,6 +28,7 @@ services:
         target: /certs
     environment:
       ELECTRIC_SECRET: ${ELECTRIC_SECRET:-dev-electric-secret}
+      ORIGIN: ${ORIGIN:-http://localhost:${MECHA_DOOR_HOST_PORT:-8080}}
     healthcheck:
       test:
       - CMD
@@ -37,21 +39,21 @@ services:
       retries: 30
       start_period: 10s
       start_interval: 500ms
-    image: bayt-libraries_mecha-caddy:${BAYT_IMAGE_TAG:-latest}
+    image: bayt-libraries_mecha-caddy:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
     networks:
       default:
         aliases:
         - caddy
-    ports:
-    - 8080:8080
   libraries_mecha-caddy_bayt:
     build:
+      additional_contexts:
+        libraries_mecha-crud_bayt: service:libraries_mecha-crud_bayt
       context: ..
       dockerfile: .bayt/Dockerfile.caddy
       target: caddy_bayt
       args:
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
     image: bayt-libraries_mecha-caddy_bayt:latest
     scale: 0
   libraries_mecha-caddy_srcs:
@@ -61,6 +63,6 @@ services:
       target: caddy_srcs
       args:
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
     image: bayt-libraries_mecha-caddy_srcs:latest
     scale: 0

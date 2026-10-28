@@ -225,6 +225,7 @@ _proc_docker: #dockerComposeGen & {project: _proc_project, depManifests: {}}
 _proc_dockerfile:        _proc_docker.dockerfiles.crud
 _proc_dockerfile_ep:     strings.Contains(_proc_dockerfile, "ENTRYPOINT [\"postgrest\"]") & true
 _proc_dockerfile_expose: strings.Contains(_proc_dockerfile, "EXPOSE 3000\nEXPOSE 3001") & true
+_proc_bayt_scope:        strings.Contains(_proc_dockerfile, ".bayt/process-compose.yaml") & true
 _proc_docker: compose: files: crud: services: "native-crud": {
 	environment: {
 		PGRST_DB_URI:            "postgres://u:p@database:5432/app"
@@ -269,6 +270,42 @@ _proc_rt: (#processComposeGen & {project: _proc_bare_project, depManifests: {}, 
 _proc_rt: "bayt:httpcheck": entrypoint: ["mise", "tool-stub", "../../plugins/bayt/runtime/nu.toml", "../../plugins/bayt/runtime/bayt.nu", "microcheck", "httpcheck", "--help"]
 _proc_rt: gpu: readiness_probe: exec: command: "mise tool-stub ../../../plugins/bayt/runtime/nu.toml ../../../plugins/bayt/runtime/bayt.nu microcheck httpcheck http://localhost:11434/api/tags"
 
+_proc_auth_project: #project & {
+	name:     "auth_test"
+	dir:      "apps/auth_test"
+	activate: ""
+	targets: srv: healthcheck.http & {
+		expose: api: port: 3000
+		healthcheck: {
+			url:           "http://localhost:3000/health"
+			authorization: "Bearer secret"
+			headers: ["X-Custom: 123"]
+		}
+		entrypoint: do: "server"
+		compose: {}
+	}
+}
+_proc_auth:         (#processComposeGen & {project: _proc_auth_project, depManifests: {}}).file.processes.srv
+_proc_auth:         readiness_probe: exec: command: "\(_microcheckHost) httpcheck -H \"Authorization: Bearer secret\" -H \"X-Custom: 123\" http://localhost:3000/health"
+_proc_auth_compose: (#dockerComposeGen & {project: _proc_auth_project, depManifests: {}}).compose.files.srv.services."auth_test-srv".healthcheck
+_proc_auth_compose: test: ["CMD", "httpcheck", "-H", "Authorization: Bearer secret", "-H", "X-Custom: 123", "http://localhost:3000/health"]
+
+// A check embedded from a bayt.json written before authorization and headers
+// were declared carries neither, and every app's own bayt.json embeds one.
+_proc_embedded_project: #project & {
+	name:     "embedded"
+	dir:      "apps/embedded"
+	activate: ""
+	targets: srv: {
+		healthcheck: {template: "http", url: "http://localhost:3000/health", start_interval: "200ms", interval: "1s", timeout: "5s", retries: 30, start_period: "30s"}
+		expose: api: port: 3000
+		entrypoint: do: "server"
+		compose: {}
+	}
+}
+_proc_embedded: (#processComposeGen & {project: _proc_embedded_project, depManifests: {}}).file.processes.srv
+_proc_embedded: readiness_probe: exec: command: "\(_microcheckHost) httpcheck http://localhost:3000/health"
+
 Tests: process_compose: {
 	host:    _proc
 	task:    _proc_tf
@@ -278,7 +315,8 @@ Tests: process_compose: {
 	argv:    _proc_argv
 	container: [_proc_container, _proc_inc, _proc_pinned, _proc_bake]
 	door: _proc_docker.dockerfiles.door
-	dockerfile: [_proc_dockerfile_ep, _proc_dockerfile_expose]
+	dockerfile: [_proc_dockerfile_ep, _proc_dockerfile_expose, _proc_bayt_scope]
 	compose: _proc_docker.compose.files.crud.services."native-crud"
 	bare: [_proc_bare, _proc_bare_image]
+	auth: [_proc_auth, _proc_auth_compose]
 }

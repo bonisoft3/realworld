@@ -100,20 +100,32 @@ BEGIN
   EXECUTE format('ALTER TABLE %s ENABLE ROW LEVEL SECURITY', tbl);
   EXECUTE format('ALTER TABLE %s FORCE ROW LEVEL SECURITY', tbl);
   EXECUTE format('DROP POLICY IF EXISTS tenancy ON %s', tbl);
+  -- The scopes as a scalar subquery: Postgres runs it once per statement, as an
+  -- InitPlan, where a bare current_scopes() call runs once per row -- about
+  -- 1.3 microseconds a row, 120 ms over a 90,000-row scan.
   EXECUTE format(
     'CREATE POLICY tenancy ON %s AS RESTRICTIVE FOR ALL '
-    'USING (scope_id = ANY(current_scopes())) '
-    'WITH CHECK (scope_id = ANY(current_scopes()))', tbl);
+    'USING (scope_id = ANY((SELECT current_scopes())::text[])) '
+    'WITH CHECK (scope_id = ANY((SELECT current_scopes())::text[]))', tbl);
 END $$;
 
 -- PostgREST calls this once per request, in the request's transaction, after
 -- switching to the request role. It is what makes current_scopes() a constant
 -- for the statement rather than a subquery per row.
 --
+-- A write to a table also names the transaction it runs in, as `x-txid`: the
+-- client confirms the write by seeing that transaction in its shape stream,
+-- and only this hook runs inside the transaction before PostgREST answers.
+-- The id is the 32-bit xid, the form Electric reports a change's transaction
+-- and a snapshot's bounds in; the 64-bit xid8 differs from it once the epoch
+-- moves past 0. Not for a read, nor for a function call, which may be one:
+-- naming a transaction assigns it an id, spent for nothing there. Added to
+-- whatever headers the request already set rather than replacing them.
+--
 -- It must exist wherever PGRST_DB_PRE_REQUEST names it, and that setting is
 -- unconditional for a server app -- so it cannot be conditional either, which
--- rules out emitting it per app. It can live here because it reads one setting
--- and writes another and depends on nothing an app declares.
+-- rules out emitting it per app. It can live here because it reads settings
+-- and writes others and depends on nothing an app declares.
 --
 -- Not SECURITY DEFINER: it reaches no table.
 CREATE OR REPLACE FUNCTION public.app_pre_request() RETURNS void
@@ -126,6 +138,12 @@ BEGIN
   END IF;
   PERFORM set_config('app.scopes',
     array_to_string(public.subject_scopes(sub), ','), true);
+  IF current_setting('request.method', true) IN ('POST', 'PATCH', 'PUT', 'DELETE')
+     AND current_setting('request.path', true) NOT LIKE '/rpc/%' THEN
+    PERFORM set_config('response.headers',
+      (coalesce(nullif(current_setting('response.headers', true), ''), '[]')::jsonb
+        || jsonb_build_array(jsonb_build_object('x-txid', pg_current_xact_id()::xid::text)))::text, true);
+  END IF;
 END $$;
 
 -- Tables the floor cannot cover, declared rather than discovered.
@@ -322,9 +340,9 @@ AS $$
                            AND p.polroles = '{0}'::oid[]
                            AND p.polcmd = '*'
                            AND pg_get_expr(p.polqual, p.polrelid)
-                                 = '(scope_id = ANY (current_scopes()))'
+                                 = '(scope_id = ANY (( SELECT current_scopes() AS current_scopes)::text[]))'
                            AND pg_get_expr(p.polwithcheck, p.polrelid)
-                                 = '(scope_id = ANY (current_scopes()))'))))
+                                 = '(scope_id = ANY (( SELECT current_scopes() AS current_scopes)::text[]))'))))
 $$;
 
 -- security_invoker because the audit flags views that lack it, and a check that
@@ -345,4 +363,59 @@ REVOKE EXECUTE ON FUNCTION mecha.rls_audit() FROM PUBLIC;
 INSERT INTO mecha.rls_exempt VALUES
   ('mecha.rls_exempt', 'the exemption list: readable by all, writable by none'),
   ('mecha.shape_key', 'the shape edges: readable by all, writable by none')
+  ON CONFLICT DO NOTHING;
+
+-- The request a transaction serves, carried through CDC: the change feed's
+-- rows carry no session state, so the W3C traceparent of whoever wrote them
+-- is written into the WAL as a row of its own. The generator of a feed's
+-- publication puts this table in it, and a statement trigger calling
+-- mark_txn() on every table it publishes; pgoutput's protocol 1 sends a
+-- transaction whole, so the marker reaches a consumer immediately before the
+-- transaction's first change. A transaction with no trace still gets one, so
+-- a consumer can tell where each transaction starts. bigint and not xid8: the
+-- WAL reader resolves no xid8 field type.
+--
+-- Append-only, about 120 bytes per writing transaction with its key: a delete
+-- would reach the feed as a change every consumer must filter. Partitioning
+-- by time and dropping old partitions bounds it without a word on the feed.
+--
+-- It lives here because this is the one step the image restates ahead of any
+-- caller step, and the publication naming it is a caller step.
+CREATE TABLE IF NOT EXISTS mecha.txn_trace (
+  txid        bigint PRIMARY KEY,
+  traceparent text NOT NULL,
+  at          timestamptz NOT NULL DEFAULT now()
+);
+
+-- A writer outside PostgREST states its trace by SET LOCAL mecha.traceparent;
+-- PostgREST's own request headers answer otherwise. A value that is not a
+-- version-00-shaped traceparent is no trace, as W3C Trace Context says a
+-- receiver treats one: the header is the client's to send.
+CREATE OR REPLACE FUNCTION mecha.traceparent() RETURNS text
+  LANGUAGE sql STABLE
+  SET search_path = pg_catalog
+  AS $$
+    SELECT coalesce(substring(
+      coalesce(nullif(current_setting('mecha.traceparent', true), ''),
+               nullif(current_setting('request.headers', true), '')::json->>'traceparent')
+      FROM '^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$'), '')
+  $$;
+
+-- BEFORE and per statement, so the marker precedes the transaction's rows in
+-- the WAL and costs one probe per statement rather than one per row. SECURITY
+-- DEFINER because no app role holds a grant on the table, and the owner (the
+-- migration superuser) is outside the floor.
+CREATE OR REPLACE FUNCTION mecha.mark_txn() RETURNS trigger
+  LANGUAGE plpgsql SECURITY DEFINER
+  SET search_path = pg_catalog
+  AS $$
+BEGIN
+  INSERT INTO mecha.txn_trace (txid, traceparent)
+    VALUES (pg_current_xact_id()::text::bigint, mecha.traceparent())
+    ON CONFLICT (txid) DO NOTHING;
+  RETURN NULL;
+END $$;
+
+INSERT INTO mecha.rls_exempt VALUES
+  ('mecha.txn_trace', 'transaction markers: no role holds a grant; written by mecha.mark_txn() as its owner')
   ON CONFLICT DO NOTHING;

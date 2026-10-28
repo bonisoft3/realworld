@@ -30,7 +30,10 @@ def repo-root []: nothing -> string {
 def private-copy [root: string]: nothing -> string {
   let dir = (mktemp -d)
   # -C before -T: GNU tar applies a directory only to the names after it.
-  do { cd $root; ^git ls-files -co --exclude-standard -z } | ^tar -C $root --null -T - -cf - | ^tar -xf - -C $dir
+  # Windows can create no symlink the tree keeps, so there alone -h copies what
+  # a link names; elsewhere the link stays one, as git enumerates it.
+  let follow = if $nu.os-info.name == "windows" { ["-h"] } else { [] }
+  do { cd $root; ^git ls-files -co --exclude-standard -z } | ^tar -C $root ...$follow --null -T - -cf - | ^tar -xf - -C $dir
   do { cd $dir; ^git init -q }
   $dir
 }
@@ -58,7 +61,7 @@ def main [] {
       via:      "a cross-project :srcs view"
     }
     {
-      manifest: "guis/iris/.bayt/bayt.ci-run.json"
+      manifest: "guis/iris/.bayt/bayt.ci.json"
       probe:    "guis/iris/app/__bayt_fp_probe__.ts"
       via:      "a same-project :srcs view"
     }
@@ -73,12 +76,12 @@ def main [] {
       via:      "its own bayt view (project-wide scaffolding)"
     }
     {
-      manifest: "guis/iris/.bayt/bayt.ci-run.json"
+      manifest: "guis/iris/.bayt/bayt.ci.json"
       probe:    "plugins/omnishell/src/__bayt_fp_probe__.ts"
       via:      "transitiveCrossDeps"
     }
     {
-      manifest: "guis/iris/.bayt/bayt.ci-run.json"
+      manifest: "guis/iris/.bayt/bayt.ci.json"
       probe:    "plugins/bayt/runtime/__bayt_fp_probe__.nu"
       via:      "an additional_context directory"
     }

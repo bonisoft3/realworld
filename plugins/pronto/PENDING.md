@@ -15,9 +15,7 @@ otherwise.
 
 ## The compiler
 
-**[The ir pin](SPEC.md#programcue) is compared with nothing**:
-`apps/thenote/program.cue` pins a hash its `ir.html` no longer has, and lint
-stays green.
+**[The ir pin](SPEC.md#programcue) is compared with nothing.**
 
 **The brief's lints do not exist.** SPEC's lints 1–3, 8 and 9 have no
 implementation: nothing reads a brief's `[[id]]`, a `![[…]]` transclusion, the
@@ -88,12 +86,12 @@ mints these once. `identity.ts mint` reads only a literal `fields: [` list, so
 an emits entity spelled `list.Concat([#tickFields, [...]])`, as the guide
 writes it, cannot be minted.
 
-**`app_user` has no owner.** truco, xpense, thenote, ponto and realworld each
+**`app_user` has no owner.** truco and realworld each
 declare it under a type id of their own. Who mints it waits on whether it is
 mecha's entity an app extends or an app's entity mecha is told about.
 
 **CEL is rendered without its field's type.** `cel-emit.ts` renders a
-comparison the same way whatever the field's type, so ponto's `this > '0'` on a
+comparison the same way whatever the field's type, so `this > '0'` on a
 decimal is right in SQL and lexical in CUE, and `duration()` and subtraction
 have no rendering, so "a break fits inside its shift" cannot be stated.
 
@@ -173,18 +171,13 @@ reads the level ([omnishell's half](../omnishell/PENDING.md#machines)) — makes
 the lattice's first join a refusal, and lets one copy of the table import the
 other.
 
-**`server` and `live` differ only in the publication**
-([the lattice](docs/lattice.md#the-durability-ladder)): `live` owes a client
-that sees changes without asking, and emits nothing `server` lacks. `offline`
-differs at the client too, where its table syncs whole.
-
-**Sync on demand takes only equality.** A view whose filter holds a boolean, a
-range or a pattern is read from the collection, so its table syncs whole
-([screens](docs/screens.md#the-reads-decide-how-a-table-syncs)): golaberto's
+**A lazy read takes only equality.** A view whose filter holds a boolean, a
+range or a pattern is read from the collection, so its table is read whole
+([screens](docs/screens.md#the-reads-decide-how-a-table-is-read)): golaberto's
 `game_card`, `team_game`, `position_chance`, `standing` and its directories.
 The view engine's clause vocabulary lacks those ops, and a boolean clause is
 refused because an optimistic row lacks the schema's defaulted booleans, which
-belongs with `writers` below. A named read (`data-read-*`) counts as a whole
+belongs with the writers paragraph below. A named read (`data-read-*`) counts as a whole
 read until derive can prove an identical view on its screen serves it, and an
 `is.null` clause on a domain-typed column counts as a comparison Electric
 cannot make, though `IS NULL` needs no operator; it is the first reason ponto's
@@ -198,7 +191,7 @@ read a retyped column block `ALTER COLUMN TYPE`,
 [schema change](docs/schema-change-admission.md)).
 
 **A capped view ordered by free text keeps its table eager**
-([screens](docs/screens.md#the-reads-decide-how-a-table-syncs)): golaberto's
+([screens](docs/screens.md#the-reads-decide-how-a-table-is-read)): golaberto's
 `stage_group`, read `limit=1` by `position,name`. Postgres picks the rows inside
 the cap by ICU root and the view orders them by the reader's locale; it goes on
 demand once both sides order by one collation, which TanStack's
@@ -206,15 +199,16 @@ demand once both sides order by one collation, which TanStack's
 
 **A reduce keeps every server table eager**, whatever event it is bound to. Its
 updates and effects name their entities in code, so derive cannot read them off
-the markup; no app with an on-demand table has one today. Closing it needs the
+the markup; no app with a lazy table has one today. Closing it needs the
 entities a reduce writes stated somewhere derive reads and the store enforces.
 
-**`writers` is read by nothing.** `#Entity.writers: "pipeline"` marks a derived
-entity, and no lint, store check or policy consults it: a form, a reduce or an
-effect may target one, and `app_user` holds whatever write arm the access mode
-grants. Refusing a form or effect aimed at a pipeline-written entity at lint,
-and emitting no `app_user` write arm for it, would make "a sink is written by
-its pipeline alone" a rule.
+**Two kinds of writer on one entity is shown, not refused.** `#Entity.writers`
+(writers.cue) lists every declaration that writes the entity, so a sink a form
+also targets reads `pipeline:tally upsert, form:board create` on its card; no
+lint, store check or policy consults the list, and `app_user` holds whatever
+write arm the access mode grants. Refusing a form or effect aimed at a
+pipeline-written entity at lint, and emitting no `app_user` write arm for it,
+would make "a sink is written by its pipeline alone" a rule.
 
 **A `tab` or `device` write is judged by its validations alone**
 ([the lattice](docs/lattice.md#the-validation-ladder)); a judge beside
@@ -239,8 +233,7 @@ vet`.
 
 **No pipeline runs below the cluster**
 ([below the cluster](docs/pipelines-and-schedules.md#below-the-cluster)); either
-the transforms run in the page, or `pages` refuses a pipeline as it refuses an
-unsuspended schedule.
+the transforms run in the page, or `pages` refuses a pipeline.
 
 **Nothing holds a CDC pipeline's source to `server` or its sink off it.** The
 publication carries `server` tables only, so a pipeline `from` a `live` or
@@ -257,10 +250,21 @@ cadence finer than the resolution of the clock at a declared target keeps pace
 on a laptop and never where that clock runs, and nothing compares them, since
 `meta.clocks` names targets and no clock declares a resolution.
 
-**No app declares a schedule.** `testdata/emit/schedule.cue` pins the seed and
-where the table comes from, but `_scheduleShape` and `_clockDeclared` are hidden
-fields of `#emit` it never references, so `cue vet` does not evaluate them: its
-program still passes with the schedule emitting into a `live` entity.
+**The schedule refusals go untested.** `testdata/emit/schedule.cue` pins the
+seed and where the table comes from, but `_scheduleShape`, `_clockDeclared` and
+`_pagesBundle` are hidden fields of `#emit` it never references, so `cue vet`
+does not evaluate them: its program still passes with the schedule emitting
+into a `live` entity. GolAberto's two midnights are the one app's schedules,
+which its own `cue vet` holds to them.
+
+**A schedule reaches only a volume initdb built.** mecha's `800_schedule.sql`
+and the `801_schedule_seed.sql` rows are initdb steps, and migrate runs only
+the pgroll ledger, so a schedule declared, changed or suspended after a volume
+exists never reaches it; until then such a volume is recreated. Migrate refuses
+a cluster that declares a schedule over a volume without the table, so the
+absence is loud. The fix is migrate's: re-apply the steps the cluster placed
+that the volume lacks, every one of them idempotent, then upsert the seed on
+every boot, which is what the seed's `ON CONFLICT` already assumes.
 
 ## Localization
 
@@ -349,15 +353,26 @@ no cluster, and belongs in omnishell's `interpreter/lint.ts`; the placeholder
 rule must resolve `param.*`, `{now}`, dotted embeds and `data-empty-row`
 fields, and read a region's own `data-filter` against the enclosing row.
 
-**No rendered document ships, and a route's `ssr` is read by nothing**
-([screens](docs/screens.md#how-a-routes-first-document-is-rendered)).
+**A route over private or folder reads cannot be rendered on request**, and
+`#emit` refuses `ssr: "ssr"` there and in an app behind a sign-in
+([screens](docs/screens.md#how-a-routes-first-document-is-rendered)). A document
+request carries no credential: the token lives in one tab's sessionStorage, by
+design one guest per tab. Rendering per session needs a cookie session — a new
+auth concept, with CSRF, cross-tab sign-out and changed guest semantics — and
+`private, no-store` would give it no offline value.
 
-**The dual witness has no reader.** `prerender.ts` writes `pronto-cas`,
-`pronto-lsn` and `__PRONTO_STATE__`, and nothing reads them. The design: rows
-since `pronto-lsn` stream in as deltas, a template whose `pronto-cas` differs
-is fetched by hash and applied when `__prontoBusy()` is idle, and template,
-bundle and stylesheet live under content-addressed paths. Every asset is served
-under a stable path with `no-cache`.
+**No JSON-LD is rendered from rows.** Mapping an entity to a schema.org type is
+a declaration nothing derives, so it would be a new knob.
+
+**A row's address is in no sitemap, and nothing purges a CDN.** The sitemap
+lists no `:param` address on purpose, and purging belongs to each release
+target; inside the stack the renderer's own cache is the purged one, and
+downstream gets `public, no-cache` with an ETag.
+
+**The pages target ships no documents.** Rows would need the server renderer
+running over the in-page cluster at bundle time, and a `:param` route's
+documents (golaberto: about 12 000 players times 6 locales) would pass Pages'
+1 GB limit, so a deep link keeps `404.html`.
 
 **A screen's states are not derived from what it reads.** A `tab` or `device`
 read is total and synchronous, so it has no `loading`, `gone` or
@@ -418,13 +433,30 @@ build reads or writes the Depot bake cache. Checked 2026-10-02.
 
 ## Release targets
 
-Only `pages` is emitted, and each design is
-[release targets](docs/release-targets.md)'s, built on a branch of its own.
+`pages` and `cloudflare` are emitted. The remaining designs are
+[release targets](docs/release-targets.md)'s, built on a branch of their own.
 
-**`cloudflare` has no rule** ([the design](docs/release-targets.md#cloudflare)).
+**gcloud is not a pinned tool.** `release@gcp` runs with the Cloud CLI the
+machine has: its SDK is its own install, and the k8s release pins neither
+kubectl nor skaffold; a pin in `#Tools` would carry it to every consumer's
+toolchain. The release refuses to start without it.
 
-**`gcp` has no rule**, no `clusters/gcp.cue` and no skaffold profile in
-`builders/bayt.cue` ([the design](docs/release-targets.md#the-clouds-and-k8s)).
+**The edge derives by drain alone**
+([cloudflare](docs/release-targets.md#cloudflare)): its drains and its clock
+run in the object, and no stream or computation does. A stream's mapping is
+bloblang, and a computation's queries are DuckDB's, whose engine (8 MB of
+WebAssembly gzipped, measured) does not fit a Worker beside PGlite. The outbox
+and Queue, the scale-to-zero containers for transform and compute with
+compute's tables on R2, and their generation from the compose closure are
+designed and not built.
+
+**`gcp` runs the database, crud, auth and electric alone**
+([gcp](docs/release-targets.md#gcp)): it refuses the change-feed unit, a ticker or clock, the airlock, compute, blobs, images and
+render, each of which needs its own Cloud Run shape and wake.
+
+**No container TURN relay is built** ([ICE servers](docs/release-targets.md#ice-servers)):
+`release@cloudflare` mints ephemeral credentials from Cloudflare Calls TURN
+when opted in; container targets (`docker`, `gcp`, `k8s`) configure STUN alone.
 
 **`aws` has no rule** ([the design](docs/release-targets.md#the-clouds-and-k8s)).
 
@@ -437,10 +469,10 @@ Only `pages` is emitted, and each design is
 **`verify@<target>` is not emitted**
 ([the design](docs/release-targets.md#what-a-release-is)).
 
-**The page derives nothing live** ([pages](docs/release-targets.md#pages)).
+**The page derives by drain alone** ([pages](docs/release-targets.md#pages)).
 Its streams' and computations' rows are the release's, so a result recorded in
-the page moves no table, chance or rating; the derivation running in the page
-on DuckStream's machinery is what closes it.
+the page moves no stream's table, chance or rating; the derivation running in
+the page on DuckStream's machinery is what closes it.
 
 **A duckstream's sink is empty in the page** ([pages](docs/release-targets.md#pages)):
 the release derives the rows of streams and computations, and xpense's

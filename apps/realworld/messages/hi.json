@@ -1,6 +1,7 @@
 {
-  "chrome_signin_hint": "अपनी पासकी से एक टैप करें — अगर आप नए हैं, तो आपके लिए एक बना दी जाएगी।",
-  "chrome_signin": "जारी रखें",
+  "chrome_signin_google": "Google से साइन इन करें",
+  "chrome_signin_hint": "अच्छी कहानियाँ हमें जोड़ती हैं। पढ़ें, लिखें और अपना समुदाय खोजें।",
+  "chrome_signin": "पासकी से आगे बढ़ें",
   "chrome_signin_guest": "अतिथि के रूप में जारी रखें",
   "chrome_signin_failed": "यह नहीं हो पाया। फिर से कोशिश करें।",
   "chrome_signout": "साइन आउट करें",

@@ -1,42 +1,48 @@
 # generated from bayt.cue — do not edit
 include:
-- path: ../../../apps/realworld/.bayt/compose.check-favorites.yaml
+- path: .././.bayt/compose.ci-replay.yaml
   required: false
-- path: ../../../apps/realworld/.bayt/compose.setup.yaml
+- path: .././.bayt/compose.database.yaml
   required: false
-- path: ../../../.bayt/compose.setup.yaml
+- path: .././.bayt/compose.setup.yaml
   required: false
-- path: ../../../apps/realworld/.bayt/compose.launch.yaml
+- path: .././.bayt/compose.lint.yaml
   required: false
-- path: ../../../apps/realworld/.bayt/compose.caddy.yaml
+- path: .././.bayt/compose.generate.yaml
   required: false
-- path: ../../../apps/realworld/.bayt/compose.database.yaml
+- path: .././.bayt/compose.build.yaml
   required: false
-- path: ../../../libraries/mecha/.bayt/compose.database-image.yaml
+- path: .././.bayt/compose.test.yaml
   required: false
-- path: ../../../apps/realworld/.bayt/compose.crud.yaml
+- path: .././.bayt/compose.launch.yaml
   required: false
-- path: ../../../apps/realworld/.bayt/compose.electric.yaml
+- path: .././.bayt/compose.caddy.yaml
   required: false
-- path: ../../../apps/realworld/.bayt/compose.redis.yaml
+- path: .././.bayt/compose.crud.yaml
   required: false
-- path: ../../../apps/realworld/.bayt/compose.mesh-events.yaml
+- path: .././.bayt/compose.served.yaml
   required: false
-- path: ../../../libraries/mecha/.bayt/compose.mesh-image.yaml
+- path: .././.bayt/compose.electric.yaml
   required: false
-- path: ../../../apps/realworld/.bayt/compose.conduit.yaml
+- path: .././.bayt/compose.redis.yaml
   required: false
-- path: ../../../libraries/mecha/.bayt/compose.conduit-image.yaml
+- path: .././.bayt/compose.mesh-events.yaml
   required: false
-- path: ../../../apps/realworld/.bayt/compose.transform.yaml
+- path: .././.bayt/compose.conduit.yaml
   required: false
-- path: ../../../apps/realworld/.bayt/compose.auth.yaml
+- path: .././.bayt/compose.transform.yaml
   required: false
-- path: ../../../libraries/mecha/.bayt/compose.auth-image.yaml
+- path: .././.bayt/compose.auth.yaml
+  required: false
+- path: .././.bayt/compose.integrate.yaml
+  required: false
+- path: .././.bayt/compose.check-favorites.yaml
+  required: false
+- path: ../monorepo/${MONOREPO_COMPOSE_MODE:-docker-image}.yaml
   required: false
 services:
   bayt:
     extends:
       file: ./compose.check-favorites.yaml
-      service: apps_realworld-check-favorites
+      service: realworld-check-favorites
     scale: 1

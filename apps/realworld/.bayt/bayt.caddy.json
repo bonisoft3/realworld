@@ -5,24 +5,22 @@
     "manual": false,
     "build": {
       "additional_contexts": {
-        "root": "../../.."
+        "root": ".."
       },
       "secrets": [],
       "args": {}
     },
-    "command": [
-      "sh",
-      "-c",
-      "if [ -f /certs/localhost.pem ]; then export CADDY_TLS='/certs/localhost.pem /certs/localhost-key.pem'; fi; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"
-    ],
     "environment": {
-      "ELECTRIC_SECRET": "${ELECTRIC_SECRET:-dev-electric-secret}"
+      "ELECTRIC_SECRET": "${ELECTRIC_SECRET:-dev-electric-secret}",
+      "ORIGIN": "${ORIGIN:-https://localhost:${CADDY_TLS_HOST_PORT}}"
     },
-    "ports": [
-      "${CADDY_TLS_HOST_PORT:-0}:8443"
-    ],
+    "ports": [],
     "volumes": [],
-    "depends_on": {},
+    "depends_on": {
+      "realworld-crud": {
+        "condition": "service_healthy"
+      }
+    },
     "networks": {
       "default": {
         "aliases": [
@@ -55,392 +53,302 @@
           "target": "/certs"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/index.html",
           "target": "/srv/shell/index.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/shell.css",
           "target": "/srv/shell/shell.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/boot.js",
           "target": "/srv/shell/boot.js"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../offline-first-sw.js",
           "target": "/srv/offline-first-sw.js"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/shell.yaml",
           "target": "/srv/shell/shell.yaml"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/shell.json",
           "target": "/srv/shell/shell.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/design.css",
           "target": "/srv/shell/design.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/home.html",
           "target": "/srv/shell/screens/home.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/home.css",
           "target": "/srv/shell/screens/home.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/feed.html",
           "target": "/srv/shell/screens/feed.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/feed.css",
           "target": "/srv/shell/screens/feed.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/reading-list.html",
           "target": "/srv/shell/screens/reading-list.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/reading-list.css",
           "target": "/srv/shell/screens/reading-list.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/editor.html",
           "target": "/srv/shell/screens/editor.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/editor.css",
           "target": "/srv/shell/screens/editor.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/settings.html",
           "target": "/srv/shell/screens/settings.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/settings.css",
           "target": "/srv/shell/screens/settings.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/older.html",
           "target": "/srv/shell/screens/older.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/older.css",
           "target": "/srv/shell/screens/older.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/feed-older.html",
           "target": "/srv/shell/screens/feed-older.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/feed-older.css",
           "target": "/srv/shell/screens/feed-older.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/article.html",
           "target": "/srv/shell/screens/article.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/article.css",
           "target": "/srv/shell/screens/article.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/edit-article.html",
           "target": "/srv/shell/screens/edit-article.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/edit-article.css",
           "target": "/srv/shell/screens/edit-article.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/profile.html",
           "target": "/srv/shell/screens/profile.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/profile.css",
           "target": "/srv/shell/screens/profile.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/profile-favorites.html",
           "target": "/srv/shell/screens/profile-favorites.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/profile-favorites.css",
           "target": "/srv/shell/screens/profile-favorites.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/tag.html",
           "target": "/srv/shell/screens/tag.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/tag.css",
           "target": "/srv/shell/screens/tag.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/search.html",
           "target": "/srv/shell/screens/search.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/screens/search.css",
           "target": "/srv/shell/screens/search.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/renderers/markdown.js",
           "target": "/srv/shell/renderers/markdown.js"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/shared/chrome.css",
           "target": "/srv/shell/shared/chrome.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/shared/system.css",
           "target": "/srv/shell/shared/system.css"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../pipelines/favorite-recount.js",
           "target": "/srv/pipelines/favorite-recount.js"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../shell/validations/own-article.js",
           "target": "/srv/shell/validations/own-article.js"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/en.json",
           "target": "/srv/messages/en.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/zh.json",
           "target": "/srv/messages/zh.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/hi.json",
           "target": "/srv/messages/hi.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/es.json",
           "target": "/srv/messages/es.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/fr.json",
           "target": "/srv/messages/fr.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/ar.json",
           "target": "/srv/messages/ar.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/bn.json",
           "target": "/srv/messages/bn.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/pt.json",
           "target": "/srv/messages/pt.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/ru.json",
           "target": "/srv/messages/ru.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/ur.json",
           "target": "/srv/messages/ur.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/id.json",
           "target": "/srv/messages/id.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/de.json",
           "target": "/srv/messages/de.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/ja.json",
           "target": "/srv/messages/ja.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/sw.json",
           "target": "/srv/messages/sw.json"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../messages/tr.json",
           "target": "/srv/messages/tr.json"
         },
         {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/shell.js",
-          "target": "/omnishell/interpreter/shell.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/chrome.js",
-          "target": "/omnishell/interpreter/chrome.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/screen.js",
-          "target": "/omnishell/interpreter/screen.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/fragment.js",
-          "target": "/omnishell/interpreter/fragment.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/data-sync.js",
-          "target": "/omnishell/interpreter/data-sync.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/validate.js",
-          "target": "/omnishell/interpreter/validate.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/render.js",
-          "target": "/omnishell/interpreter/render.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/hatch.js",
-          "target": "/omnishell/interpreter/hatch.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/hatch-worker.js",
-          "target": "/omnishell/interpreter/hatch-worker.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/storybook.js",
-          "target": "/omnishell/interpreter/storybook.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/jessie.js",
-          "target": "/omnishell/interpreter/jessie.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/kinetic.js",
-          "target": "/omnishell/interpreter/kinetic.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/prng.js",
-          "target": "/omnishell/interpreter/prng.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/vendor/mecha-client.js",
-          "target": "/omnishell/interpreter/vendor/mecha-client.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/vendor/js-yaml.js",
-          "target": "/omnishell/interpreter/vendor/js-yaml.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/vendor/ses.umd.min.js",
-          "target": "/omnishell/interpreter/vendor/ses.umd.min.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/vendor/morphlex.js",
-          "target": "/omnishell/interpreter/vendor/morphlex.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/interpreter/vendor/messages.js",
-          "target": "/omnishell/interpreter/vendor/messages.js"
-        },
-        {
-          "action": "sync+restart",
-          "path": "../../../plugins/omnishell/components/wallclock.js",
-          "target": "/omnishell/components/wallclock.js"
-        },
-        {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../brief.html",
           "target": "/srv/docs/brief.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../ir.html",
           "target": "/srv/docs/ir.html"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
+          "path": "../ir/card.css",
+          "target": "/srv/docs/ir/card.css"
+        },
+        {
+          "action": "rebuild",
           "path": "../acceptance.md",
           "target": "/srv/docs/acceptance.md"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../DESIGN.md",
           "target": "/srv/docs/DESIGN.md"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../robots.txt",
           "target": "/srv/robots.txt"
         },
         {
-          "action": "sync+restart",
+          "action": "rebuild",
           "path": "../sitemap.xml",
           "target": "/srv/sitemap.xml"
         }
@@ -451,7 +359,7 @@
     "preamble": [],
     "preambleCopyContexts": [],
     "from": {
-      "name": "caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0"
+      "name": "caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f"
     },
     "add": [],
     "mounts": [],
@@ -493,819 +401,40 @@
         "exclude": []
       },
       {
-        "from": null,
+        "from": {
+          "ref": ":served",
+          "name": "realworld-served"
+        },
         "srcs": [
-          "shell/index.html"
+          "/served/omnishell/"
         ],
-        "dst": "/srv/shell/index.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/shell.css"
-        ],
-        "dst": "/srv/shell/shell.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/boot.js"
-        ],
-        "dst": "/srv/shell/boot.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "offline-first-sw.js"
-        ],
-        "dst": "/srv/offline-first-sw.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/shell.yaml"
-        ],
-        "dst": "/srv/shell/shell.yaml",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/shell.json"
-        ],
-        "dst": "/srv/shell/shell.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/design.css"
-        ],
-        "dst": "/srv/shell/design.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/home.html"
-        ],
-        "dst": "/srv/shell/screens/home.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/home.css"
-        ],
-        "dst": "/srv/shell/screens/home.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/feed.html"
-        ],
-        "dst": "/srv/shell/screens/feed.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/feed.css"
-        ],
-        "dst": "/srv/shell/screens/feed.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/reading-list.html"
-        ],
-        "dst": "/srv/shell/screens/reading-list.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/reading-list.css"
-        ],
-        "dst": "/srv/shell/screens/reading-list.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/editor.html"
-        ],
-        "dst": "/srv/shell/screens/editor.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/editor.css"
-        ],
-        "dst": "/srv/shell/screens/editor.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/settings.html"
-        ],
-        "dst": "/srv/shell/screens/settings.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/settings.css"
-        ],
-        "dst": "/srv/shell/screens/settings.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/older.html"
-        ],
-        "dst": "/srv/shell/screens/older.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/older.css"
-        ],
-        "dst": "/srv/shell/screens/older.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/feed-older.html"
-        ],
-        "dst": "/srv/shell/screens/feed-older.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/feed-older.css"
-        ],
-        "dst": "/srv/shell/screens/feed-older.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/article.html"
-        ],
-        "dst": "/srv/shell/screens/article.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/article.css"
-        ],
-        "dst": "/srv/shell/screens/article.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/edit-article.html"
-        ],
-        "dst": "/srv/shell/screens/edit-article.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/edit-article.css"
-        ],
-        "dst": "/srv/shell/screens/edit-article.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/profile.html"
-        ],
-        "dst": "/srv/shell/screens/profile.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/profile.css"
-        ],
-        "dst": "/srv/shell/screens/profile.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/profile-favorites.html"
-        ],
-        "dst": "/srv/shell/screens/profile-favorites.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/profile-favorites.css"
-        ],
-        "dst": "/srv/shell/screens/profile-favorites.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/tag.html"
-        ],
-        "dst": "/srv/shell/screens/tag.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/tag.css"
-        ],
-        "dst": "/srv/shell/screens/tag.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/search.html"
-        ],
-        "dst": "/srv/shell/screens/search.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/screens/search.css"
-        ],
-        "dst": "/srv/shell/screens/search.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/renderers/markdown.js"
-        ],
-        "dst": "/srv/shell/renderers/markdown.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/shared/chrome.css"
-        ],
-        "dst": "/srv/shell/shared/chrome.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/shared/system.css"
-        ],
-        "dst": "/srv/shell/shared/system.css",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "pipelines/favorite-recount.js"
-        ],
-        "dst": "/srv/pipelines/favorite-recount.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "shell/validations/own-article.js"
-        ],
-        "dst": "/srv/shell/validations/own-article.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/en.json"
-        ],
-        "dst": "/srv/messages/en.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/zh.json"
-        ],
-        "dst": "/srv/messages/zh.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/hi.json"
-        ],
-        "dst": "/srv/messages/hi.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/es.json"
-        ],
-        "dst": "/srv/messages/es.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/fr.json"
-        ],
-        "dst": "/srv/messages/fr.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/ar.json"
-        ],
-        "dst": "/srv/messages/ar.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/bn.json"
-        ],
-        "dst": "/srv/messages/bn.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/pt.json"
-        ],
-        "dst": "/srv/messages/pt.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/ru.json"
-        ],
-        "dst": "/srv/messages/ru.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/ur.json"
-        ],
-        "dst": "/srv/messages/ur.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/id.json"
-        ],
-        "dst": "/srv/messages/id.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/de.json"
-        ],
-        "dst": "/srv/messages/de.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/ja.json"
-        ],
-        "dst": "/srv/messages/ja.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/sw.json"
-        ],
-        "dst": "/srv/messages/sw.json",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "messages/tr.json"
-        ],
-        "dst": "/srv/messages/tr.json",
+        "dst": "/omnishell/",
         "link": true,
         "parents": false,
         "exclude": []
       },
       {
         "from": {
-          "name": "root"
+          "ref": ":served",
+          "name": "realworld-served"
         },
         "srcs": [
-          "plugins/omnishell/interpreter/shell.js"
+          "/served/"
         ],
-        "dst": "/omnishell/interpreter/shell.js",
+        "dst": "/srv/",
         "link": true,
         "parents": false,
         "exclude": []
       },
       {
         "from": {
-          "name": "root"
+          "ref": ":served",
+          "name": "realworld-served"
         },
         "srcs": [
-          "plugins/omnishell/interpreter/chrome.js"
+          "/served.scripts"
         ],
-        "dst": "/omnishell/interpreter/chrome.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/screen.js"
-        ],
-        "dst": "/omnishell/interpreter/screen.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/fragment.js"
-        ],
-        "dst": "/omnishell/interpreter/fragment.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/data-sync.js"
-        ],
-        "dst": "/omnishell/interpreter/data-sync.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/validate.js"
-        ],
-        "dst": "/omnishell/interpreter/validate.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/render.js"
-        ],
-        "dst": "/omnishell/interpreter/render.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/hatch.js"
-        ],
-        "dst": "/omnishell/interpreter/hatch.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/hatch-worker.js"
-        ],
-        "dst": "/omnishell/interpreter/hatch-worker.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/storybook.js"
-        ],
-        "dst": "/omnishell/interpreter/storybook.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/jessie.js"
-        ],
-        "dst": "/omnishell/interpreter/jessie.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/kinetic.js"
-        ],
-        "dst": "/omnishell/interpreter/kinetic.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/prng.js"
-        ],
-        "dst": "/omnishell/interpreter/prng.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/vendor/mecha-client.js"
-        ],
-        "dst": "/omnishell/interpreter/vendor/mecha-client.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/vendor/js-yaml.js"
-        ],
-        "dst": "/omnishell/interpreter/vendor/js-yaml.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/vendor/ses.umd.min.js"
-        ],
-        "dst": "/omnishell/interpreter/vendor/ses.umd.min.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/vendor/morphlex.js"
-        ],
-        "dst": "/omnishell/interpreter/vendor/morphlex.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/interpreter/vendor/messages.js"
-        ],
-        "dst": "/omnishell/interpreter/vendor/messages.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": {
-          "name": "root"
-        },
-        "srcs": [
-          "plugins/omnishell/components/wallclock.js"
-        ],
-        "dst": "/omnishell/components/wallclock.js",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "brief.html"
-        ],
-        "dst": "/srv/docs/brief.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "ir.html"
-        ],
-        "dst": "/srv/docs/ir.html",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "acceptance.md"
-        ],
-        "dst": "/srv/docs/acceptance.md",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "DESIGN.md"
-        ],
-        "dst": "/srv/docs/DESIGN.md",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "robots.txt"
-        ],
-        "dst": "/srv/robots.txt",
-        "link": true,
-        "parents": false,
-        "exclude": []
-      },
-      {
-        "from": null,
-        "srcs": [
-          "sitemap.xml"
-        ],
-        "dst": "/srv/sitemap.xml",
+        "dst": "/etc/caddy/release-scripts",
         "link": true,
         "parents": false,
         "exclude": []
@@ -1327,72 +456,44 @@
     "incremental": false,
     "cmd": null
   },
+  "entrypoint": {
+    "do": "case \"${ORIGIN#http://}\" in \"$ORIGIN\") h=${ORIGIN#https://};; *) h=${ORIGIN#http://};; esac; case \"$h\" in \"$ORIGIN\"|\"\"|*[!A-Za-z0-9.:-]*) echo \"ORIGIN '$ORIGIN' is no origin: set it to the scheme and host readers reach the door at, as https://app.example\" >&2; exit 1;; esac; set -e -o pipefail; roots=$(caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile | tr , '\\n' | grep -o '\"root\":\"[^\"]*\"' | cut -d'\"' -f4 | sort -u); if [ -n \"$roots\" ]; then find $roots -type f ! -name '*.etag' -exec sh -c 'set -e; q=$1; shift; for f do h=$(sha256sum < \"$f\"); printf \"$q%s$q\" \"${h%% *}\" > \"$f.etag\"; done' sh '\"' {} +; fi; PRONTO_RELEASE_SCRIPTS=$(cat /etc/caddy/release-scripts 2>/dev/null || true); export PRONTO_RELEASE_SCRIPTS; if [ -f /certs/localhost.pem ]; then export CADDY_TLS='/certs/localhost.pem /certs/localhost-key.pem'; fi; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile",
+    "shell": "sh",
+    "env": {
+      "ELECTRIC_SECRET": "${ELECTRIC_SECRET:-dev-electric-secret}",
+      "ORIGIN": "${ORIGIN:-https://localhost:${CADDY_TLS_HOST_PORT}}"
+    },
+    "after": {
+      "crud": "healthy"
+    },
+    "host": true
+  },
+  "expose": {
+    "door": {
+      "port": 8443,
+      "publish": {
+        "environment": "CADDY_TLS_HOST_PORT"
+      }
+    }
+  },
+  "healthcheck": {
+    "template": "http",
+    "url": "http://127.0.0.1:8080/health",
+    "authorization": null,
+    "headers": [],
+    "interval": "5s",
+    "start_interval": "500ms",
+    "timeout": "5s",
+    "retries": 30,
+    "start_period": "10s"
+  },
   "name": "caddy",
-  "project": "apps_realworld",
-  "dir": "apps/realworld",
+  "project": "realworld",
+  "dir": ".",
   "activate": "",
   "srcs": {
     "globs": [
-      "docker/Caddyfile",
-      "shell/index.html",
-      "shell/shell.css",
-      "shell/boot.js",
-      "offline-first-sw.js",
-      "shell/shell.yaml",
-      "shell/shell.json",
-      "shell/design.css",
-      "shell/screens/home.html",
-      "shell/screens/home.css",
-      "shell/screens/feed.html",
-      "shell/screens/feed.css",
-      "shell/screens/reading-list.html",
-      "shell/screens/reading-list.css",
-      "shell/screens/editor.html",
-      "shell/screens/editor.css",
-      "shell/screens/settings.html",
-      "shell/screens/settings.css",
-      "shell/screens/older.html",
-      "shell/screens/older.css",
-      "shell/screens/feed-older.html",
-      "shell/screens/feed-older.css",
-      "shell/screens/article.html",
-      "shell/screens/article.css",
-      "shell/screens/edit-article.html",
-      "shell/screens/edit-article.css",
-      "shell/screens/profile.html",
-      "shell/screens/profile.css",
-      "shell/screens/profile-favorites.html",
-      "shell/screens/profile-favorites.css",
-      "shell/screens/tag.html",
-      "shell/screens/tag.css",
-      "shell/screens/search.html",
-      "shell/screens/search.css",
-      "shell/renderers/markdown.js",
-      "shell/shared/chrome.css",
-      "shell/shared/system.css",
-      "pipelines/favorite-recount.js",
-      "shell/validations/own-article.js",
-      "messages/en.json",
-      "messages/zh.json",
-      "messages/hi.json",
-      "messages/es.json",
-      "messages/fr.json",
-      "messages/ar.json",
-      "messages/bn.json",
-      "messages/pt.json",
-      "messages/ru.json",
-      "messages/ur.json",
-      "messages/id.json",
-      "messages/de.json",
-      "messages/ja.json",
-      "messages/sw.json",
-      "messages/tr.json",
-      "brief.html",
-      "ir.html",
-      "acceptance.md",
-      "DESIGN.md",
-      "robots.txt",
-      "sitemap.xml"
+      "docker/Caddyfile"
     ],
     "exclude": []
   },
@@ -1407,8 +508,8 @@
   "synthetics": {
     "bayt": {
       "name": "caddy_bayt",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "activate": "",
       "srcs": {
         "globs": [],
@@ -1420,7 +521,8 @@
           ".bayt/Dockerfile.caddy",
           ".bayt/bayt.caddy.json",
           ".bayt/Taskfile.yml",
-          ".bayt/Taskfile.bayt.yml"
+          ".bayt/Taskfile.bayt.yml",
+          ".bayt/process-compose.yaml"
         ],
         "exclude": []
       },
@@ -1436,13 +538,16 @@
         "similar": false
       },
       "upClosure": [
-        "apps/realworld/.bayt/compose.caddy.yaml"
+        "./.bayt/compose.caddy.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml",
+        "./.bayt/compose.served.yaml"
       ]
     },
     "outs": {
       "name": "caddy_outs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "activate": "",
       "srcs": {
         "globs": [],
@@ -1464,13 +569,16 @@
         "similar": false
       },
       "upClosure": [
-        "apps/realworld/.bayt/compose.caddy.yaml"
+        "./.bayt/compose.caddy.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml",
+        "./.bayt/compose.served.yaml"
       ]
     },
     "srcs": {
       "name": "caddy_srcs",
-      "project": "apps_realworld",
-      "dir": "apps/realworld",
+      "project": "realworld",
+      "dir": ".",
       "activate": "",
       "srcs": {
         "globs": [],
@@ -1478,73 +586,17 @@
       },
       "outs": {
         "globs": [
-          "docker/Caddyfile",
-          "shell/index.html",
-          "shell/shell.css",
-          "shell/boot.js",
-          "offline-first-sw.js",
-          "shell/shell.yaml",
-          "shell/shell.json",
-          "shell/design.css",
-          "shell/screens/home.html",
-          "shell/screens/home.css",
-          "shell/screens/feed.html",
-          "shell/screens/feed.css",
-          "shell/screens/reading-list.html",
-          "shell/screens/reading-list.css",
-          "shell/screens/editor.html",
-          "shell/screens/editor.css",
-          "shell/screens/settings.html",
-          "shell/screens/settings.css",
-          "shell/screens/older.html",
-          "shell/screens/older.css",
-          "shell/screens/feed-older.html",
-          "shell/screens/feed-older.css",
-          "shell/screens/article.html",
-          "shell/screens/article.css",
-          "shell/screens/edit-article.html",
-          "shell/screens/edit-article.css",
-          "shell/screens/profile.html",
-          "shell/screens/profile.css",
-          "shell/screens/profile-favorites.html",
-          "shell/screens/profile-favorites.css",
-          "shell/screens/tag.html",
-          "shell/screens/tag.css",
-          "shell/screens/search.html",
-          "shell/screens/search.css",
-          "shell/renderers/markdown.js",
-          "shell/shared/chrome.css",
-          "shell/shared/system.css",
-          "pipelines/favorite-recount.js",
-          "shell/validations/own-article.js",
-          "messages/en.json",
-          "messages/zh.json",
-          "messages/hi.json",
-          "messages/es.json",
-          "messages/fr.json",
-          "messages/ar.json",
-          "messages/bn.json",
-          "messages/pt.json",
-          "messages/ru.json",
-          "messages/ur.json",
-          "messages/id.json",
-          "messages/de.json",
-          "messages/ja.json",
-          "messages/sw.json",
-          "messages/tr.json",
-          "brief.html",
-          "ir.html",
-          "acceptance.md",
-          "DESIGN.md",
-          "robots.txt",
-          "sitemap.xml"
+          "docker/Caddyfile"
         ],
         "exclude": []
       },
       "env": {},
       "visibility": "internal",
       "deps": [],
-      "transitiveDeps": [],
+      "transitiveDeps": [
+        "crud_outs_srcs",
+        "served_outs_srcs"
+      ],
       "transitiveCrossDeps": [],
       "chainedDeps": [],
       "cmds": [],
@@ -1553,20 +605,54 @@
         "similar": false
       },
       "upClosure": [
-        "apps/realworld/.bayt/compose.caddy.yaml"
+        "./.bayt/compose.caddy.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml",
+        "./.bayt/compose.served.yaml"
       ]
     }
   },
   "visibility": "internal",
   "emitsSrcs": true,
-  "deps": [],
-  "sameProjectDeps": [],
-  "transitiveDeps": [],
+  "deps": [
+    "crud_outs",
+    "served_outs"
+  ],
+  "sameProjectDeps": [
+    "crud_outs",
+    "served_outs"
+  ],
+  "transitiveDeps": [
+    "crud_outs",
+    "served_outs"
+  ],
   "transitiveCrossDeps": [],
   "upClosure": [
-    "apps/realworld/.bayt/compose.caddy.yaml"
+    "./.bayt/compose.caddy.yaml",
+    "./.bayt/compose.crud.yaml",
+    "./.bayt/compose.database.yaml",
+    "./.bayt/compose.served.yaml"
   ],
-  "chainedDeps": [],
+  "chainedDeps": [
+    {
+      "name": "crud_outs",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [],
+        "exclude": []
+      }
+    },
+    {
+      "name": "served_outs",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [],
+        "exclude": []
+      }
+    }
+  ],
   "cmds": [],
   "cache": {
     "full": false,

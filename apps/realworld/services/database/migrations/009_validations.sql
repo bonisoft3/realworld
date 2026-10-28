@@ -22,26 +22,8 @@ $validation$;
 
 REVOKE EXECUTE ON FUNCTION favorite_validation_own_article(jsonb, jsonb) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION favorite_validate() RETURNS trigger
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE
-  items jsonb;
-  event jsonb;
-  v text;
-BEGIN
-  items := CASE WHEN TG_OP = 'UPDATE' THEN jsonb_build_array(to_jsonb(OLD)) ELSE '[]'::jsonb END;
-  event := jsonb_build_object('type', lower(TG_OP), 'row', to_jsonb(NEW));
-  v := favorite_validation_own_article(jsonb_build_object('items', items, 'rows', jsonb_build_object('article', (SELECT coalesce(jsonb_agg(to_jsonb(r)), '[]'::jsonb) FROM article r WHERE r."id" = NEW."article_id"))), event);
-  IF v = 'false' THEN
-    RAISE EXCEPTION USING ERRCODE = 'check_violation', MESSAGE = 'validation favorite.own-article';
-  ELSIF v IS DISTINCT FROM 'true' THEN
-    RAISE EXCEPTION USING ERRCODE = 'raise_exception', MESSAGE = 'predicate favorite.own-article ' || coalesce(v, 'answered nothing');
-  END IF;
-  RETURN NULL;
-END $$;
-
 DROP TRIGGER IF EXISTS favorite_validate ON favorite;
-CREATE TRIGGER favorite_validate AFTER INSERT OR UPDATE ON favorite
-  FOR EACH ROW EXECUTE FUNCTION favorite_validate();
+
+DROP FUNCTION IF EXISTS favorite_validate();
 
 COMMIT;

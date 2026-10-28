@@ -1,22 +1,25 @@
 # generated from bayt.cue — do not edit
 services:
-  apps_realworld-caddy:
+  realworld-caddy:
     build:
       additional_contexts:
-        root: ../../..
+        realworld-crud: service:realworld-crud
+        realworld-served: service:realworld-served
+        root: ..
       context: ..
       dockerfile: .bayt/Dockerfile.caddy
       target: caddy
+      tags:
+      - bayt-realworld-caddy:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+      - bayt-realworld-caddy:latest
       args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-    command:
-    - sh
-    - -c
-    - >-
-      if [ -f /certs/localhost.pem ]; then export CADDY_TLS='/certs/localhost.pem
-      /certs/localhost-key.pem'; fi; exec caddy run --config /etc/caddy/Caddyfile
-      --adapter caddyfile
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    depends_on:
+      realworld-crud:
+        condition: service_healthy
+        restart: true
     develop:
       watch:
       - action: sync+restart
@@ -25,242 +28,189 @@ services:
       - action: sync+restart
         path: ../.certs
         target: /certs
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/index.html
         target: /srv/shell/index.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/shell.css
         target: /srv/shell/shell.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/boot.js
         target: /srv/shell/boot.js
-      - action: sync+restart
+      - action: rebuild
         path: ../offline-first-sw.js
         target: /srv/offline-first-sw.js
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/shell.yaml
         target: /srv/shell/shell.yaml
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/shell.json
         target: /srv/shell/shell.json
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/design.css
         target: /srv/shell/design.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/home.html
         target: /srv/shell/screens/home.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/home.css
         target: /srv/shell/screens/home.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/feed.html
         target: /srv/shell/screens/feed.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/feed.css
         target: /srv/shell/screens/feed.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/reading-list.html
         target: /srv/shell/screens/reading-list.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/reading-list.css
         target: /srv/shell/screens/reading-list.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/editor.html
         target: /srv/shell/screens/editor.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/editor.css
         target: /srv/shell/screens/editor.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/settings.html
         target: /srv/shell/screens/settings.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/settings.css
         target: /srv/shell/screens/settings.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/older.html
         target: /srv/shell/screens/older.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/older.css
         target: /srv/shell/screens/older.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/feed-older.html
         target: /srv/shell/screens/feed-older.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/feed-older.css
         target: /srv/shell/screens/feed-older.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/article.html
         target: /srv/shell/screens/article.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/article.css
         target: /srv/shell/screens/article.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/edit-article.html
         target: /srv/shell/screens/edit-article.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/edit-article.css
         target: /srv/shell/screens/edit-article.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/profile.html
         target: /srv/shell/screens/profile.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/profile.css
         target: /srv/shell/screens/profile.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/profile-favorites.html
         target: /srv/shell/screens/profile-favorites.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/profile-favorites.css
         target: /srv/shell/screens/profile-favorites.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/tag.html
         target: /srv/shell/screens/tag.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/tag.css
         target: /srv/shell/screens/tag.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/search.html
         target: /srv/shell/screens/search.html
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/screens/search.css
         target: /srv/shell/screens/search.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/renderers/markdown.js
         target: /srv/shell/renderers/markdown.js
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/shared/chrome.css
         target: /srv/shell/shared/chrome.css
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/shared/system.css
         target: /srv/shell/shared/system.css
-      - action: sync+restart
+      - action: rebuild
         path: ../pipelines/favorite-recount.js
         target: /srv/pipelines/favorite-recount.js
-      - action: sync+restart
+      - action: rebuild
         path: ../shell/validations/own-article.js
         target: /srv/shell/validations/own-article.js
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/en.json
         target: /srv/messages/en.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/zh.json
         target: /srv/messages/zh.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/hi.json
         target: /srv/messages/hi.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/es.json
         target: /srv/messages/es.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/fr.json
         target: /srv/messages/fr.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/ar.json
         target: /srv/messages/ar.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/bn.json
         target: /srv/messages/bn.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/pt.json
         target: /srv/messages/pt.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/ru.json
         target: /srv/messages/ru.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/ur.json
         target: /srv/messages/ur.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/id.json
         target: /srv/messages/id.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/de.json
         target: /srv/messages/de.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/ja.json
         target: /srv/messages/ja.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/sw.json
         target: /srv/messages/sw.json
-      - action: sync+restart
+      - action: rebuild
         path: ../messages/tr.json
         target: /srv/messages/tr.json
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/shell.js
-        target: /omnishell/interpreter/shell.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/chrome.js
-        target: /omnishell/interpreter/chrome.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/screen.js
-        target: /omnishell/interpreter/screen.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/fragment.js
-        target: /omnishell/interpreter/fragment.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/data-sync.js
-        target: /omnishell/interpreter/data-sync.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/validate.js
-        target: /omnishell/interpreter/validate.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/render.js
-        target: /omnishell/interpreter/render.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/hatch.js
-        target: /omnishell/interpreter/hatch.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/hatch-worker.js
-        target: /omnishell/interpreter/hatch-worker.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/storybook.js
-        target: /omnishell/interpreter/storybook.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/jessie.js
-        target: /omnishell/interpreter/jessie.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/kinetic.js
-        target: /omnishell/interpreter/kinetic.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/prng.js
-        target: /omnishell/interpreter/prng.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/vendor/mecha-client.js
-        target: /omnishell/interpreter/vendor/mecha-client.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/vendor/js-yaml.js
-        target: /omnishell/interpreter/vendor/js-yaml.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/vendor/ses.umd.min.js
-        target: /omnishell/interpreter/vendor/ses.umd.min.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/vendor/morphlex.js
-        target: /omnishell/interpreter/vendor/morphlex.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/interpreter/vendor/messages.js
-        target: /omnishell/interpreter/vendor/messages.js
-      - action: sync+restart
-        path: ../../../plugins/omnishell/components/wallclock.js
-        target: /omnishell/components/wallclock.js
-      - action: sync+restart
+      - action: rebuild
         path: ../brief.html
         target: /srv/docs/brief.html
-      - action: sync+restart
+      - action: rebuild
         path: ../ir.html
         target: /srv/docs/ir.html
-      - action: sync+restart
+      - action: rebuild
+        path: ../ir/card.css
+        target: /srv/docs/ir/card.css
+      - action: rebuild
         path: ../acceptance.md
         target: /srv/docs/acceptance.md
-      - action: sync+restart
+      - action: rebuild
         path: ../DESIGN.md
         target: /srv/docs/DESIGN.md
-      - action: sync+restart
+      - action: rebuild
         path: ../robots.txt
         target: /srv/robots.txt
-      - action: sync+restart
+      - action: rebuild
         path: ../sitemap.xml
         target: /srv/sitemap.xml
     environment:
       ELECTRIC_SECRET: ${ELECTRIC_SECRET:-dev-electric-secret}
+      ORIGIN: ${ORIGIN:-https://localhost:${CADDY_TLS_HOST_PORT:-17995}}
     healthcheck:
       test:
       - CMD
@@ -271,30 +221,33 @@ services:
       retries: 30
       start_period: 10s
       start_interval: 500ms
-    image: bayt-apps_realworld-caddy:${BAYT_IMAGE_TAG:-latest}
+    image: bayt-realworld-caddy:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
     networks:
       default:
         aliases:
         - caddy
-    ports:
-    - ${CADDY_TLS_HOST_PORT:-0}:8443
-  apps_realworld-caddy_bayt:
+  realworld-caddy_bayt:
     build:
+      additional_contexts:
+        realworld-crud_bayt: service:realworld-crud_bayt
+        realworld-served_bayt: service:realworld-served_bayt
       context: ..
       dockerfile: .bayt/Dockerfile.caddy
       target: caddy_bayt
       args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-    image: bayt-apps_realworld-caddy_bayt:latest
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-realworld-caddy_bayt:latest
     scale: 0
-  apps_realworld-caddy_srcs:
+  realworld-caddy_srcs:
     build:
       context: ..
       dockerfile: .bayt/Dockerfile.caddy
       target: caddy_srcs
       args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-    image: bayt-apps_realworld-caddy_srcs:latest
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-realworld-caddy_srcs:latest
     scale: 0

@@ -1,6 +1,7 @@
 {
-  "chrome_signin_hint": "One tap with your passkey — new here, one is created for you.",
-  "chrome_signin": "Continue",
+  "chrome_signin_google": "Sign in with Google",
+  "chrome_signin_hint": "Good stories bring us together. Read, write, and find your people.",
+  "chrome_signin": "Continue with a passkey",
   "chrome_signin_guest": "Continue as guest",
   "chrome_signin_failed": "That did not go through. Try again.",
   "chrome_signout": "sign out",

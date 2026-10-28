@@ -44,9 +44,11 @@
   },
   "app": "realworld",
   "auth": {
+    "providers": [
+      "google"
+    ],
     "required": true,
     "service": "/auth",
-    "mode": "passkey",
     "self": {
       "route": "profile",
       "name": {
@@ -54,6 +56,7 @@
         "column": "display_name"
       }
     },
+    "mode": "passkey",
     "promote": false
   },
   "floors": {
@@ -113,6 +116,13 @@
     "article_stats": "article_id"
   },
   "native": true,
+  "read": {
+    "article_tag": "lazy",
+    "comment": "lazy",
+    "article_stats": "lazy",
+    "tag_count": "lazy",
+    "favorite_index": "lazy"
+  },
   "server": true,
   "routes": [
     {
@@ -120,24 +130,7 @@
       "screen": "home",
       "nav": {
         "key": "nav_home",
-        "label": "Community",
-        "labels": {
-          "en": "Community",
-          "zh": "社区",
-          "hi": "समुदाय",
-          "es": "Comunidad",
-          "fr": "Communauté",
-          "ar": "المجتمع",
-          "bn": "কমিউনিটি",
-          "pt": "Comunidade",
-          "ru": "Сообщество",
-          "ur": "کمیونٹی",
-          "id": "Komunitas",
-          "de": "Community",
-          "ja": "コミュニティ",
-          "sw": "Jamii",
-          "tr": "Topluluk"
-        }
+        "label": "Community"
       },
       "files": {
         "html": "shell/screens/home.html",
@@ -149,7 +142,7 @@
           "shell/shared/system.css"
         ]
       },
-      "ssr": "ssr",
+      "ssr": "spa",
       "states": [
         "loading",
         "empty",
@@ -165,24 +158,7 @@
       "screen": "feed",
       "nav": {
         "key": "nav_feed",
-        "label": "Your Feed",
-        "labels": {
-          "en": "Your Feed",
-          "zh": "我的关注",
-          "hi": "आपका फ़ीड",
-          "es": "Tu Feed",
-          "fr": "Votre fil",
-          "ar": "موجزك",
-          "bn": "আপনার ফিড",
-          "pt": "Seu Feed",
-          "ru": "Ваша лента",
-          "ur": "آپ کا فیڈ",
-          "id": "Feed Anda",
-          "de": "Dein Feed",
-          "ja": "フィード",
-          "sw": "Mtiririko wako",
-          "tr": "Akışın"
-        }
+        "label": "Your Feed"
       },
       "files": {
         "html": "shell/screens/feed.html",
@@ -207,24 +183,7 @@
       "screen": "reading-list",
       "nav": {
         "key": "nav_reading_list",
-        "label": "Saved",
-        "labels": {
-          "en": "Saved",
-          "zh": "已保存",
-          "hi": "सेव किए गए",
-          "es": "Guardados",
-          "fr": "Enregistrés",
-          "ar": "المحفوظات",
-          "bn": "সংরক্ষিত",
-          "pt": "Salvos",
-          "ru": "Сохранённое",
-          "ur": "محفوظ شدہ",
-          "id": "Tersimpan",
-          "de": "Gemerkt",
-          "ja": "保存済み",
-          "sw": "Zilizohifadhiwa",
-          "tr": "Kaydedilenler"
-        }
+        "label": "Saved"
       },
       "files": {
         "html": "shell/screens/reading-list.html",
@@ -250,24 +209,7 @@
       "screen": "editor",
       "nav": {
         "key": "nav_editor",
-        "label": "New Article",
-        "labels": {
-          "en": "New Article",
-          "zh": "新建文章",
-          "hi": "नया लेख",
-          "es": "Nuevo artículo",
-          "fr": "Nouvel article",
-          "ar": "مقال جديد",
-          "bn": "নতুন লেখা",
-          "pt": "Novo Artigo",
-          "ru": "Новая статья",
-          "ur": "نئی تحریر",
-          "id": "Artikel Baru",
-          "de": "Neuer Artikel",
-          "ja": "新規記事",
-          "sw": "Makala Mpya",
-          "tr": "Yeni Yazı"
-        }
+        "label": "New Article"
       },
       "files": {
         "html": "shell/screens/editor.html",
@@ -330,7 +272,7 @@
           "shell/shared/system.css"
         ]
       },
-      "ssr": "ssr",
+      "ssr": "spa",
       "states": [
         "loading",
         "populated",
@@ -374,15 +316,15 @@
         "css": "shell/screens/article.css",
         "handlers": [],
         "adapters": [],
-        "renderers": [
-          "shell/renderers/markdown.js"
-        ],
         "shared": [
           "shell/shared/chrome.css",
           "shell/shared/system.css"
+        ],
+        "renderers": [
+          "shell/renderers/markdown.js"
         ]
       },
-      "ssr": "ssr",
+      "ssr": "spa",
       "states": [
         "loading",
         "populated",
@@ -438,7 +380,7 @@
           "shell/shared/system.css"
         ]
       },
-      "ssr": "ssr",
+      "ssr": "spa",
       "states": [
         "loading",
         "populated",
@@ -464,7 +406,7 @@
           "shell/shared/system.css"
         ]
       },
-      "ssr": "ssr",
+      "ssr": "spa",
       "states": [
         "loading",
         "populated",
@@ -489,7 +431,7 @@
           "shell/shared/system.css"
         ]
       },
-      "ssr": "ssr",
+      "ssr": "spa",
       "states": [
         "loading",
         "populated",
@@ -513,7 +455,7 @@
           "shell/shared/system.css"
         ]
       },
-      "ssr": "ssr",
+      "ssr": "spa",
       "states": [
         "loading",
         "populated",
@@ -523,10 +465,6 @@
       ]
     }
   ],
-  "sync": {
-    "comment": "on-demand",
-    "favorite_index": "on-demand"
-  },
   "tables": [
     "app_user",
     "article",
@@ -585,7 +523,7 @@
           "required": false
         },
         {
-          "default": "now()",
+          "defaulted": true,
           "name": "created_at",
           "type": "timestamp",
           "required": true
@@ -616,14 +554,14 @@
       "durability": "server",
       "fields": [
         {
-          "default": "gen_random_uuid()",
+          "defaulted": true,
           "name": "id",
           "pk": true,
           "type": "uuid",
           "required": true
         },
         {
-          "default": "auth_uid()",
+          "defaulted": true,
           "name": "author_id",
           "ref": "app_user",
           "type": "uuid",
@@ -688,13 +626,13 @@
           "unique": true
         },
         {
-          "default": "now()",
+          "defaulted": true,
           "name": "created_at",
           "type": "timestamp",
           "required": true
         },
         {
-          "default": "now()",
+          "defaulted": true,
           "name": "updated_at",
           "type": "timestamp",
           "required": true
@@ -715,7 +653,7 @@
       "durability": "server",
       "fields": [
         {
-          "default": "gen_random_uuid()",
+          "defaulted": true,
           "name": "id",
           "pk": true,
           "type": "uuid",
@@ -751,7 +689,7 @@
       "durability": "server",
       "fields": [
         {
-          "default": "gen_random_uuid()",
+          "defaulted": true,
           "name": "id",
           "pk": true,
           "type": "uuid",
@@ -764,7 +702,7 @@
           "required": true
         },
         {
-          "default": "auth_uid()",
+          "defaulted": true,
           "name": "author_id",
           "ref": "app_user",
           "type": "uuid",
@@ -780,7 +718,7 @@
           "required": true
         },
         {
-          "default": "now()",
+          "defaulted": true,
           "name": "created_at",
           "type": "timestamp",
           "required": true
@@ -791,14 +729,14 @@
       "durability": "server",
       "fields": [
         {
-          "default": "gen_random_uuid()",
+          "defaulted": true,
           "name": "id",
           "pk": true,
           "type": "uuid",
           "required": true
         },
         {
-          "default": "auth_uid()",
+          "defaulted": true,
           "name": "user_id",
           "ref": "app_user",
           "type": "uuid",
@@ -811,7 +749,7 @@
           "required": true
         },
         {
-          "default": "now()",
+          "defaulted": true,
           "name": "created_at",
           "type": "timestamp",
           "required": true
@@ -836,14 +774,14 @@
       "durability": "server",
       "fields": [
         {
-          "default": "gen_random_uuid()",
+          "defaulted": true,
           "name": "id",
           "pk": true,
           "type": "uuid",
           "required": true
         },
         {
-          "default": "auth_uid()",
+          "defaulted": true,
           "name": "user_id",
           "ref": "app_user",
           "type": "uuid",
@@ -856,7 +794,7 @@
           "required": true
         },
         {
-          "default": "now()",
+          "defaulted": true,
           "name": "created_at",
           "type": "timestamp",
           "required": true
@@ -876,14 +814,14 @@
       "durability": "server",
       "fields": [
         {
-          "default": "gen_random_uuid()",
+          "defaulted": true,
           "name": "id",
           "pk": true,
           "type": "uuid",
           "required": true
         },
         {
-          "default": "auth_uid()",
+          "defaulted": true,
           "name": "follower_id",
           "ref": "app_user",
           "type": "uuid",
@@ -896,7 +834,7 @@
           "required": true
         },
         {
-          "default": "now()",
+          "defaulted": true,
           "name": "created_at",
           "type": "timestamp",
           "required": true
@@ -1523,6 +1461,7 @@
     "services/database/migrations/007_txid.sql",
     "services/database/migrations/008_publication.sql",
     "services/database/migrations/009_validations.sql",
+    "services/database/migrations/010_machines.sql",
     "services/database/migrations/011_owner_writes.sql",
     "services/database/migrations/012_me_readonly.sql",
     "services/database/migrations/013_article_tag_sync.sql",
@@ -1618,7 +1557,22 @@
             "key": "id",
             "from": "article_id"
           }
-        ]
+        ],
+        "on": [
+          "insert",
+          "update"
+        ],
+        "order": {
+          "insert": [
+            0,
+            0
+          ],
+          "update": [
+            0,
+            0
+          ]
+        },
+        "machine": "FavoriteRules"
       }
     }
   }

@@ -14,8 +14,8 @@ import { renderStorybook } from "./interpreter/storybook.js";
 import { directionOf, PLACEHOLDER, PLACEHOLDERS } from "./interpreter/fragment.js";
 // The terminal's own copy table, so the keys required here are the keys the
 // terminal actually asks for and cannot drift from them.
-import { CHROME_KEYS } from "./interpreter/chrome.js";
-import { controlProperties } from "./test/linkedom-controls.ts";
+import { CHROME_KEYS, providerKey } from "./interpreter/chrome.js";
+import { controlProperties } from "./server/linkedom-controls.ts";
 import { type MessageNode, compileCatalog, parseMessage } from "./src/messages.ts";
 
 export type Finding = { severity: string; path: string; message: string };
@@ -49,12 +49,13 @@ type Route = {
   // that declares no slug.
   paths?: Record<string, string>;
   // What the terminal's nav strip says about this route. `label` is the
-  // default-language spelling; `key` and `labels` are what `slug` and `paths`
-  // are for the address. Optional here, where an emitted shell.yaml is graded
-  // with no program beside it.
-  nav?: { label: string; key?: string; labels?: Record<string, string>; strip?: boolean };
+  // default-language spelling; `key` names the word in each catalogue.
+  // Optional here, where an emitted shell.yaml is graded with no program
+  // beside it.
+  nav?: { label: string; key?: string; strip?: boolean };
   files: { html: string; css: string; handlers?: string[]; shared?: string[] };
   states?: string[];
+  hatches?: string[];
 };
 
 type I18n = { default: string; locales: Record<string, { path: string }> };
@@ -65,11 +66,12 @@ type ShellConfig = {
   // The facts that decide which of the terminal's own chrome a reader reaches:
   // a required gate draws the login screen, either a gate or a table of the
   // app's own mints the session the strip names, and promote offers a guest
-  // that session's passkey.
-  auth?: { required?: boolean; promote?: boolean };
+  // that session's passkey, and each provider a way in at the gate and to a guest.
+  auth?: { required?: boolean; promote?: boolean; providers?: string[] };
   tables?: string[];
   routes?: Route[];
   units?: Record<string, unknown>;
+  hostDom?: Record<string, { src: string; note: string }>;
   // Passed through to every mount rather than read here: a value format
   // resolves a column's declaration in it.
   schema?: Record<string, unknown>;
@@ -472,11 +474,6 @@ export function checkMessageArms(
  * one that does declare them, only the chrome its own declaration puts on
  * screen is asked: the gate where auth is required, the strip wherever a
  * session exists, and a label only for a route the strip actually lists.
- *
- * Under the label half sits a stronger check: the emitter resolves `nav.labels`
- * out of the catalogues, so a missing key is a cue error before any check runs.
- * It is restated here for the reason checkLocalizedUrls states, and because a
- * route carrying no key at all is invisible to that check.
  */
 export function checkChrome(
   shell: ShellConfig,
@@ -506,7 +503,8 @@ export function checkChrome(
   // a session is what puts the person and the way out in the strip.
   const session = gated || (shell.tables?.length ?? 0) > 0;
   const promote = session && shell.auth?.promote === true;
-  for (const key of [...(gated ? CHROME_KEYS.login : []), ...(session ? CHROME_KEYS.session : []), ...(promote ? CHROME_KEYS.promote : [])]) {
+  const providers = session ? (shell.auth?.providers ?? []).map(providerKey) : [];
+  for (const key of [...(gated ? CHROME_KEYS.login : []), ...(session ? CHROME_KEYS.session : []), ...(promote ? CHROME_KEYS.promote : []), ...providers]) {
     for (const tag of tags) {
       if (said(tag, key)) continue;
       report(`messages/${tag}.json`, `chrome key "${key}" is missing: the terminal speaks its own English here`);
@@ -531,10 +529,6 @@ export function checkChrome(
     }
     for (const tag of tags) {
       if (!said(tag, key)) report(`messages/${tag}.json`, `route '${route.screen}' [${tag}]: label key "${key}" is missing`);
-      const label = route.nav?.labels?.[tag];
-      if (typeof label !== "string" || label.trim() === "") {
-        report(shellPath, `route '${route.screen}' [${tag}]: nav.labels resolves "${key}" to nothing`);
-      }
     }
   }
   return findings;
@@ -598,6 +592,24 @@ function mountDocument() {
   return document;
 }
 
+export function* inspectedElements(root: Element, formatted = false): Generator<Element> {
+  const excluded = 'script, style, [translate="no"]' + (formatted ? ", [data-text-format]" : "");
+  if (root.closest(excluded)) return;
+  let el: Element | null = root.firstElementChild;
+  while (el !== null) {
+    if (el.tagName !== "SCRIPT" && el.tagName !== "STYLE" && !el.matches(excluded)) {
+      yield el;
+      if (el.tagName !== "TEMPLATE" && el.firstElementChild !== null) {
+        el = el.firstElementChild;
+        continue;
+      }
+    }
+    while (el !== root && el.nextElementSibling === null) el = el.parentElement!;
+    if (el === root) return;
+    el = el.nextElementSibling;
+  }
+}
+
 export async function checkMemoryApp(
   shell: ShellConfig,
   messages: Record<string, Catalog>,
@@ -611,6 +623,20 @@ export async function checkMemoryApp(
 
   const defaultLocale = shell.i18n?.default ?? locales[0];
   const secondaryLocales = locales.filter((l) => l !== defaultLocale);
+  const leakPatterns = Object.fromEntries(locales.map((locale) => {
+    const patterns = Object.entries(messages[defaultLocale] ?? {}).flatMap(([key, value]) => {
+      const localized = messages[locale]?.[key];
+      if (typeof value !== "string" || typeof localized !== "string") return [];
+      const d = value.trim();
+      const l = localized.trim();
+      if (d.length < 4 || d.toLowerCase() === l.toLowerCase() || l.toLowerCase().includes(d.toLowerCase())) return [];
+      return [{ d, l, regex: new RegExp(`(?:^|\\W)${escapeRegex(d)}(?:$|\\W)`, "i") }];
+    });
+    const any = patterns.length === 0 ? null : new RegExp(
+      `(?:^|\\W)(?:${patterns.map(({ d }) => escapeRegex(d)).join("|")})(?:$|\\W)`, "i",
+    );
+    return [locale, { patterns, any }];
+  }));
 
   const document = mountDocument();
   const global = globalThis as unknown as Record<string, unknown>;
@@ -646,6 +672,7 @@ export async function checkMemoryApp(
           // A money binding resolves its currency and its scale off the bound
           // column, so a screen carrying one renders only where the schema does.
           schema: shell.schema,
+          hostDom: shell.hostDom,
         });
       } catch (err) {
         findings.push({
@@ -656,7 +683,6 @@ export async function checkMemoryApp(
         continue;
       }
 
-      const defCat = messages[defaultLocale] ?? {};
       const locCat = messages[locale] ?? {};
 
       for (const fig of mount.querySelectorAll("figure")) {
@@ -664,10 +690,7 @@ export async function checkMemoryApp(
         const frame = fig.querySelector(".frame");
         if (!frame) continue;
 
-        for (const el of frame.querySelectorAll("*")) {
-          if (el.tagName === "SCRIPT" || el.tagName === "STYLE" || el.closest("script, style")) continue;
-          if (el.closest('[translate="no"]')) continue;
-
+        for (const el of inspectedElements(frame)) {
           // 1. Exact catalog binding match on data-text="{msg.<key>}"
           const dt = el.getAttribute("data-text");
           if (dt && dt.startsWith("{msg.") && dt.endsWith("}")) {
@@ -705,26 +728,14 @@ export async function checkMemoryApp(
                 });
               }
 
-              if (locale !== defaultLocale && !dt && !val.startsWith("Sample ")) {
-                for (const [key, defVal] of Object.entries(defCat)) {
-                  const locVal = locCat[key];
-                  if (typeof defVal === "string" && typeof locVal === "string") {
-                    const d = defVal.trim();
-                    const l = locVal.trim();
-                    if (
-                      d.length >= 4 &&
-                      d.toLowerCase() !== l.toLowerCase() &&
-                      !l.toLowerCase().includes(d.toLowerCase())
-                    ) {
-                      const regex = new RegExp(`(?:^|\\W)${escapeRegex(d)}(?:$|\\W)`, "i");
-                      if (regex.test(val)) {
-                        findings.push({
-                          severity: "error",
-                          path: route.files.html,
-                          message: `state '${state}' [${locale}]: '${defaultLocale}' text leak '${d}' (expected '${l}') in <${el.tagName.toLowerCase()}> text: "${val}"`,
-                        });
-                      }
-                    }
+              if (locale !== defaultLocale && !dt && !val.startsWith("Sample ") && leakPatterns[locale].any?.test(val)) {
+                for (const { d, l, regex } of leakPatterns[locale].patterns) {
+                  if (regex.test(val)) {
+                    findings.push({
+                      severity: "error",
+                      path: route.files.html,
+                      message: `state '${state}' [${locale}]: '${defaultLocale}' text leak '${d}' (expected '${l}') in <${el.tagName.toLowerCase()}> text: "${val}"`,
+                    });
                   }
                 }
               }
@@ -747,26 +758,14 @@ export async function checkMemoryApp(
               });
             }
 
-            if (locale !== defaultLocale) {
-              for (const [key, defVal] of Object.entries(defCat)) {
-                const locVal = locCat[key];
-                if (typeof defVal === "string" && typeof locVal === "string") {
-                  const d = defVal.trim();
-                  const l = locVal.trim();
-                  if (
-                    d.length >= 4 &&
-                    d.toLowerCase() !== l.toLowerCase() &&
-                    !l.toLowerCase().includes(d.toLowerCase())
-                  ) {
-                    const regex = new RegExp(`(?:^|\\W)${escapeRegex(d)}(?:$|\\W)`, "i");
-                    if (regex.test(val)) {
-                      findings.push({
-                        severity: "error",
-                        path: route.files.html,
-                        message: `state '${state}' [${locale}]: '${defaultLocale}' text leak in ${name}="${val}" (expected '${l}')`,
-                      });
-                    }
-                  }
+            if (locale !== defaultLocale && leakPatterns[locale].any?.test(val)) {
+              for (const { l, regex } of leakPatterns[locale].patterns) {
+                if (regex.test(val)) {
+                  findings.push({
+                    severity: "error",
+                    path: route.files.html,
+                    message: `state '${state}' [${locale}]: '${defaultLocale}' text leak in ${name}="${val}" (expected '${l}')`,
+                  });
                 }
               }
             }
@@ -982,6 +981,7 @@ export async function checkPseudoLocale(
           routes,
           i18n: view,
           schema: shell.schema,
+          hostDom: shell.hostDom,
         });
       } catch (err) {
         findings.push({
@@ -1014,14 +1014,8 @@ export async function checkPseudoLocale(
           });
         }
 
-        for (const el of frame.querySelectorAll("*")) {
-          if (el.tagName === "SCRIPT" || el.tagName === "STYLE" || el.closest("script, style")) continue;
-          if (el.closest('[translate="no"]')) continue;
-          // Intl formats a date or an amount under the pseudo tag's base
-          // language, so its output is correctly undecorated: "Aug 2, 09:00" is
-          // not a string anybody translates.
-          if (el.closest("[data-text-format]")) continue;
-
+        // Intl output belongs to the pseudo locale's base language.
+        for (const el of inspectedElements(frame, true)) {
           const plain = (where: string, value: string) => {
             const val = value.trim();
             if (val === "" || val.includes(OPEN) || SYNTHETIC.test(val)) return;
@@ -1080,6 +1074,21 @@ export async function selfTest(): Promise<{ failures: string[] }> {
   const cleanFindings = await checkMemoryApp(baseShell, baseMessages, cleanFiles);
   if (cleanFindings.length !== 0) {
     failures.push(`clean app expected 0 findings, got ${JSON.stringify(cleanFindings)}`);
+  }
+
+  const hostShell: ShellConfig = {
+    ...baseShell,
+    hostDom: { trusted: { src: "shell/hatches/trusted.js", note: "host-owned presenter" } },
+    routes: baseShell.routes!.map(route => ({ ...route, hatches: ["trusted"] })),
+  };
+  // Fixtures must resolve the declaration without importing its module.
+  for (const check of [checkMemoryApp, checkPseudoLocale]) {
+    const findings = await check(hostShell, baseMessages, cleanFiles);
+    if (findings.length) failures.push(`declared inert host-DOM hatch: ${JSON.stringify(findings)}`);
+    const missing = await check({ ...hostShell, hostDom: {} }, baseMessages, cleanFiles);
+    if (!missing.some(f => f.message.includes("undeclared host-DOM hatch"))) {
+      failures.push("fixture accepted an undeclared host-DOM hatch");
+    }
   }
 
   // Case 2: Catches un-interpolated placeholder in text node
@@ -1337,8 +1346,8 @@ function chromeFailures(): string[] {
     auth: { required: true },
     tables: ["match"],
     routes: [
-      route("arena", "/", { label: "Mesa", key: "nav_table", labels: { "pt-BR": "Mesa", es: "Mesa" } }),
-      route("bar", "/bar", { label: "Bar", key: "nav_bar", labels: { "pt-BR": "Bar", es: "Bar" } }),
+      route("arena", "/", { label: "Mesa", key: "nav_table" }),
+      route("bar", "/bar", { label: "Bar", key: "nav_bar" }),
     ],
   };
   const catalogue = {
@@ -1396,6 +1405,10 @@ function chromeFailures(): string[] {
     shell: { auth: { required: false, promote: true } },
   });
   quiet("an app that offers no passkey", { shell: { auth: { required: false } } });
+  // A provider is a way in at the gate and in a guest's strip alike.
+  grades("a provider offered in no Spanish", `chrome key "chrome_signin_google" is missing`, {
+    shell: { auth: { required: false, providers: ["google"] } },
+  });
 
   // The whole of the built-in copy's point: an app that shows neither surface
   // is asked for none of it.
@@ -1414,12 +1427,6 @@ function chromeFailures(): string[] {
 
   grades("a label key no catalogue answers", `route 'bar' [es]: label key "nav_bar" is missing`, {
     messages: without("nav_bar"),
-  });
-
-  grades("a label the emitter resolved for one locale only", `route 'bar' [es]: nav.labels resolves "nav_bar"`, {
-    shell: {
-      routes: [shell.routes![0], route("bar", "/bar", { label: "Bar", key: "nav_bar", labels: { "pt-BR": "Bar" } })],
-    },
   });
 
   quiet("a route that takes itself off the strip", {

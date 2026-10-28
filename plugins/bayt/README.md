@@ -25,7 +25,7 @@ Pin the release in your project's `.mise.toml`:
 
 ```toml
 [tools]
-"github:bonisoft3/bayt" = "0.58.2"
+"github:bonisoft3/bayt" = "0.66.0"
 ```
 
 `bayt` is then on PATH. Run from any directory containing a `bayt.cue` to get the `.bayt` generated dir with all configuration your build needs:
@@ -196,11 +196,11 @@ A *stack* captures what a language toolchain needs. Bayt ships toolchain stacks 
 - **`stacks/bun`** — bun/Node.js concept fragments: `install` (the dependency closure as a layer), `build`, `test`, `testInt`, `testE2E`, `dev`, and the `srcsBuild`/`srcsTest`/`srcsIntegrate` source sets. `installFlags` pins `--frozen-lockfile --ignore-scripts`: the lockfile stays authoritative, and lifecycle scripts defer downstream because they need source the deps layer does not carry. bun store cache mount.
 - **`stacks/uv`** — python/uv concept fragments: `sync` (the locked environment as a `deps` layer), `build` (`compileall`, python's nearest thing to a link step), `test`, `integrationTest`, and an opt-in `bytecode`. uv owns the environment and mise owns the interpreter, so every fragment carries `toolEnv`. The venv is presence-gated through `state` rather than declared as `outs` — it is not relocatable in either direction, and the host CAS drops the interpreter symlinks — so stages reach it by FROM-chaining the `deps` stage. Layout is a parameter, not a pair of overrides: `(sayt.#uv & {srcDir: "app", unitDir: "tests"}).out` reaches both the source globs and the commands that walk them, so a project on a different tree states each directory once. Source globs sit in the framework-side `defaultGlobs` and are `| null`, so a project with no such tree deletes the key outright.
 - **`stacks/mise`** — toolchain installer. `install` (provisions the project's `.mise.toml`), `exec` (sets `activate: "mise x --"` so cmds resolve through mise's shim layer), `doctor`. Used as a building block by other stacks.
-- **`stacks/sayt`** — umbrella that maps the 10 sayt verbs (setup/build/test/launch/integrate/release/verify/generate/lint/doctor) onto stack fragments. `sayt.go`, `sayt.gradle`, `sayt.pnpm`, `sayt.pnpmWorkspace`, `sayt.uv` are the standard mappings projects compose against. `sayt.pnpmWorkspace`'s setup provisions the shared toolchain layer: it runs the workspace root's `mise install`, so consumer setups FROM-chaining it install only their project's tool delta. `sayt.inject` adds the dind plumbing for ci-cascade flows; `sayt.ci` is a one-line recipe combining inject + the standard bake-and-up-the-integrate-closure RUN body + FROM `:dindbox`; `sayt.dindbox` is the matching dindbox-target preset.
+- **`stacks/sayt`** — umbrella that maps the 10 sayt verbs (setup/build/test/launch/integrate/release/verify/generate/lint/doctor) onto stack fragments. `sayt.go`, `sayt.gradle`, `sayt.pnpm`, `sayt.pnpmWorkspace`, `sayt.uv` are the standard mappings projects compose against. `sayt.pnpmWorkspace`'s setup provisions the shared toolchain layer: it runs the workspace root's `mise install`, so consumer setups FROM-chaining it install only their project's tool delta. `sayt.inject` adds the docker bridge plumbing for bkid flows; `sayt.ci` is the bkid runner: inject plus a RUN that bakes a closure (`#closure`, default `integrate`) and brings it up as a stack of its own (`${BKID_PROJECT}_<#check>`), on bayt's `bkid` image preset.
 
 A *distro* captures what a base image's package manager needs. The axes are different: you pick a stack from what the project is written in, a distro from what the base image is — and a package manager spans distros (`apk` covers Alpine and Wolfi, `apt` covers Debian and Ubuntu), so the libraries are named for the manager.
 
-- **`distros/apt`**, **`distros/apk`**, **`distros/zypper`** — each exports one `#install` definition taking `pkgs` and producing an `out` that composes into either position a package install occupies: a `dockerfile.defaultPreamble` entry in-stage, or `cmd: "builtin": dockerfile:` on a shared target. Each owns its manager's cache mounts, and the layer keeps only what the image needs — apt mounts `/var/cache/apt` plus `/var/lib/apt/lists`, zypper mounts all of `/var/cache/zypp` (its metadata is build-time scratch), so no arm needs a `clean` tail. Mounts are project-scoped and locked: a package manager keeps a lock file and fails rather than waiting.
+- **`distros/apt`**, **`distros/apk`**, **`distros/zypper`** — each exports one `#install` definition taking `pkgs` and producing an `out` that composes into either position a package install occupies: a `dockerfile.defaultPreamble` entry in-stage, or `cmd: "builtin": dockerfile:` on a shared target. Each owns its manager's cache mounts, and the layer keeps only what the image needs — apt mounts `/var/cache/apt` plus `/var/lib/apt/lists`, zypper mounts all of `/var/cache/zypp` (its metadata is build-time scratch), so no arm needs a `clean` tail. Mounts are project-scoped and locked: a package manager keeps a lock file and fails rather than waiting. Bayt also exports a universal `#users` palette (`root: 0:0`, `nobody: 65534:65534`, `nonroot: 65532:65532`, `vscode: 1000:1000`) providing numeric UID and GID allocations for BuildKit `--link` cache-independent `COPY --chown` and `USER` directives, satisfying `#userIdentity`.
 
 The go and gradle stacks ship an opt-in non-verb `deps` target that bakes the dependency closure into an image layer: go downloads via the RUN-only `dockerfile.do` form (below) and downstream `build` COPYs it in via `:deps:outs`; gradle resolves a read-only dep cache that rides into `build` through the FROM chain (`GRADLE_RO_DEP_CACHE`). pnpm folds the same idea into its `setup` verb instead — `install` materializes the closure as a layer directly.
 
@@ -246,7 +246,10 @@ service-specific defaults where they are needed.
 
 ```cue
 "release-proxy": sayt.release & bayt.healthcheck.http & {
-    healthcheck: url: "http://127.0.0.1:8081/health"
+    healthcheck: {
+        url:           "http://127.0.0.1:8081/health"
+        authorization: "Bearer secret-token"
+    }
     dockerfile: from: name: "caddy:..."
 }
 
@@ -367,6 +370,37 @@ part in dependency and cache boundaries. The tool roots (`Taskfile.yml`,
 are **user-authored**: you write them once and point their includes at the
 `.bayt/` aggregates below.
 
+### Additional generated files
+
+Projects can emit structured files alongside Bayt's built-in outputs:
+
+```cue
+project: bayt.#project & {
+    files: "settings.yaml": {enabled: true}
+    targets: build: files: "settings.json": {enabled: true}
+}
+```
+
+Project filenames are preserved (`.bayt/settings.yaml`); target filenames
+include the target (`.bayt/settings.build.json`). The format, collision and
+input contracts are specified in [[SPEC#Additional file emission]].
+
+`stacks/sayt.gate` derives `.bayt/say.yaml` for the declared generate, build, lint and test
+Task targets. Custom checks belong in those targets' command maps, where their
+inputs, outputs and dependencies participate in the same graph. The project
+owns the glue: after running Bayt generation, it can copy the gates into its
+Sayt configuration:
+
+```sh
+cp .bayt/say.yaml .say.yaml
+```
+
+The configuration remains typed by Sayt's schema; conflicting values fail.
+Pronto generates its own `.say.yaml` with these gates, so its bootstrap can run
+before `.bayt/say.yaml` exists.
+
+### Authored roots
+
 User-authored roots (you write these; bayt never overwrites them):
 
 | Path                        | Purpose                                                          |
@@ -404,7 +438,9 @@ profile-gated under their own names, so `docker compose up integrate` still
 works — it targets the alias (`scale: 1`) and runs the harness (naming a service
 auto-activates its profiles) without the alias joining a bare up. Combine
 with `--no-build` (or `BAYT_PULL_POLICY=missing` under `images: pull`) for a
-runtime-only up that never touches the build graph. Anything that flattens
+runtime-only up that never touches the build graph. Local images carry their
+compose project tag (`bayt-<svc>:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}`)
+and `:latest`, so multiple checkouts never collide. Anything that flattens
 the root for bake (`docker compose config -o` piped to `buildx bake`) must
 pass `--profile "*"` to keep the alias target names in the flat file, and a
 manual `docker compose down` needs the same flag to reap containers started
@@ -420,7 +456,7 @@ and must never recurse. The file defines one service, the reserved
 `bayt` alias (extends the qualified entry service, `scale: 1`), so
 `docker compose -f .bayt/compose.integrate.closure.yaml up bayt`
 works identically in every project — that's what the generated ci RUN
-bodies use inside the dindbox, where the user root and federation files
+bodies use inside a bkid runner, where the user root and federation files
 may not exist. Services defined outside the bayt graph ride in via
 `#project.compose.includes` (a bare-services file, no includes, declared
 in the referencing target's srcs so it reaches the layer and the
@@ -432,7 +468,7 @@ release-proxy) to targets. Overlays must not define `bayt`.
 
 1. **One declaration, every format.** Cross-cutting concerns live once on `#target`; each emitter projects into its own output format.
 2. **Canonical manifest as the source of truth.** `#manifestGen` produces format-neutral JSON; every other emitter consumes it. So do downstream tools like `fingerprint.nu` and `cache.nu`.
-3. **Pure CUE for schemas; impure nushell for I/O.** `generate-bayt.nu` is the only layer that touches the filesystem. `fingerprint.nu` hashes files. `cache.nu` talks to HTTP caches. CUE stays deterministic and sandboxable.
+3. **Pure CUE for schemas; impure nushell for I/O.** `generate.nu` is the only layer that touches the filesystem. `fingerprint.nu` hashes files. `cache.nu` talks to HTTP caches. CUE stays deterministic and sandboxable.
 4. **No path math in CUE.** Repo-relative `../` computation lives in nushell, which has a proper path library. CUE carries structured data (`{name, projectDir}`), nushell joins it.
 5. **Fragments via unification, not inheritance.** Verbs (`setup`, `build`, …) and base presets (`nubox`, `busybox`, …) are plain structs, not closed `#`-prefixed definitions — CUE's closed conjunction rejects cross-def fields. See the closedness note in `core/bayt.cue`.
 6. **Version intent vs. version lock.** Base image tags go in `bayt.cue`; digests live in `images.lock.cue`, bumped as ordinary dependency changes.
@@ -452,7 +488,7 @@ plugins/bayt/
 │   │                         #skaffold, #bake, #vscode, #taskfile, #mount)
 │   ├── capabilities.cue     (bayt.incremental, bayt.cache, …)
 │   ├── healthcheck.cue      (bayt.healthcheck.* templates)
-│   ├── images.cue           (nubox / dindbox / busybox / scratch presets
+│   ├── images.cue           (nubox / bkid / busybox / scratch presets
 │   │                         — set dockerfile.from)
 │   ├── images.lock.cue      (digest pin per image — package.json-style)
 │   ├── emitter.cue          (#render — composes the per-format generators)
@@ -484,7 +520,7 @@ plugins/bayt/
 │   ├── mise/mise.cue       (install / exec / doctor — used by other stacks)
 │   └── sayt/               (umbrella — maps 10 sayt verbs onto stack
 │       ├── sayt.cue         fragments; sayt.gradle, sayt.pnpm, …
-│       └── inject.cue       dind plumbing for ci-cascade flows)
+│       └── inject.cue       docker bridge plumbing for bkid flows)
 ├── runtime/               ← impure nushell bits invoked by generated files
 │   ├── fingerprint.nu       (content hash + Merkle chain, git-aware,
 │   │                         platform-key includes arch + libc flavor)

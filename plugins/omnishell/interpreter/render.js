@@ -17,8 +17,8 @@
 // attribute is dropped and the rest of the document still renders: a reader's
 // own content must never be able to take the screen down.
 
-// Anything else — javascript:, data:, vbscript: — is not a URL the terminal
-// will emit, because those are the schemes a browser executes rather than
+// Anything else — javascript:, data:, vbscript: — is not a navigable URL the
+// terminal will emit, because those are the schemes a browser executes rather than
 // fetches. What passes is what a browser merely fetches or hands to a mail
 // client, plus schemeless forms: "/path" and "#frag" resolve against the app's
 // own origin, and "//host/path" keeps the scheme and changes the host, which
@@ -45,15 +45,15 @@ export function safeUrl(raw) {
 }
 
 const GLOBAL_ATTRS = new Set(["class", "title", "lang", "dir"]);
+const SVG_GLOBAL_ATTRS = new Set(["class", "title", "lang", "dir", "role", "aria-label"]);
 
 // Prose elements, and only prose. Absent by decision, not by oversight:
 // script/style (code, and this is the whole point), iframe/object/embed (the
 // hatch is how a foreign document gets mounted, under a sandbox this path
 // cannot express), form/input/button (mutations are forms the screen author
 // wrote, never markup a renderer invented), link/meta/base (document-scoped
-// authority), and svg/math (their own attribute surfaces — xlink:href,
-// foreignObject — which this allowlist does not model). Widening the set is a
-// deliberate change here, which is the point of it living here.
+// authority), and math (its own attribute surface). SVG is the one narrow
+// extension below: chart primitives with no embedded documents or resources.
 const TAGS = {
   p: [], br: [], hr: [], div: [], span: [],
   h1: [], h2: [], h3: [], h4: [], h5: [], h6: [],
@@ -61,19 +61,51 @@ const TAGS = {
   blockquote: ["cite"], pre: [], code: [],
   em: [], strong: [], del: [], ins: [], mark: [], small: [], sub: [], sup: [], kbd: [], abbr: [],
   figure: [], figcaption: [],
-  a: ["href", "target", "rel"],
+  a: ["href", "target", "rel", "download"],
   img: ["src", "alt", "width", "height", "loading"],
   table: [], thead: [], tbody: [], tfoot: [], tr: [], caption: [],
   th: ["colspan", "rowspan", "scope"], td: ["colspan", "rowspan"],
 };
+
+// SVG has a different attribute and execution surface from HTML. Keep its
+// vocabulary small and declarative: enough for charts, with no foreignObject,
+// embedded images, animation, filters, or external resource references.
+const SVG_NS = "http://www.w3.org/2000/svg";
+const SVG_TAGS = {
+  svg: ["viewBox", "width", "height", "role", "aria-label", "focusable", "preserveAspectRatio"],
+  defs: [],
+  linearGradient: ["id", "gradientUnits", "x1", "y1", "x2", "y2"],
+  stop: ["offset", "stop-color", "stop-opacity"],
+  g: ["transform"], title: [], desc: [],
+  line: ["x1", "y1", "x2", "y2", "stroke", "stroke-width", "stroke-dasharray"],
+  polyline: ["points", "stroke", "stroke-width", "stroke-linejoin", "stroke-linecap"],
+  polygon: ["points", "stroke", "stroke-width"],
+  path: ["d", "stroke", "stroke-width", "stroke-linejoin", "stroke-linecap", "fill"],
+  circle: ["cx", "cy", "r", "stroke", "stroke-width", "tabindex"],
+  rect: ["x", "y", "width", "height", "rx", "stroke", "stroke-width", "fill"],
+  text: ["x", "y", "dx", "dy", "text-anchor", "dominant-baseline"],
+  a: ["href", "target", "rel", "aria-label", "tabindex"],
+};
+
+// A data-owned colour, such as a zone a source defines, is literal paint: six
+// hex digits and nothing else. Any other paint value can name a url() paint
+// server, which is a reference and a fetch, and colours the design names
+// stay in its tokens, reached through a class. Stroke additionally admits a
+// same-document #id gradient reference declared in <defs><linearGradient>.
+const HEX_FILL = /^#[0-9a-fA-F]{6}$/;
+const GRADIENT_ID = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
+const STROKE_PAINT = /^(?:#[0-9a-fA-F]{6}|url\(#[A-Za-z_][A-Za-z0-9_.-]*\))$/;
 
 // Every allowlisted attribute that HTML treats as a URL. A URL-valued
 // attribute added to TAGS but not here gives the builder an allowlisted
 // attribute carrying an unchecked scheme, which is why this set is written
 // beside TAGS rather than inferred from it.
 const URL_ATTRS = new Set(["href", "src", "cite"]);
+// A CSV download carries bytes without granting a navigable document or a
+// second MIME interpretation. Its payload is encodeURIComponent output.
+const CSV_DOWNLOAD = /^data:text\/csv;charset=utf-8,(?:[A-Za-z0-9_.!~*'()-]|%[0-9A-Fa-f]{2})*$/;
 
-function checkAttr(tag, name) {
+function checkAttr(tag, name, svg) {
   // data-* is refused ahead of the allowlist because its reason is different
   // and worth saying: the terminal's own binding vocabulary is data-*, so a
   // renderer that could emit one could forge a data-live region, a data-text
@@ -84,7 +116,9 @@ function checkAttr(tag, name) {
   // on* would be script, and style is both an exfiltration channel and a
   // second opinion about appearance, which design tokens already own.
   if (name.startsWith("on") || name === "style") throw new Error(`renderer may not set ${name}`);
-  if (!GLOBAL_ATTRS.has(name) && !TAGS[tag].includes(name)) {
+  const allowed = svg ? SVG_TAGS[tag] : TAGS[tag];
+  const global = svg ? SVG_GLOBAL_ATTRS.has(name) : GLOBAL_ATTRS.has(name);
+  if (!global && !allowed.includes(name)) {
     throw new Error(`renderer may not set ${name} on <${tag}>`);
   }
 }
@@ -94,15 +128,51 @@ function checkAttr(tag, name) {
 // this is the backstop for one that does not, and it is set where a real
 // document never reaches it.
 const MAX_DEPTH = 256;
+let gradientSerial = 0;
 
-function toNode(node, depth = 0) {
+function followSvgTooltips(svg) {
+  if (typeof svg.querySelectorAll !== "function") return;
+  for (const tooltip of svg.querySelectorAll('g[role="tooltip"]')) {
+    if (tooltip.closest("svg") !== svg) continue;
+    const trigger = tooltip.parentElement;
+    trigger.addEventListener("pointermove", (event) => {
+      const pointer = svg.createSVGPoint();
+      pointer.x = event.clientX;
+      pointer.y = event.clientY;
+      const { x, y } = pointer.matrixTransform(svg.getScreenCTM().inverse());
+      const box = tooltip.getBBox();
+      const view = svg.viewBox.baseVal;
+      const left = view.x + 8;
+      const top = view.y + 8;
+      const right = view.x + view.width - 8;
+      const bottom = view.y + view.height - 8;
+      const nextX = Math.max(left, Math.min(
+        x + 12 + box.width <= right ? x + 12 : x - 12 - box.width,
+        right - box.width,
+      ));
+      const nextY = Math.max(top, Math.min(
+        y + 12 + box.height <= bottom ? y + 12 : y - 12 - box.height,
+        bottom - box.height,
+      ));
+      tooltip.setAttribute("transform", `translate(${nextX - box.x} ${nextY - box.y})`);
+    });
+    const reset = () => tooltip.removeAttribute("transform");
+    trigger.addEventListener("pointerleave", reset);
+    trigger.addEventListener("focusin", reset);
+  }
+}
+
+function toNode(node, depth = 0, inSvg = false, gradients = null) {
   if (typeof node === "string") return document.createTextNode(node);
   if (node === null || typeof node !== "object" || typeof node.tag !== "string") {
     throw new Error(`renderer produced ${JSON.stringify(node)}, not a string or {tag}`);
   }
   if (depth >= MAX_DEPTH) throw new Error(`renderer nested deeper than ${MAX_DEPTH} elements`);
   const { tag, attrs = {}, children = [] } = node;
-  if (!Object.hasOwn(TAGS, tag)) throw new Error(`renderer may not produce <${tag}>`);
+  if (tag === "svg") gradients = { ids: new Map(), refs: [] };
+  const svg = inSvg || tag === "svg";
+  const allowedTags = svg ? SVG_TAGS : TAGS;
+  if (!Object.hasOwn(allowedTags, tag)) throw new Error(`renderer may not produce <${tag}>`);
   // A string is iterable, so `children: "abc"` would spread into one text node
   // per code unit — a shape the schema does not describe quietly becoming a
   // different document. Same for attrs, whose entries would be its indices.
@@ -110,15 +180,41 @@ function toNode(node, depth = 0) {
   if (attrs === null || typeof attrs !== "object" || Array.isArray(attrs)) {
     throw new Error(`<${tag}> attrs must be an object, got ${JSON.stringify(attrs)}`);
   }
-  const el = document.createElement(tag);
+  const el = svg ? document.createElementNS(SVG_NS, tag) : document.createElement(tag);
   for (const [name, value] of Object.entries(attrs)) {
-    checkAttr(tag, name);
+    checkAttr(tag, name, svg);
     // `{target: cond ? "_blank" : undefined}` is how a conditional attribute
     // is written, and setAttribute stringifies: left alone it sets the literal
     // "undefined", which for target is a real browsing-context name.
     if (value === undefined || value === null) continue;
+    if (name === "fill" && !HEX_FILL.test(String(value))) {
+      throw new Error(`renderer fill must be a six-digit hex colour, got ${JSON.stringify(value)}`);
+    }
+    if (name === "stop-color" && !HEX_FILL.test(String(value))) {
+      throw new Error(`renderer stop-color must be a six-digit hex colour, got ${JSON.stringify(value)}`);
+    }
+    if (name === "stroke" && !STROKE_PAINT.test(String(value))) {
+      throw new Error(`renderer stroke must be a six-digit hex colour or local url(#id), got ${JSON.stringify(value)}`);
+    }
+    if (tag === "linearGradient" && name === "id" && !GRADIENT_ID.test(String(value))) {
+      throw new Error(`renderer linearGradient id must be an identifier, got ${JSON.stringify(value)}`);
+    }
+    if (tag === "linearGradient" && name === "id") {
+      const id = String(value);
+      if (gradients.ids.has(id)) throw new Error(`renderer repeats gradient ${id}`);
+      let scoped;
+      do { scoped = `pronto-gradient-${++gradientSerial}`; } while (document.getElementById(scoped));
+      gradients.ids.set(id, scoped);
+      el.setAttribute(name, scoped);
+      continue;
+    }
+    if (name === "stroke" && String(value).startsWith("url(")) {
+      gradients.refs.push({ el, id: String(value).slice(5, -1) });
+      continue;
+    }
     if (URL_ATTRS.has(name)) {
-      const url = safeUrl(value);
+      const csv = !svg && tag === "a" && name === "href" && attrs.download !== undefined && attrs.download !== null && CSV_DOWNLOAD.test(String(value));
+      const url = csv ? String(value) : safeUrl(value);
       if (url === null) continue;
       el.setAttribute(name, url);
       continue;
@@ -130,7 +226,17 @@ function toNode(node, depth = 0) {
   // on the element, not the description: any path that puts a target on the
   // DOM is a path this has to see, whatever shape the description had.
   if (tag === "a" && el.hasAttribute("target")) el.setAttribute("rel", "noopener noreferrer");
-  for (const child of children) el.append(toNode(child, depth + 1));
+  for (const child of children) el.append(toNode(child, depth + 1, svg, gradients));
+  // Repeated chart instances share a document, so authored fragment IDs cannot
+  // reach another instance's paint server.
+  if (tag === "svg") {
+    followSvgTooltips(el);
+    for (const { el: ref, id } of gradients.refs) {
+      const scoped = gradients.ids.get(id);
+      if (!scoped) throw new Error(`renderer references undeclared gradient ${id}`);
+      ref.setAttribute("stroke", `url(#${scoped})`);
+    }
+  }
   return el;
 }
 

@@ -1,14 +1,14 @@
 // Bundles a pronto app into one HTML document: the interpreter and the cluster
 // as one module written inline, the files shell.json serves in a base64 table,
-// the migrations and RLS for the cluster the page boots, and PGlite's wasm and
-// data as base64 of gzip inflated at boot. The module is `deno bundle`'s, so
+// the migrations and RLS for the cluster the page boots with the drains it
+// calls (.pronto/cluster.json), and PGlite's wasm and data as base64 of gzip
+// inflated at boot. The module is `deno bundle`'s, so
 // the page resolves through the same map and lock `deno run` would, and it is
 // written inline so `import.meta.url` is the page's own, which PGlite's
 // relative asset URLs resolve against. Inline script data cannot carry `<!--`
-// or `</script`, and both occur in SES and in screens: the data rides as
-// base64, and the module has the two sequences escaped.
+// or `</script`: the data rides as base64, and executable scripts escape both.
 //
-//   deno run -A --config bundle/deno.json bundle/bundle.ts <appDir> --omnishell <dir> --mecha <dir> [--base /prefix] [--derived <file>] [--out <dir>]
+//   deno run -A --config bundle/deno.json bundle/bundle.ts <appDir> --omnishell <dir> --mecha <dir> [--base /prefix] [--derived <file>] [--out <dir>] [--clock ticker|disabled]
 //
 // The interpreter is omnishell's and the cluster is mecha's, so both roots are
 // named by the caller; the module resolves `omnishell/` and `mecha-browser/`
@@ -20,11 +20,13 @@
 // written as 404.html, which is what makes a deep link boot instead of 404.
 //
 // --derived names the rows the app's streams and computations derive, as
-// derived.ts writes them, run after the migrations: the page runs neither, so
-// what they derive ships as it stood when the page was bundled.
+// derived.ts writes them, run after the migrations: the page runs neither, its
+// drains and its clock aside, so what they derive ships as it stood when the
+// page was bundled.
 import { encodeBase64 } from '@std/encoding/base64'
 import * as path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { clusterDrains, releaseFiles } from './edge-scripts.ts'
 
 function fail(msg: string): never {
   console.error(`bundle: ${msg}`)
@@ -33,18 +35,25 @@ function fail(msg: string): never {
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const args = Deno.args.slice()
-const app = path.resolve(args.shift() ?? fail('usage: bundle.ts <appDir> --omnishell <dir> --mecha <dir> [--base /prefix] [--derived <file>] [--out <dir>]'))
+const app = path.resolve(args.shift() ?? fail('usage: bundle.ts <appDir> --omnishell <dir> --mecha <dir> [--base /prefix] [--derived <file>] [--out <dir>] [--clock ticker|disabled]'))
 const flags: Record<string, string> = {}
 while (args.length) {
   const flag = args.shift()!
-  flags[flag] = args.shift() ?? fail(`${flag} takes a value`)
+  if (flag === '--no-cluster') {
+    flags[flag] = 'true'
+  } else {
+    flags[flag] = args.shift() ?? fail(`${flag} takes a value`)
+  }
 }
 const omnishell = path.resolve(flags['--omnishell'] ?? fail('--omnishell names the interpreter root'))
 const mecha = path.resolve(flags['--mecha'] ?? fail('--mecha names the mecha root'))
 const base = (flags['--base'] ?? '').replace(/\/$/, '')
 if (base && !base.startsWith('/')) fail(`--base is a path from the site root, such as /truco, not ${base}`)
 const out = path.resolve(flags['--out'] ?? path.join(app, 'dist/browser'))
-for (const flag of Object.keys(flags)) if (!['--omnishell', '--mecha', '--base', '--derived', '--out'].includes(flag)) fail(`unknown flag ${flag}`)
+for (const flag of Object.keys(flags)) if (!['--omnishell', '--mecha', '--base', '--derived', '--out', '--no-cluster', '--clock'].includes(flag)) fail(`unknown flag ${flag}`)
+// A frozen archive's page runs no clock over the schedules it keeps.
+const clock = flags['--clock'] ?? 'ticker'
+if (clock !== 'ticker' && clock !== 'disabled') fail('--clock must be ticker or disabled')
 
 const read = (p: string) => Deno.readTextFile(path.join(app, p))
 const shell = JSON.parse(await read('shell/shell.json')) as {
@@ -88,16 +97,35 @@ const IMPORT = /@import\s+(?:url\(\s*["']?([^"')]+?)["']?\s*\)|["']([^"']+)["'])
 const inHead = new Set(['shell/shell.css', 'shell/design.css', ...shell.routes.map((r) => r.files.css as string)])
 const baseOf = (p: string) => (inHead.has(p) ? 'file:///shell/' : `file:///${path.posix.dirname(p)}/`)
 const inlined = new Map<string, string>()
+// A comment is prose: an @import in one is neither inlined nor refused. A
+// string is code, and a `/*` inside one opens no comment.
+const TOKEN = /"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|\/\*[\s\S]*?\*\//g
+/** The sheet as alternating code and comments, code first. */
+function parts(sheet: string): string[] {
+  const out = ['']
+  let at = 0
+  for (const m of sheet.matchAll(TOKEN)) {
+    out[out.length - 1] += sheet.slice(at, m.index)
+    if (m[0].startsWith('/*')) out.push(m[0], '')
+    else out[out.length - 1] += m[0]
+    at = m.index + m[0].length
+  }
+  out[out.length - 1] += sheet.slice(at)
+  return out
+}
+const comment = (i: number) => i % 2 === 1
+const outsideComments = (sheet: string, f: (code: string) => string) =>
+  parts(sheet).map((part, i) => (comment(i) ? part : f(part))).join('')
 function inline(p: string, asking: string[]): string {
   if (asking.includes(p)) fail(`${asking.join(' imports ')} imports ${p} again`)
   let sheet = inlined.get(p)
   if (sheet === undefined) {
-    sheet = files[p].replace(IMPORT, (_m, a, b) => {
+    sheet = outsideComments(files[p], (code) => code.replace(IMPORT, (_m, a, b) => {
       const target = new URL(a ?? b, baseOf(p)).pathname.slice(1)
       if (!(target in files)) fail(`${p} imports ${target}, which shell.json does not serve`)
       return inline(target, [...asking, p])
-    })
-    if (/@import\b/.test(sheet)) fail(`${p} carries an @import the bundler does not inline`)
+    }))
+    if (parts(sheet).some((part, i) => !comment(i) && /@import\b/.test(part))) fail(`${p} carries an @import the bundler does not inline`)
     inlined.set(p, sheet)
   }
   return sheet
@@ -106,17 +134,15 @@ for (const p of Object.keys(files)) if (p.endsWith('.css')) files[p] = inline(p,
 
 // An app with no migration has no cluster to boot: its document carries the
 // files alone, and the page runs the shell without PGlite.
-const clustered = shell.migrations.length > 0
+const clustered = !flags['--no-cluster'] && shell.migrations.length > 0
 const derived = flags['--derived']
 if (derived && !clustered) fail('--derived names rows for a cluster, and this app has no migration')
-const steps = ['rls.sql', ...shell.migrations, ...(derived ? [derived] : [])]
-const sql = clustered
-  ? [
-    await Deno.readTextFile(path.join(mecha, 'services/database/rls/rls.sql')),
-    ...(await Promise.all(shell.migrations.map(read))),
-    ...(derived ? [await Deno.readTextFile(path.resolve(derived))] : []),
-  ]
-  : []
+// The scripts the edge's data directory is built from, so the page's
+// database is the same: mecha's schedule table before the seed among them.
+const scripts = clustered ? await releaseFiles(app, mecha, shell.migrations) : []
+const steps = [...scripts.map((f) => f.name), ...(derived ? [derived] : [])]
+const sql = [...scripts.map((f) => f.sql), ...(derived ? [await Deno.readTextFile(path.resolve(derived))] : [])]
+const drains = clustered ? await clusterDrains(path.join(app, '.pronto/cluster.json')) : []
 // A publication and a replica identity are a WAL reader's, which the page has
 // none of: the cluster skips them by the fence the emitter and an author write,
 // read here by the cluster's own grammar, so one outside a fence is refused.
@@ -142,13 +168,21 @@ const map: { imports: Record<string, string> } = {
     ...rebase(path.join(here, 'deno.json'), pins(path.join(here, 'deno.json'))),
     'omnishell/': String(pathToFileURL(path.join(omnishell, 'interpreter') + '/')),
     'mecha-browser/': String(pathToFileURL(path.join(mecha, 'packages/mecha-browser') + '/')),
+    'node:fs': String(pathToFileURL(path.join(here, 'node-shims.ts'))),
+    'node:path': String(pathToFileURL(path.join(here, 'node-shims.ts'))),
+    'fs': String(pathToFileURL(path.join(here, 'node-shims.ts'))),
+    'path': String(pathToFileURL(path.join(here, 'node-shims.ts'))),
   },
 }
 const work = await Deno.makeTempDir({ prefix: 'bundle-' })
 const mapFile = path.join(work, 'imports.json')
 const jsFile = path.join(work, 'page.js')
+const sesFile = path.join(work, 'ses.js')
 let js: string
 try {
+  const ses = await Deno.readTextFile(path.join(omnishell, 'interpreter/vendor/ses.umd.min.js'))
+  await Deno.writeTextFile(sesFile, `export function installSes() {\n${ses}\n}\n`)
+  map.imports['pronto-bundle-ses'] = String(pathToFileURL(sesFile))
   await Deno.writeTextFile(mapFile, JSON.stringify(map))
   const bundled = new Deno.Command(Deno.execPath(), {
     args: [
@@ -160,32 +194,44 @@ try {
   }).outputSync()
   if (!bundled.success) fail('deno bundle failed')
   js = await Deno.readTextFile(jsFile)
+  // Browsers cannot resolve bare node:* specifiers. NodeFS in PGlite is never
+  // invoked in browser environments, so replace any dangling node:* imports with
+  // safe browser shims so that scripts parse and run without network CORS errors.
+  js = js
+    .replaceAll(/import\s*\*\s*as\s+(\w+)\s+from\s*["']node:fs["'];?/g, 'const $1 = { existsSync: () => false, mkdirSync: () => {} };')
+    .replaceAll(/import\s*\*\s*as\s+(\w+)\s+from\s*["']node:path["'];?/g, 'const $1 = { resolve: (...a) => a.filter(Boolean).join("/"), join: (...a) => a.filter(Boolean).join("/") };')
+    .replaceAll(/import\s*\*\s*as\s+(\w+)\s+from\s*["']node:[^"']+["'];?/g, 'const $1 = {};')
 } finally {
   await Deno.remove(work, { recursive: true })
 }
 
-// PGlite's assets sit in Deno's cache beside the package the module resolved.
-const pglite = /^npm:(@electric-sql\/pglite)@(.+)$/.exec(map.imports['@electric-sql/pglite']) ?? fail(`${clusterPins} pins no @electric-sql/pglite`)
-const info = new Deno.Command(Deno.execPath(), { args: ['info', '--json'], stdout: 'piped' }).outputSync()
-if (!info.success) fail('deno info failed')
-const denoDir = (JSON.parse(new TextDecoder().decode(info.stdout)) as { denoDir: string }).denoDir
-const dist = path.join(denoDir, 'npm/registry.npmjs.org', pglite[1], pglite[2], 'dist')
-const gz64 = async (f: string) => {
-  const bytes = (await Deno.readFile(path.join(dist, f))) as Uint8Array<ArrayBuffer>
-  return encodeBase64(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'))).bytes())
+let assets = {}
+if (clustered) {
+  const pglite = /^npm:(@electric-sql\/pglite)@(.+)$/.exec(map.imports['@electric-sql/pglite']) ?? fail(`${clusterPins} pins no @electric-sql/pglite`)
+  const icu = /^npm:(@electric-sql\/pglite-icu-full)@(.+)$/.exec(map.imports['@electric-sql/pglite-icu-full']) ?? fail(`${clusterPins} pins no @electric-sql/pglite-icu-full`)
+  const info = new Deno.Command(Deno.execPath(), { args: ['info', '--json'], stdout: 'piped' }).outputSync()
+  if (!info.success) fail('deno info failed')
+  const denoDir = (JSON.parse(new TextDecoder().decode(info.stdout)) as { denoDir: string }).denoDir
+  const dist = path.join(denoDir, 'npm/registry.npmjs.org', pglite[1], pglite[2], 'dist')
+  const icuArchive = path.join(denoDir, 'npm/registry.npmjs.org', icu[1], icu[2], 'dist/icu.76.tgz')
+  const gz64 = async (f: string) => {
+    const bytes = (await Deno.readFile(path.join(dist, f))) as Uint8Array<ArrayBuffer>
+    return encodeBase64(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'))).bytes())
+  }
+  assets = { wasm: await gz64('pglite.wasm'), data: await gz64('pglite.data'), initdb: await gz64('initdb.wasm'), icu: encodeBase64(await Deno.readFile(icuArchive)) }
 }
 const payload = {
   files,
   ...(clustered
-    ? { cluster: { sql, tables: shell.tables, assets: { wasm: await gz64('pglite.wasm'), data: await gz64('pglite.data'), initdb: await gz64('initdb.wasm') } } }
+    ? { cluster: { sql, tables: shell.tables, drains, clock, assets } }
     : {}),
 }
 
 const b64 = (s: string) => encodeBase64(new TextEncoder().encode(s))
-const ses = await Deno.readTextFile(path.join(omnishell, 'interpreter/vendor/ses.umd.min.js'))
 // A module carries the two sequences only in a string, a regex or a comment,
 // where `\/` and `\!` read as the character.
-const module = js.replaceAll('</script', '<\\/script').replaceAll('<!--', '<\\!--')
+const scriptText = (text: string) => text.replace(/\r\n?/g, '\n').replaceAll('\0', '\\x00').replaceAll('</script', '<\\/script').replaceAll('<!--', '<\\!--')
+const module = scriptText(js)
 // A function, so a `$` in a stylesheet is written as it is and not read as
 // a replacement pattern.
 const replace = (html: string, from: string | RegExp, to: string) => {
@@ -195,13 +241,23 @@ const replace = (html: string, from: string | RegExp, to: string) => {
 let html = await read('shell/index.html')
 html = replace(html, '<link rel="stylesheet" href="./shell.css">', `<style>${files['shell/shell.css']}</style>`)
 html = replace(html, '<link rel="stylesheet" href="./design.css">', `<style>${files['shell/design.css']}</style>`)
+html = html.replace(/<link rel="stylesheet" href="([^"]+)">/g, (_match, href) => {
+  const p = new URL(href, 'file:///shell/').pathname.slice(1)
+  if (!(p in files)) fail(`shell/index.html links ${p}, which shell.json does not serve`)
+  return `<style>${files[p]}</style>`
+})
 html = html.replace(/<link rel="modulepreload"[^>]*>\n/g, '').replace(/<script type="speculationrules">[\s\S]*?<\/script>\n/, '')
+// A preload of a file the shim serves goes to the network past it: on a host
+// that answers an unknown path with the document, it downloads the whole page.
+html = html.replace(/<link rel="preload" href="([^"]+)"[^>]*>\n/g, (tag, href) => {
+  if (isExternal(href)) return tag
+  const p = new URL(href, 'file:///shell/').pathname.slice(1)
+  return p in files ? '' : fail(`shell/index.html preloads ${p}, which shell.json does not serve`)
+})
 
-const isExternal = (url: string) =>
-  url.startsWith('data:') ||
-  url.startsWith('http://') ||
-  url.startsWith('https://') ||
-  url.startsWith('//')
+function isExternal(url: string) {
+  return url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://') || url.startsWith('//')
+}
 
 // Mirrors #faviconPlan href emission in schema.cue (./ relative to shell/, / relative to root).
 const resolveShellAsset = (appPath: string, href: string): string | null => {
@@ -283,11 +339,28 @@ for (const match of html.matchAll(/<link\s+[^>]*rel=["']manifest["'][^>]*>/gi)) 
   const inlinedTag = tag.replace(hrefMatch[0], () => `href="${manifestDataUri}"`)
   html = html.replace(tag, () => inlinedTag)
 }
+// Bundling changes external scripts into inline scripts; authorize only their
+// exact bytes under every policy, including a script-src-elem override.
+const hash = `'sha256-${encodeBase64(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(module))))}'`
+html = html.replace(/<meta\b[^>]*>/gi, (tag) => {
+  if (!/\bhttp-equiv\s*=\s*["']Content-Security-Policy["']/i.test(tag)) return tag
+  return tag.replace(/\bcontent\s*=\s*"([^"]*)"/i, (_attribute, policy: string) => {
+    const directives = policy.split(';').map((d) => d.trim()).filter(Boolean)
+    const find = (name: string) => directives.findIndex((d) => d.split(/\s/)[0] === name)
+    const element = find('script-src-elem')
+    const script = element < 0 ? find('script-src') : element
+    if (script >= 0) directives[script] = `${directives[script].replace(/\s+'none'(?=\s|$)/g, '')} ${hash}`
+    else {
+      const fallback = directives[find('default-src')]?.split(/\s+/).slice(1).filter((s) => s !== "'none'") ?? []
+      directives.push(['script-src', ...fallback, hash].join(' '))
+    }
+    return `content="${directives.join('; ')}"`
+  })
+})
 html = replace(
   html,
   '<script type="module" src="./boot.js"></script>',
   `<script type="application/octet-stream" id="pronto-payload">${b64(JSON.stringify(payload))}</script>\n` +
-    `<script src="data:text/javascript;base64,${b64(ses)}"></script>\n` +
     `<script type="module">${module}</script>`,
 )
 

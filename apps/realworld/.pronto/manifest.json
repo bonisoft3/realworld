@@ -1,6 +1,7 @@
 {
   "written": [
-    ".config/mise/conf.d/omnishell.toml",
+    ".pronto/check-inputs.json",
+    ".pronto/cluster.json",
     ".say.yaml",
     ".vscode/tasks.json",
     "bayt.cue",
@@ -13,6 +14,7 @@
     "docker/realworld-favorite-index.yaml",
     "docker/realworld-favorite-recount.yaml",
     "docker/realworld-tag-recount.yaml",
+    "monorepo/docker-image.yaml",
     "offline-first-sw.js",
     "robots.txt",
     "schema/entities.proto",
@@ -25,6 +27,7 @@
     "services/database/migrations/007_txid.sql",
     "services/database/migrations/008_publication.sql",
     "services/database/migrations/009_validations.sql",
+    "services/database/migrations/010_machines.sql",
     "services/database/migrations/011_owner_writes.sql",
     "services/database/migrations/012_me_readonly.sql",
     "services/database/migrations/013_article_tag_sync.sql",

@@ -1,6 +1,7 @@
 {
-  "chrome_signin_hint": "لمسة واحدة بمفتاح المرور — إن كنت جديدًا هنا، سيُنشأ لك واحد.",
-  "chrome_signin": "متابعة",
+  "chrome_signin_google": "تسجيل الدخول باستخدام Google",
+  "chrome_signin_hint": "القصص الجميلة تجمعنا. اقرأ واكتب واعثر على مجتمعك.",
+  "chrome_signin": "المتابعة باستخدام مفتاح مرور",
   "chrome_signin_guest": "المتابعة كضيف",
   "chrome_signin_failed": "لم تنجح العملية. حاول مرة أخرى.",
   "chrome_signout": "تسجيل الخروج",

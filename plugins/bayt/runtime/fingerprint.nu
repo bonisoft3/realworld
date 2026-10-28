@@ -155,8 +155,8 @@ export def compute-fingerprint [
   let abs = { |p| $project | path join $p }
   let dirs = ($plain | where { |p| (do $abs $p | path type) == "dir" } | each { |p| $"($p)/**/*" })
   let literals = ($plain | where { |p| (do $abs $p | path type) != "dir" })
-  let present_literals = ($literals | where { |p| (do $abs $p | path type) == "file" })
-  let missing = ($literals | where { |p| (do $abs $p | path type) != "file" })
+  let present_literals = ($literals | where { |p| (do $abs $p | path type) in ["file" "symlink"] })
+  let missing = ($literals | where { |p| (do $abs $p | path type) not-in ["file" "symlink"] })
   if not ($missing | is-empty) {
     let n = ($missing | length)
     let names = ($missing | str join ', ')
@@ -198,9 +198,14 @@ export def compute-fingerprint [
   let assessed = ($files | par-each { |p|
     let full = ($proj_exp | path join $p)
     let key = (try { $full | path relative-to $root_exp } catch { $p })
-    let s = (try { ls $full | first } catch { null })
+    let s = (try { ls -D $full | first } catch { null })
     if ($s == null) {
       let h = (open --raw $full | hash sha256)
+      {path: $p, hash: $h, dirty: false, key: $key, mtime: "", size: 0}
+    } else if $s.type == "symlink" {
+      let target = (ls -lD $full | first | get target)
+      let content = if ($full | path expand | path type) == "file" { open --raw $full | hash sha256 } else { "" }
+      let h = ([$target $content] | to json --raw | hash sha256)
       {path: $p, hash: $h, dirty: false, key: $key, mtime: "", size: 0}
     } else {
       let mtime = ($s.modified | format date '%s.%f')
@@ -242,7 +247,7 @@ export def compute-fingerprint [
   # scopes the hash.
   let windows = ($nu.os-info.name == "windows")
   let enriched = ($unique | each { |it|
-    let info = (ls --long ($project | path join $it.path) | first)
+    let info = (ls --long --directory ($project | path join $it.path) | first)
     let mtime = ($info.modified | format date '%Y-%m-%dT%H:%M:%S.%9f')
     let size = ($info.size | into int)
     let base = {
@@ -344,7 +349,7 @@ export def closure-hash [
   let dr = (dep-hashes $r.deps $docker $memo $all_cmds $walk $idx $tr)
   let deps = $dr.hashes
   let ctx = (context-hashes $r.contexts $docker $r.root $idx $tr)
-  let own = (compute-fingerprint $r.paths $r.excludes $docker $r.root $r.project ($deps ++ $ctx) $idx $tr)
+  let own = (compute-fingerprint $r.paths $r.excludes $docker $r.root $r.project ($deps ++ $ctx ++ $r.invocation) $idx $tr)
   {hash: $own.hash, memo: ($dr.memo | upsert $key $own.hash)}
 }
 
@@ -362,7 +367,7 @@ export def manifest-fingerprint [r: record, docker: bool = false, all_cmds: bool
   let tr = if ($trees | is-empty) { plan-scopes $r } else { $trees }
   let deps = (dep-hashes ($r.deps? | default []) $docker {} $all_cmds $walk $idx $tr).hashes
   let ctx = (context-hashes ($r.contexts? | default []) $docker $r.root $idx $tr)
-  compute-fingerprint $r.paths $r.excludes $docker $r.root $r.project ($deps ++ $ctx) $idx $tr
+  compute-fingerprint $r.paths $r.excludes $docker $r.root $r.project ($deps ++ $ctx ++ ($r.invocation? | default [])) $idx $tr
 }
 
 # Hash each context directory over its own contents. Rooted AT the directory so
@@ -385,24 +390,25 @@ def context-hashes [dirs: list<string>, docker: bool, root: string, index: recor
 def dep-hashes [nodes: list<record>, docker: bool, memo: record, all_cmds: bool = false, walk: bool = false, index: record = {}, trees: record = {}]: nothing -> record {
   if ($nodes | is-empty) { return {hashes: [], memo: $memo} }
 
-  let results = ($nodes | par-each --keep-order { |d|
+  mut cur_memo = $memo
+  mut hashes = []
+  for d in $nodes {
     let trusted = (not $walk) or (not ($d.manifest | path exists))
     let cached = (if (not $docker) and (not $all_cmds) and $trusted and ($d.stamp | path exists) {
       open $d.stamp | str trim
     } else { "" })
     if not ($cached | is-empty) {
-      {hash: $cached, memo: {}}
+      $hashes ++= [$cached]
     } else {
       if not ($d.manifest | path exists) {
         error make { msg: $"fingerprint: dep manifest not found: ($d.manifest)" }
       }
-      closure-hash $d.manifest "" $docker $memo $d.view $all_cmds $walk $index $trees
+      let res = (closure-hash $d.manifest "" $docker $cur_memo $d.view $all_cmds $walk $index $trees)
+      $hashes ++= [$res.hash]
+      $cur_memo = $res.memo
     }
-  })
-
-  let hashes = ($results | get hash)
-  let merged_memo = ($results | reduce --fold $memo { |it, acc| $acc | merge $it.memo })
-  {hashes: $hashes, memo: $merged_memo}
+  }
+  {hashes: $hashes, memo: $cur_memo}
 }
 
 # resolve-manifest — concrete inputs from a .bayt/bayt.<n>.json: srcs, the
@@ -544,7 +550,14 @@ export def resolve-manifest [manifest: string, cmd: string = "", view: string = 
       excludes:   $entry.srcs.exclude
     }
   }
+  let invocation = if $all_cmds or ($view | is-not-empty) { [] } else {
+    let selected = ($env.BAYT_INVOCATION? | default '{}' | from json)
+    if ($selected.manifest? | default "") == ($manifest | path expand) {
+      [($selected.value | to json --raw | hash sha256)]
+    } else { [] }
+  }
   {
+    invocation: $invocation
     stamp:    $".task/bayt/($scope.stamp_name).hash"
     # Ignore rules compose from the repo root down, and `up` is already the hop
     # count to it. Without this the project's own .gitignore would be the only
@@ -589,6 +602,7 @@ def merge-inputs [
     project:    $m.project
     deps:       $m.deps
     contexts:   $m.contexts
+    invocation: ($m.invocation? | default [])
     paths:      (($m.paths ++ $paths) | uniq)
     excludes:   (($m.excludes ++ (parse-list $exclude)) | uniq)
     outs:       (($m.outs ++ (parse-list $outs)) | uniq)

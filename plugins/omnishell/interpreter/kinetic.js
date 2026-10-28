@@ -1,10 +1,47 @@
+import { createMilestoneLift, loadMilestone } from "./kinetic-milestones.js";
+import { parseMarkup } from "./markup.js";
 // Kinetic Host: Fixed-step deterministic tick engine, snapshot history,
 // and time-travel controller for Omnishell.
 // Decouples kinetic simulation ticks from display rendering refresh rates.
 
 export { prngStep, createPrng } from "./prng.js";
+import { GameInputs } from "./vendor/game-inputs.js";
+export { GameInputs };
+
+export function lerp(a, b, alpha) {
+  return a + (b - a) * alpha;
+}
+
+export function lerpAngle(a, b, alpha) {
+  let diff = (b - a) % (Math.PI * 2);
+  if (diff < -Math.PI) diff += Math.PI * 2;
+  if (diff > Math.PI) diff -= Math.PI * 2;
+  return a + diff * alpha;
+}
 
 const MAX_FRAME_MS = 250.0;
+
+/** A snapshot as one string: object keys sorted, so two equal states that
+ * built their objects in a different order still agree. */
+export function canonical(value) {
+  return JSON.stringify(value, (_, v) => (v !== null && typeof v === "object" && !Array.isArray(v)
+    ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, v[k]]))
+    : v));
+}
+
+/** cyrb53: a 53-bit hash of a string, a checksum and not a defence. */
+export function checksum(text) {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761);
+    h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
 
 export function createKineticHost(options) {
   const engine = options.engine;
@@ -27,6 +64,15 @@ export function createKineticHost(options) {
     throw new RangeError(`createKineticHost: invalid historyLimit ${historyLimit}`);
   }
 
+  // Sync test (GGPO's SyncTestSession): after every tick, roll back this many
+  // frames, load that snapshot, re-simulate the logged commands, and hold
+  // each frame's checksum to the forward run's. Off at 0.
+  const syncFrames = options.syncTest ?? 0;
+  if (!Number.isInteger(syncFrames) || syncFrames < 0 || syncFrames >= historyLimit) {
+    throw new RangeError(`createKineticHost: syncTest must be an integer in [0, ${historyLimit}), got ${syncFrames}`);
+  }
+  const sums = new Map();
+
   const seed = options.seed !== undefined ? options.seed : 0x1337;
   if (options.schedule && !options.cancel) {
     throw new Error("createKineticHost: cancel function is required when schedule is provided");
@@ -37,6 +83,12 @@ export function createKineticHost(options) {
   const onFault = options.onFault ?? null;
   const onBranch = options.onBranch ?? null;
   const onReset = options.onReset ?? null;
+  // `milestones: {width, encode, decode, onLift, snapshots}` lifts the engine's
+  // milestones (kinetic-milestones.js): a host steps one seat with all its
+  // input here, so every committed frame is confirmed as it is taken.
+  const lifting = options.milestones ?? null;
+  const lift = (from) => lifting && createMilestoneLift({ engine, width: lifting.width, onLift: lifting.onLift, snapshots: lifting.snapshots, from });
+  let lifter = lift(0);
   const getInput = options.getInput ?? (() => ({}));
   const schedule = options.schedule ?? (typeof requestAnimationFrame === "function" ? requestAnimationFrame : null);
   const cancel = options.cancel ?? (typeof cancelAnimationFrame === "function" ? cancelAnimationFrame : null);
@@ -56,11 +108,28 @@ export function createKineticHost(options) {
   function commitSnapshot(tick, snap, input) {
     snapshots.set(tick, snap);
     if (input !== undefined) inputLog.set(tick, { ...input });
+    if (syncFrames) sums.set(tick, checksum(canonical(snap)));
 
     if (snapshots.size > historyLimit) {
       const oldest = minTick();
       snapshots.delete(oldest);
       inputLog.delete(oldest);
+      sums.delete(oldest);
+    }
+  }
+
+  /** The sync test over the frames up to `tick`, which fails on the first
+   * frame whose re-simulation the forward run disagrees with. */
+  function syncTest(tick) {
+    const from = tick - syncFrames;
+    if (!snapshots.has(from)) return;
+    let state = engine.loadState(snapshots.get(from));
+    for (let t = from + 1; t <= tick; t++) {
+      state = engine.advanceFrame(state, inputLog.get(t));
+      const again = checksum(canonical(engine.saveState(state)));
+      if (again !== sums.get(t)) {
+        throw new Error(`kinetic sync test: frame ${t}, re-simulated from ${from}, has checksum ${again}; the forward run had ${sums.get(t)}`);
+      }
     }
   }
 
@@ -79,11 +148,16 @@ export function createKineticHost(options) {
 
   function stepOnce(input) {
     const next = engine.advanceFrame(currentState, input);
+    if (lifter) {
+      lifter.observe(currentTick + 1, next, lifting.encode(input));
+      lifter.confirm(currentTick + 1);
+    }
     const snap = engine.saveState(next);
     onStep?.(next, currentTick + 1);
     previousState = currentState;
     currentTick++;
     commitSnapshot(currentTick, snap, input);
+    if (syncFrames) syncTest(currentTick);
     currentState = engine.loadState(snap);
     displayTick = currentTick;
     onCommit?.(currentState, currentTick);
@@ -93,10 +167,12 @@ export function createKineticHost(options) {
   function pump(elapsedMs) {
     if (!isPlaying) return;
     accumulator += Math.min(MAX_FRAME_MS, elapsedMs);
-    while (accumulator >= tickDurationMs) {
+    // A commit may pause the host, which zeroes what is still due; the tick
+    // is spent first, so that zero stands and the render takes no alpha < 0.
+    while (isPlaying && accumulator >= tickDurationMs) {
       const input = getInput();
-      stepOnce(input);
       accumulator -= tickDurationMs;
+      stepOnce(input);
     }
     const alpha = accumulator / tickDurationMs;
     onRender(previousState, currentState, alpha, currentTick, false);
@@ -254,6 +330,7 @@ export function createKineticHost(options) {
     },
 
     branch(tick) {
+      lifter?.rewind(tick);
       onBranch?.(tick);
       this.pause();
       const restored = this.seek(tick);
@@ -265,6 +342,7 @@ export function createKineticHost(options) {
         if (k > currentTick) {
           snapshots.delete(k);
           inputLog.delete(k);
+          sums.delete(k);
         }
       }
       controlsSyncFn?.();
@@ -328,17 +406,44 @@ export function createKineticHost(options) {
       isPlaying = false;
       snapshots.clear();
       inputLog.clear();
+      sums.clear();
       currentState = engine.loadState(snap);
       previousState = currentState;
       commitSnapshot(0, snap, {});
+      lifter = lift(0);
       onRender(currentState, currentState, 1.0, 0, false);
+      controlsSyncFn?.();
+      return currentState;
+    },
+
+    /** The race at lifted milestone `rows[i]` (of a run begun at `seed`),
+     * its snapshot or the replay of every milestone's commands up to it, held
+     * to the row's checksum: the head, and the ring's only frame. */
+    loadMilestone(rows, i, newSeed = seed, newOptions = initOptions) {
+      if (!lifting) throw new Error("loadMilestone: this host lifts no milestones");
+      const at = loadMilestone(engine, { seed: newSeed, initOptions: newOptions, decode: lifting.decode }, rows, i);
+      const snap = engine.saveState(at);
+      this.stop();
+      initOptions = newOptions;
+      currentTick = rows[i].frame;
+      displayTick = currentTick;
+      accumulator = 0;
+      lastTime = null;
+      snapshots.clear();
+      inputLog.clear();
+      sums.clear();
+      currentState = engine.loadState(snap);
+      previousState = currentState;
+      commitSnapshot(currentTick, snap, {});
+      lifter = lift(currentTick);
+      onRender(currentState, currentState, 1.0, currentTick, false);
       controlsSyncFn?.();
       return currentState;
     },
 
     mountControls(container) {
       if (!container) throw new Error("mountControls: container element is required");
-      container.innerHTML = `
+      container.replaceChildren(parseMarkup(container.ownerDocument, `
         <div class="kinetic-controls">
           <div class="kc-playback">
             <button type="button" class="kc-btn kc-play">PAUSE</button>
@@ -357,7 +462,7 @@ export function createKineticHost(options) {
             <span class="kc-rate-badge">${currentRateHz} Hz</span>
           </div>
         </div>
-      `;
+      `));
 
       const btnPlay = container.querySelector(".kc-play");
       const btnPrev = container.querySelector(".kc-prev");
@@ -424,8 +529,198 @@ export function createKineticHost(options) {
 
       return () => {
         controlsSyncFn = null;
-        container.innerHTML = "";
+        container.replaceChildren();
       };
     }
+  };
+}
+
+// Touch, the input mapper's third source: docs/kinetic.md "Touch" is the
+// contract.
+
+export const TOUCH_ZONE = "data-touch-zone";
+export const TOUCH_PREFIX = "touch:";
+
+// What makes a zone a key to the browser: touch-action alone stops its pan
+// and zoom (a pointerdown's preventDefault does not), so the platform sets
+// it rather than each app's stylesheet.
+const ZONE_CSS = `[${TOUCH_ZONE}] { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }`;
+const zoned = new WeakSet();
+function adoptZoneStyle(doc) {
+  if (zoned.has(doc)) return;
+  const sheet = new doc.defaultView.CSSStyleSheet();
+  sheet.replaceSync(ZONE_CSS);
+  doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
+  zoned.add(doc);
+}
+
+/** The zones under a pointer event: the topmost element's nearest zone
+ * within `root`; a sliding pointer enters no `data-touch-tap` zone. */
+function zonesUnder(root) {
+  return (ev, sliding) => {
+    const hit = root.ownerDocument.elementFromPoint(ev.clientX, ev.clientY)?.closest(`[${TOUCH_ZONE}]`);
+    if (!hit || !root.contains(hit) || (sliding && hit.hasAttribute("data-touch-tap"))) return [];
+    return hit.getAttribute(TOUCH_ZONE).split(/\s+/).filter(Boolean);
+  };
+}
+
+/**
+ * The touch tracker of `root`, one per root however many mappers read it:
+ * each `listen(press)` hears `press(code, down, ev)` once a zone is first
+ * held and once it is last let go, and returns its unlisten.
+ * @param {Element} root
+ * @param {{zonesAt?: (ev: PointerEvent, sliding: boolean) => string[]}} [opts]
+ */
+export function attachTouch(root, { zonesAt = zonesUnder(root) } = {}) {
+  const doc = root.ownerDocument;
+  const win = doc.defaultView;
+  adoptZoneStyle(doc);
+  /** @type {Set<(code: string, down: boolean, ev: Event) => void>} */
+  const listeners = new Set();
+  /** @type {Map<number, string[]>} */
+  const pointers = new Map();
+  /** @type {Map<string, number>} */
+  const held = new Map();
+  let shown = "";
+
+  const show = () => {
+    const now = [...held.keys()].join(" ");
+    if (now === shown) return;
+    shown = now;
+    root.setAttribute("data-touch-held", now);
+  };
+  const press = (zone, down, ev) => {
+    for (const listener of listeners) listener(TOUCH_PREFIX + zone, down, ev);
+  };
+  const hold = (zone, ev) => {
+    const n = (held.get(zone) ?? 0) + 1;
+    held.set(zone, n);
+    if (n === 1) press(zone, true, ev);
+  };
+  const letGo = (zone, ev) => {
+    const n = held.get(zone) - 1;
+    if (n > 0) return held.set(zone, n);
+    held.delete(zone);
+    press(zone, false, ev);
+  };
+  // Entered before left, so a slide between two zones that share one keeps
+  // it held throughout.
+  const place = (id, zones, ev) => {
+    const was = pointers.get(id);
+    for (const zone of zones) if (!was.includes(zone)) hold(zone, ev);
+    for (const zone of was) if (!zones.includes(zone)) letGo(zone, ev);
+    pointers.set(id, zones);
+    show();
+  };
+  const lift = (id, ev) => {
+    place(id, [], ev);
+    pointers.delete(id);
+  };
+
+  const down = (ev) => {
+    const zones = zonesAt(ev, false);
+    if (zones.length === 0) return;
+    if (ev.cancelable) ev.preventDefault();
+    root.setPointerCapture(ev.pointerId);
+    pointers.set(ev.pointerId, []);
+    place(ev.pointerId, zones, ev);
+  };
+  const move = (ev) => {
+    if (pointers.has(ev.pointerId)) place(ev.pointerId, zonesAt(ev, true), ev);
+  };
+  const up = (ev) => {
+    if (pointers.has(ev.pointerId)) lift(ev.pointerId, ev);
+  };
+  // What GameInputs releases its keys on.
+  const releaseAll = (ev) => {
+    for (const id of [...pointers.keys()]) lift(id, ev);
+  };
+  const hidden = (ev) => {
+    if (doc.hidden) releaseAll(ev);
+  };
+
+  const wired = [
+    [root, "pointerdown", down, { passive: false }],
+    [root, "pointermove", move, { passive: true }],
+    [root, "pointerup", up, { passive: true }],
+    [root, "pointercancel", up, { passive: true }],
+    [root, "lostpointercapture", up, { passive: true }],
+    [win, "blur", releaseAll, false],
+    [doc, "visibilitychange", hidden, false],
+  ];
+  for (const [target, type, fn, opts] of wired) target.addEventListener(type, fn, opts);
+  return {
+    listen(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    detach() {
+      for (const [target, type, fn, opts] of wired) target.removeEventListener(type, fn, opts);
+    },
+  };
+}
+
+/**
+ * Creates a unified kinetic input manager with virtual action bindings,
+ * edge latching, blur clearing, macOS meta key handling, Gamepad API support,
+ * and with `touch`, an attachTouch tracker's zones as `touch:<zone>` keys.
+ * @param {object} options
+ * @param {HTMLElement|Document} [options.element]
+ * @param {Record<string, string[]>} [options.bindings]
+ * @param {boolean} [options.preventDefaults=true]
+ * @param {boolean} [options.gamepad=true]
+ * @param {ReturnType<typeof attachTouch>} [options.touch]
+ */
+export function createKineticInput(options = {}) {
+  const inputs = new GameInputs(options.element, {
+    preventDefaults: options.preventDefaults ?? true,
+    gamepad: options.gamepad !== false,
+  });
+
+  const bindings = options.bindings || {};
+  const latched = new Set();
+  const unlisten = options.touch?.listen((code, down, ev) => inputs._handleKeyEvent(code, down, ev)) ?? (() => {});
+
+  function registerBinding(action, ...keys) {
+    inputs.bind(action, ...keys);
+    inputs.down.on(action, () => {
+      latched.add(action);
+    });
+  }
+
+  for (const [action, keys] of Object.entries(bindings)) {
+    registerBinding(action, ...(Array.isArray(keys) ? keys : [keys]));
+  }
+
+  return {
+    inputs,
+    bind: registerBinding,
+    unbind: (action) => inputs.unbind(action),
+    getBindings: () => inputs.getBindings(),
+    isDown: (action) => !!inputs.state[action],
+    wasPressed: (action) => (inputs.pressCount[action] || 0) > 0 || latched.has(action),
+    poll: () => {
+      /** @type {Record<string, boolean>} */
+      const state = {};
+      for (const action in inputs.state) {
+        state[action] = !!inputs.state[action] || latched.has(action);
+      }
+      latched.clear();
+      inputs.tick();
+      return state;
+    },
+    clear: () => {
+      latched.clear();
+      for (const action in inputs.state) {
+        inputs.state[action] = false;
+      }
+      for (const action in inputs.pressCount) {
+        inputs.pressCount[action] = 0;
+      }
+    },
+    destroy: () => {
+      unlisten();
+      inputs.destroy();
+    },
   };
 }

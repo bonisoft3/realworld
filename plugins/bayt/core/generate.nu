@@ -1,8 +1,7 @@
 # generate.nu — walk the #render bundle and write every output file.
 #
-# Pure/impure split: CUE computes the full render (#manifestGen +
-# #taskfileGen + #dockerComposeGen + #skaffoldGen + #vscodeGen + #bakeGen),
-# this script reads the JSON output and writes files to disk.
+# Pure/impure split: CUE computes the full render (#render), this script
+# reads the JSON output and writes files to disk.
 #
 # Usage (from a project directory containing bayt.cue):
 #
@@ -101,10 +100,12 @@ export def scan-projects [workspace_root: string] {
 	# but define schemas, not projects. Anchor repo-relative paths to
 	# workspace_root so the downstream `cue export` works from any cwd.
 	let rel_paths = (workspace-files $workspace_root
-		| where ($it | str ends-with "/bayt.cue") or $it == "bayt.cue"
+		| where ($it | str ends-with "/bayt.cue") or ($it | str ends-with "\\bayt.cue") or $it == "bayt.cue"
 		| where not ($it | str starts-with "plugins/bayt/core/")
+		| where not ($it | str starts-with "plugins/bayt/core\\")
 		| where not ($it | str starts-with "plugins/bayt/stacks/")
-		| each { |p| $"($workspace_root)/($p)" }
+		| where not ($it | str starts-with "plugins/bayt/stacks\\")
+		| each { |p| $workspace_root | path join $p }
 	)
 	# The cue stub installs on its first run; concurrent first runs race that
 	# install and find it half-written ("http:cue.toml does not have an
@@ -162,12 +163,18 @@ export def partition-scan [scanned: table]: nothing -> record {
 	let rooted = ($scanned | where {|r| $r.rooted and $r.dir_rel != "." })
 	# By where each bayt.cue sits: a project below a nested root declares its
 	# dir relative to that root, not to this one.
-	let roots = ($rooted | each {|n| $n.path | path dirname })
-	let under = {|at| $roots | any {|n| $at == $n or ($at | str starts-with $"($n)/") } }
-	let below = {|at| $roots | any {|n| $at | str starts-with $"($n)/" } }
-	let local = ($scanned | where {|r| not (do $under ($r.path | path dirname)) })
+	let roots = ($rooted | each {|n| scan-dir ($n.path | str replace --all '\' '/' | path dirname) })
+	let under = {|at|
+		let at_norm = (scan-dir ($at | str replace --all '\' '/'))
+		$roots | any {|n| $at_norm == $n or ($at_norm | str starts-with $"($n)/") }
+	}
+	let below = {|at|
+		let at_norm = (scan-dir ($at | str replace --all '\' '/'))
+		$roots | any {|n| $at_norm | str starts-with $"($n)/" }
+	}
+	let local = ($scanned | where {|r| not (do $under ($r.path | str replace --all '\' '/' | path dirname)) })
 	# Only the outermost get a pass here; each generates its own nested roots.
-	let nested = ($rooted | where {|r| not (do $below ($r.path | path dirname)) })
+	let nested = ($rooted | where {|r| not (do $below ($r.path | str replace --all '\' '/' | path dirname)) })
 	let index = ($local | reduce -f {} { |row, acc| $acc | insert $row.name $row.dir_rel })
 	let index = ($rooted | reduce -f $index { |row, acc| $acc | insert $row.name {rooted: $row.dir_rel} })
 	{local: $local, nested: $nested, index: $index}
@@ -209,7 +216,9 @@ def atomic-write [target: string, content: string] {
 
 # Rewrite the `bayt` build context from the published image to a
 # compose-YAML-relative path when BAYT_RUNTIME_DIR is set (monorepo-dev
-# mode).
+# mode). Unset, the image stays the default of `${BAYT_RUNTIME:-…}`: a
+# rooted project's committed composes serve its own repository too, so the
+# monorepo points them at its tree from the .bayt/.env its mirror leaves out.
 #
 # Operates on the record, not on the emitted text: the emitter folds a long
 # scalar onto a `>-` continuation line, so a pattern expecting
@@ -220,7 +229,6 @@ def atomic-write [target: string, content: string] {
 # would hash differently outer-vs-inner and break the depot cache.
 export def _inject-runtime [data: any, base: string]: nothing -> any {
 	let runtime_dir = ($env.BAYT_RUNTIME_DIR? | default "")
-	if ($runtime_dir | is-empty) { return $data }
 	# base arrives with OS separators when generation runs on Windows —
 	# normalize before splitting or the depth (and every ../ prefix)
 	# comes out short.
@@ -232,7 +240,8 @@ export def _inject-runtime [data: any, base: string]: nothing -> any {
 		$d.services | items {|name, svc|
 			let ctx = ($svc | get -o build.additional_contexts.bayt)
 			if $ctx != null and ($ctx | str starts-with "docker-image://") {
-				{$name: ($svc | update build.additional_contexts.bayt $rel_path)}
+				let to = if ($runtime_dir | is-empty) { $"${BAYT_RUNTIME:-($ctx)}" } else { $rel_path }
+				{$name: ($svc | update build.additional_contexts.bayt $to)}
 			} else {
 				{$name: $svc}
 			}
@@ -267,6 +276,43 @@ def _hash-header       [c: string]: nothing -> string { "# generated from bayt.c
 def _slash-header      [c: string]: nothing -> string { "// generated from bayt.cue — do not edit\n" + $c }
 def _json-header  [d: any]: nothing -> any { {_generated_from: "bayt.cue (do not edit)"} | merge $d }
 
+
+export def custom-outputs [bundle: record]: nothing -> list<record> {
+	let reserved = ["bayt.json" "Taskfile.yml" "Taskfile.bayt.yml" "compose.yaml" "compose.bayt.yaml" "compose.bayt.ports.yaml" "process-compose.yaml" "bake.hcl" "init.gradle.kts" "depot.yaml" "depot.hcl" "depot.json"]
+	let generated = [
+		...($bundle.manifest.files | columns | each { |n| $"bayt.($n).json" })
+		...($bundle.taskfile.files | columns | each { |n| $"Taskfile.($n).yaml" })
+		...($bundle.docker.dockerfiles | columns | each { |n| $"Dockerfile.($n)" })
+		...($bundle.docker.compose.files | columns | each { |n| $"compose.($n).yaml" })
+		...($bundle.skaffold.files | columns | each { |n| $"skaffold.($n).yaml" })
+		...($bundle.vscode.files | columns | each { |n| $"vscode.($n).json" })
+	]
+	mut names = []
+	mut outputs = []
+	for entry in ($bundle.passthrough.files? | default []) {
+		let name = $entry.name
+		if not ($name =~ '^[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(yaml|yml|json|toml|cue|txt)$') {
+			error make {msg: $"bayt: invalid generated filename: ($name)"}
+		}
+		if $name in ($reserved ++ $generated ++ $names) {
+			error make {msg: $"bayt: generated file collision: ($name)"}
+		}
+		let ext = $name | split row "." | last
+		let body = match $ext {
+			"yaml" | "yml" => { _hash-header ($entry.data | to yaml) }
+			"toml" => { _hash-header ($entry.data | to toml) }
+			"json" | "cue" => { $entry.data | to json --indent 2 }
+			"txt" => {
+				if ($entry.data | describe) != "string" { error make {msg: $"bayt: ($name) requires text"} }
+				$entry.data
+			}
+		}
+		$names = $names ++ [$name]
+		$outputs = $outputs ++ [{name: $name, body: $body}]
+	}
+	$outputs
+}
+
 # write-bundle writes all output files for a pre-loaded render bundle.
 # base — workspace-root-relative project dir (e.g. "path/to/project" or ".")
 def write-bundle [bundle: record, base: string, --depot] {
@@ -282,6 +328,7 @@ def write-bundle [bundle: record, base: string, --depot] {
 		error make {msg: $"bayt: the imported bayt CUE package predates this CLI \(launch shim include resolves to '($shim)'\) — refresh the vendored plugins/bayt tree to match the installed bayt version"}
 	}
 
+	let custom = custom-outputs $bundle
 	clear-bayt-dir $"($prefix).bayt"
 	write-render-driver $"($prefix)bayt.cue"
 
@@ -320,6 +367,9 @@ def write-bundle [bundle: record, base: string, --depot] {
 	atomic-write $"($prefix).bayt/compose.bayt.yaml" (_hash-header (_inject-runtime $bundle.docker.compose.bayt_root $base | to yaml))
 	for entry in ($bundle.docker.compose.files | transpose name data) {
 		atomic-write $"($prefix).bayt/compose.($entry.name).yaml" (_hash-header (_inject-runtime $entry.data $base | to yaml))
+	}
+	if ($bundle.docker.compose.ports | is-not-empty) {
+		atomic-write $"($prefix).bayt/compose.bayt.ports.yaml" (_hash-header ($bundle.docker.compose.ports | to yaml))
 	}
 
 	# --- process-compose: one file per project, one process per host process.
@@ -389,6 +439,10 @@ def write-bundle [bundle: record, base: string, --depot] {
 		}
 	}
 
+	for entry in $custom {
+		atomic-write $"($prefix).bayt/($entry.name)" $entry.body
+	}
+
 	print $"bayt: wrote files for project ($bundle.manifest.projectManifest.name)"
 }
 
@@ -412,7 +466,29 @@ def emit-depot-yaml [proj_dir: string, ws: string, --required, --group: record =
 		0 => { error make {msg: $"bayt: no compose base file in ($dir) — the depot flatten requires one"} }
 		_ => { error make {msg: $"bayt: ambiguous compose base files in ($dir): ($bases | str join ', ')"} }
 	})
-	let r = (do { cd $dir; ^docker compose -f $base --profile '*' config --no-interpolate } | complete)
+	# `config --no-interpolate` still runs compose-spec schema validation,
+	# whose anchored pull_policy pattern rejects `${BAYT_PULL_POLICY:-build}`.
+	let pull_var = "pull_policy: ${BAYT_PULL_POLICY:-build}"
+	let pull_tok = "pull_policy: every_0s"
+	let patched = (glob $"($dir)/.bayt/compose.*.yaml" | each { |f|
+		let raw = (open --raw $f)
+		if ($raw | str contains $pull_var) {
+			atomic-write $f ($raw | str replace --all $pull_var $pull_tok)
+			{file: $f, raw: $raw}
+		}
+	} | compact)
+	let compose_stub = ($ws | path join plugins/sayt/compose.toml)
+	let r = (do {
+		cd $dir
+		if ($compose_stub | path exists) and (which mise | is-not-empty) {
+			with-env { MISE_LOCKED: "0" } {
+				^mise tool-stub $compose_stub -f $base --profile '*' config --no-interpolate
+			}
+		} else {
+			^docker compose -f $base --profile '*' config --no-interpolate
+		}
+	} | complete)
+	for p in $patched { atomic-write $p.file $p.raw }
 	if $r.exit_code != 0 {
 		let detail = ($r.stderr | lines | last 3 | str join "\n")
 		# A depot opt-in declares docker a generate dependency; skipping
@@ -424,7 +500,7 @@ def emit-depot-yaml [proj_dir: string, ws: string, --required, --group: record =
 		print -e $detail
 		return
 	}
-	let flat = (relative-flat $r.stdout $ws | str replace --all "service:" "target:")
+	let flat = (relative-flat $r.stdout $ws | str replace --all "service:" "target:" | str replace --all $pull_tok $pull_var)
 	atomic-write $"($dir)/.bayt/depot.yaml" (_hash-header (_dedup-x-bake $flat))
 	if not ($group | is-empty) {
 		atomic-write $"($dir)/.bayt/depot.json" (depot-plan $flat $group | to json --indent 2)
@@ -543,7 +619,9 @@ export def _dedup-x-bake [flat: string]: nothing -> string {
 
 # pass1 extracts the project.targets map from a bayt.cue.
 # bayt_cue — path to bayt.cue (relative or absolute).
-def pass1 [bayt_cue: string] {
+export def pass1 [bayt_cue: string] {
+	let json_path = ($bayt_cue | path dirname | path join "bayt.json")
+	if ($json_path | path exists) { return (open $json_path | get targets) }
 	let r = (do { run-cue export $bayt_cue -e project.targets --out json } | complete)
 	if $r.exit_code != 0 {
 		print -e $"bayt: pass-1 failed for ($bayt_cue)"
@@ -566,7 +644,7 @@ def write-render-driver [bayt_cue: string] {
 	let pkg = (open --raw $bayt_cue | lines | where ($it | str starts-with "package ") | first | str replace "package " "")
 	let driver = ($bayt_cue | path dirname | path join ".bayt" "render.cue")
 	let core_import = (open $render_import_file)
-	atomic-write $driver $"// generated from bayt.cue — do not edit\npackage ($pkg)\n\nimport bayt_ \"($core_import)\"\n\n// Declared so a bayt.json project can inject the value via stdin —\n// file-mode identifier references only resolve against declarations.\nproject: _\ndepManifestsIn: {[string]: _}\nruntimeIn: *\"\" | string\n_render: \(bayt_.#render & {\"project\": project, depManifests: depManifestsIn, runtime: runtimeIn}\)\n"
+	atomic-write $driver $"// generated from bayt.cue — do not edit\npackage ($pkg)\n\nimport bayt_ \"($core_import)\"\n\n// Declared so a bayt.json project can inject the value via stdin —\n// file-mode identifier references only resolve against declarations.\nproject: _\ndepManifestsIn: {[string]: _}\nruntimeIn: *\"\" | string\nmoduleIn: *\"\" | string\n_render: \(bayt_.#render & {\"project\": project, depManifests: depManifestsIn, runtime: runtimeIn, module: moduleIn}\)\n"
 }
 
 def pass2 [bayt_cue: string, dep_manifests: record] {
@@ -576,7 +654,7 @@ def pass2 [bayt_cue: string, dep_manifests: record] {
 	# file-mode `cue export` cannot resolve the stub's @embed — inject the
 	# value as `project` and render from the driver alone.
 	let json_path = ($bayt_cue | path dirname | path join "bayt.json")
-	let base = {depManifestsIn: $dep_manifests, runtimeIn: ($env.BAYT_RUNTIME_DIR? | default "")}
+	let base = {depManifestsIn: $dep_manifests, runtimeIn: ($env.BAYT_RUNTIME_DIR? | default ""), moduleIn: (workspace-module ($bayt_cue | path dirname))}
 	let r = if ($json_path | path exists) {
 		let inject = ($base | insert project (open $json_path) | to json --raw)
 		(do { $inject | run-cue export - $driver -e _render --out json } | complete)
@@ -632,9 +710,9 @@ def load-dep-manifests [deps: list<string>, index: record, workspace_root: strin
 		let view = if ($parts | length) >= 3 { ($parts | get 2) } else { null }
 		let dep_dir_rel = (dep-to-dir $dep $index)
 		let manifest_path = if $dep_dir_rel == "." {
-			$"($workspace_root)/.bayt/bayt.($file_target).json"
+			$workspace_root | path join ".bayt" $"bayt.($file_target).json"
 		} else {
-			$"($workspace_root)/($dep_dir_rel)/.bayt/bayt.($file_target).json"
+			$workspace_root | path join $dep_dir_rel ".bayt" $"bayt.($file_target).json"
 		}
 		if not ($manifest_path | path exists) {
 			if ($dep in $optional) { continue }
@@ -665,11 +743,38 @@ def srcs-variants [deps: list<string>] {
 	$deps | where {|r| ($r | split row ":" | length) == 2 } | each {|r| $"($r):srcs" }
 }
 
+# workspace-module is the CUE module path a project is published under, which
+# salts its default host ports (#project._portIdentity): the nearest mirror's
+# `.mirror/cue.mod/module.cue` (copybara makes it the mirror's root module),
+# else the workspace's. So a project generates the same ports in the monorepo
+# and in its mirror. The `@vN` suffix is dropped: a major bump is no new project.
+export def workspace-module [from: string] {
+	# Both sides expanded, or a relative or symlinked `from` never meets the
+	# root and the walk climbs past it into an enclosing checkout's mirror.
+	let from = ($from | path expand)
+	let root = (find-workspace-root $from | path expand)
+	mut dir = $from
+	mut file = ($root | path join "cue.mod" "module.cue")
+	loop {
+		let mirror = ($dir | path join ".mirror" "cue.mod" "module.cue")
+		if ($mirror | path exists) { $file = $mirror; break }
+		if $dir == $root { break }
+		let parent = ($dir | path dirname)
+		if $parent == $dir { break }
+		$dir = $parent
+	}
+	let found = (open --raw $file | parse --regex '(?m)^module:\s*"(?P<path>[^"]+)"')
+	if ($found | is-empty) {
+		error make {msg: $"bayt: no module path in ($file)"}
+	}
+	$found.0.path | str replace --regex '@v[0-9]+$' ''
+}
+
 # find-workspace-root walks up from `from` to the directory containing cue.mod/.
 export def find-workspace-root [from: string] {
 	mut dir = $from
 	loop {
-		if ($"($dir)/cue.mod" | path exists) {
+		if ($dir | path join "cue.mod" | path exists) {
 			return $dir
 		}
 		let parent = ($dir | path dirname)
@@ -684,11 +789,15 @@ export def find-workspace-root [from: string] {
 # rooted at itself (dir ".") that contains it, or else the cue.mod root, which
 # is itself rooted when a project at it declares dir ".", as a mirror's root.
 export def root-for [scanned: table, workspace_root: string, here: string]: nothing -> record {
+	let here_norm = (scan-dir $here)
 	let containing = ($scanned
 		| where {|r| $r.rooted }
-		| each {|r| $r.path | path dirname }
-		| where {|at| $here == $at or ($here | str starts-with $"($at)/") }
-		| sort-by {|at| $at | str length })
+		| each {|r| $r.path | str replace --all '\' '/' | path dirname }
+		| where {|at|
+			let at_norm = (scan-dir $at)
+			$here_norm == $at_norm or ($here_norm | str starts-with $"($at_norm)/")
+		}
+		| sort-by {|at| (scan-dir $at) | str length })
 	if ($containing | is-empty) {
 		{root: $workspace_root, rooted: false}
 	} else {
@@ -887,7 +996,7 @@ def generate-root [workspace_root: string, scanned?: any, --rooted, --recursive 
 			# relative paths (used by --runtime injection) are computed
 			# against the right depth — same convention --recursive uses.
 			let project_rel = (scan-dir ((pwd) | path relative-to $workspace_root))
-			let bayt_cue = if $project_rel == "." { $"($workspace_root)/bayt.cue" } else { $"($workspace_root)/($project_rel)/bayt.cue" }
+			let bayt_cue = if $project_rel == "." { $workspace_root | path join "bayt.cue" } else { $workspace_root | path join $project_rel "bayt.cue" }
 			cd $workspace_root
 			# The row can be missing here (e.g. a gitignored dir escapes the
 			# scan's listing); regen-project's pass 1 covers it.

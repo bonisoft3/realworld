@@ -20,11 +20,10 @@ const w = (...pairs: [string, string | number | boolean][]): Write[] =>
   pairs.map(([col, value]) => ({ col, value }))
 
 describe("machineWrites", () => {
-  it("collects the empty row, the context, the state column and every assign literal", () => {
+  it("collects the empty row, the state column and every assign literal", () => {
     const machine = {
       field: "variant",
       initial: "mineiro",
-      context: { winner: "" },
       states: {
         mineiro: { on: { "click@trigger-paulista": [{ target: "paulista", assign: { hand_no: "1", stake: "2" } }] } },
         paulista: {},
@@ -34,7 +33,7 @@ describe("machineWrites", () => {
     // expectState compares that column strictly on every step — a machine
     // spelling it one way in an arrow and another in an assign disowns half
     // its own rows, which is the defect this rule is for.
-    expect(machineWrites(machine, '{"id":"","variant":"mineiro"}')).toEqual([
+    expect(machineWrites(machine, '{"id":"","variant":"mineiro","winner":""}')).toEqual([
       { col: "id", value: "" },
       { col: "variant", value: "mineiro" },
       { col: "winner", value: "" },
@@ -43,6 +42,23 @@ describe("machineWrites", () => {
       { col: "stake", value: "2" },
       { col: "variant", value: "paulista" },
     ])
+  })
+
+  it("does not mistake a typed fallback placeholder for a string write", () => {
+    const assignment: { hand_no: string | number } = { hand_no: 0 }
+    const machine = {
+      field: "variant", initial: "mineiro",
+      states: { mineiro: { on: { reset: { assign: assignment } } } },
+    }
+    const writes = machineWrites(machine, '{"hand_no":"{start_offset}","id":"page-{id}"}')
+    expect(writes).toEqual([
+      { col: "id", value: "page-{id}" },
+      { col: "variant", value: "mineiro" },
+      { col: "hand_no", value: 0 },
+    ])
+    expect(writeLint(writes, match())).toBe(null)
+    assignment.hand_no = "{start_offset}"
+    expect(machineWrites(machine)).toContainEqual({ col: "hand_no", value: "{start_offset}" })
   })
 
   // apps/truco assigns {"type":"stake0"} to stake; the module returns "1" or

@@ -3,7 +3,11 @@
 // Compartment refuses, so lint loads each the same way first.
 package emit
 
-import "strings"
+import (
+	"strings"
+	"encoding/json"
+	"list"
+)
 import pronto "bonisoft.org/plugins/pronto"
 
 _computed: _code & {
@@ -13,7 +17,7 @@ _computed: _code & {
 			durability: "live"
 			fields: [{name: "id", type: "uuid", pk: true}, {name: "odds", type: "int"}]
 		}
-		computations: chances: to: ["Chance"]
+		computations: chances: {to: ["Chance"], endowments: ["Crypto", "TextEncoder", "Cheerio"]}
 	}
 }
 
@@ -25,8 +29,23 @@ _computedLoop: (pronto.#DefaultLoop & {
 _admit: _computedLoop.surface.checks.admit
 
 admitLints:       _admit.verb & "lint"
-admitLoadsModule: strings.HasSuffix(_admit.cmds[0], #"admit.ts) "computations/chances.js""#) & true
+// A computation's endowments ride with its module, as the service loads it.
+admitLoadsModule: strings.HasSuffix(_admit.cmds[0], #"admit.ts) "computations/chances.js=Crypto,TextEncoder,Cheerio""#) & true
 admitUnderPins:   strings.Contains(_admit.cmds[0], "services compute deno.json") & true
+// And they reach the service that cages it.
+_computedCluster: (pronto.#DefaultCluster & {code: _computed, statics: []}).out
+computeEndowed: strings.Contains(_computedCluster.surface.targets.compute.compose.environment.COMPUTATIONS, #""endowments":["Crypto","TextEncoder","Cheerio"]"#) & true
+
+_withHook: _computed & {state: computations: chances: onComplete: "capture_team_odds_history"}
+_hookCluster: (pronto.#DefaultCluster & {code: _withHook, statics: []}).out
+_hookConfig: json.Unmarshal(_hookCluster.surface.targets.compute.compose.environment.COMPUTATIONS)
+completionRPCReachesRuntime: _hookConfig[0].onComplete & "capture_team_odds_history"
+_plainCluster: (pronto.#DefaultCluster & {code: _computed, statics: []}).out
+_plainConfig: json.Unmarshal(_plainCluster.surface.targets.compute.compose.environment.COMPUTATIONS)
+undeclaredCompletionRPCAbsent: (_plainConfig[0].onComplete == _|_) & true
+invalidCompletionRPCsRefused: [for rpc in ["", "Capture", "rpc/capture", "capture-name", strings.Repeat("a", 64)] {
+	((pronto.#Computation & {name: "chances", to: ["Chance"], onComplete: rpc}) == _|_) & true
+}]
 
 // Released to pages, the page runs no computation, so the release settles the
 // cluster and ships its live tables before it bundles; with no stream the
@@ -48,3 +67,37 @@ pagesBundlesRows:   strings.HasSuffix(_pages.cmds[1], " --derived dist/derived.s
 pagesDerivesAlone:  (len(_pages.cmds) == 2) & true
 _unpaged:           _computedLoop.surface.verbs
 unpagedHasNoTarget: (_unpaged.pages == _|_) & true
+
+// Publication includes derived inputs regardless of browser durability or writer.
+_freshInputs: _computed & {
+	state: {
+		entities: {
+			Goal: {table: "goal", durability: "live", fields: [{name: "id", type: "uuid", pk: true}]}
+			Retained: {table: "retained", durability: "offline", fields: [{name: "id", type: "uuid", pk: true}]}
+			RequestProjection: {table: "request_projection", durability: "server", fields: [{name: "id", type: "uuid", pk: true}]}
+			ServerPipeline: {table: "server_pipeline", durability: "server", fields: [{name: "id", type: "uuid", pk: true}]}
+		}
+		pipelines: server_pipeline: {raw: true, note: "the authored pipeline owns the sink writes", from: "Goal", to: "ServerPipeline", group: "server-pipeline"}
+	}
+}
+_freshCluster: (pronto.#DefaultCluster & {code: _freshInputs, statics: []}).out
+_freshTerminal: (pronto.#DefaultTerminal & {code: _freshInputs}).out
+_freshLoop: (pronto.#DefaultLoop & {code: _freshInputs, cluster: _freshCluster, terminal: _freshTerminal}).out
+_freshFiles: (pronto.#emit & {
+	code:     _freshInputs
+	cluster:  _freshCluster
+	terminal: _freshTerminal
+	loop:     _freshLoop
+	build: (pronto.#DefaultBuild & {code: _freshInputs, loop: _freshLoop, cluster: _freshCluster, terminal: _freshTerminal}).out
+}).files
+_freshCDC:                         strings.Split(_freshFiles["services/database/migrations/008_publication.sql"].text, "-- Electric")[0]
+serverInputStillCaptured:          strings.Contains(_freshCDC, "profile") & true
+liveInputStillCaptured:            strings.Contains(_freshCDC, "goal") & true
+offlineInputStillCaptured:         strings.Contains(_freshCDC, "retained") & true
+computedOutputCaptured:       strings.Contains(_freshCDC, "chance") & true
+requestProjectionCaptured:      strings.Contains(_freshCDC, "request_projection") & true
+serverPipelineOutputCaptured: strings.Contains(_freshCDC, "server_pipeline") & true
+cdcSourceTables: json.Marshal(list.SortStrings(strings.Split(
+	_freshFiles["docker/conduit-pipeline.yaml"].data.pipelines[0].connectors[0].settings.tables, ","))) & json.Marshal(["chance", "goal", "profile", "request_projection", "retained", "server_pipeline"])
+computeWaitsForSourceSlot: _freshCluster.surface.targets.compute.compose.environment.CDC_SLOT &
+	_freshFiles["docker/conduit-pipeline.yaml"].data.pipelines[0].connectors[0].settings["logrepl.slotName"]

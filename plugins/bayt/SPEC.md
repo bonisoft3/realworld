@@ -53,6 +53,9 @@ from the target and merged at evaluation. Keyed entries (`defaultGlobs`,
 
 `inject` forces `shell: "sh"`: the wrapped body is a heredoc `RUN` that
 `/bin/sh` interprets.
+Incremental RUNs retain singleton injection around Task. Multi-command
+injection and differing `dockerfile.do`/shell overrides are rejected: a shared
+Task invocation cannot preserve their individual execution scopes.
 
 ```cue
 // 1. Shorthand: `do` is the "builtin" rule.
@@ -134,6 +137,18 @@ HCL cannot say "leave unset". `.bayt/depot.yaml` is the graph pre-flattened at
 generate time, kept as compose because `buildx bake --print` would resolve the
 `${…}` CI still has to bind.
 
+**Image tags and refs.** An explicit `image:` on every emitted service prevents
+compose from inventing `<project>-<service>` and forcing a rebuild on `up`/`run`
+without `--build`. Under local builds (default), the image is
+`bayt-<svc>:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}`, following the caller's
+compose project name (`-p`, `COMPOSE_PROJECT_NAME`, `name:` or directory default)
+so distinct checkouts never collide or restart each other's containers; `build.tags`
+lists that image first, followed by `bayt-<svc>:latest` (bake reads only
+`build.tags`, so the image leads it, while `:latest` still names the most recent
+build across the host). Under `images: pull`, the image is
+`<registry>/bayt-<svc>:${BAYT_IMAGE_TAG:-latest}` and `build.tags` lists only
+that registry ref. A target's explicit `compose.image` overrides both.
+
 ## The runtime process
 
 `entrypoint` is the process a target runs, whether it serves until stopped or
@@ -173,11 +188,28 @@ its target depends on.
 **Ports.** A port reaches its process only through `env`, read directly or by
 the entrypoint's shell (`-p "$PORT"`), which expands at run time on both sides.
 On the host it is `${<TARGET>_<NAME>_PORT:-<n>}`, where `<n>` is the port's
-`host`, or else a hash of project, target and port into 10000–32767, below the
-Linux and macOS ephemeral ranges: two projects differ, and two checkouts of one
-collide loudly on the bind. Two host processes' ports on one variable or one
+`host`, or else a hash into 10000–32767, below the Linux and macOS ephemeral
+ranges, of the repo's CUE module path, the project's name and `discriminator`,
+the target and the port: two projects differ, in one repo or two, and two
+checkouts of one collide loudly on the bind; a `discriminator` separates two
+projects whose ports collide. Two host processes' ports on one variable or one
 default fail generation; containers each have their own network. A port without
 `env` keeps its number on the host, where no caller can move it either.
+
+**Published ports.** A container's port with `publish` binds the host at
+`${<VAR>:-<n>}:<port>`, `<n>` as above. Its variable is sourced as a secret's
+is: `publish: true` takes the derived `<TARGET>_<NAME>_PORT`, the one a host
+process's port moves by; `publish: {environment: V}` takes one the declaring
+project names. Only the project's root compose publishes it, merging
+`.bayt/compose.bayt.ports.yaml` over the federation root: what a person brings
+up binds it, while a closure (integrate's), which includes fragments, keeps it
+private, as is every port without `publish`. A bare `${<VAR>}` in the project's
+compose environment takes the same default, so a value built on the port, an
+origin, follows it. Generation fails, naming the ports, when two published
+ports share a variable or a default, when one shares a variable or a default
+with another target's host process, or when the target publishing it has no
+compose service. A target that is both a host process and a container may
+publish the port its process moves by: launch starts it one way or the other.
 
 **Addresses.** A value names a peer as compose does, `<target>:<port>` or
 `<project>-<target>:<port>`, and the host projection rewrites it to `127.0.0.1`
@@ -274,8 +306,17 @@ missing literal file is skipped with a warning, srcs that match no file fail the
 check, and a missing out forces a rerun, which the cache can answer with a
 fetch. Files hash with nushell's `hash sha256`, memoized by path, size and
 mtime in `.task/bayt/index`; git, when bayt's root is a work tree's top level,
-only lists the files faster. The stamp needs only nushell, so it runs in
-containers, on Windows and in air-gapped CI.
+only lists the files faster. Symbolic links hash their target path and, for a
+file, its contents. Directory link contents belong to a separately declared
+source dependency. The stamp needs only nushell, so it runs in containers, on
+Windows and in air-gapped CI.
+
+An interactive caller can set `BAYT_INVOCATION` to JSON containing `manifest`
+(the absolute manifest path) and `value` (its arguments and execution options).
+That value contributes to both stamp and cache keys for the selected target;
+dependencies, synthetic source views and image fingerprints ignore it. Sayt
+sets this for the requested verb so changing arguments or platform runs the
+new invocation without invalidating its prerequisites.
 
 **`bayt cache run [--full] [--similar] -- <cmd>`** computes the same key and
 restores an exact hit's outs. With `--full` (`bayt.cache.full`) it skips the
@@ -320,3 +361,17 @@ inputs and a `cache.full` hit covers a change to none.
   reach every key through the setup target's outs.
 - **bayt's cache in place of a tool's own** — a per-target key misses whenever
   any input changed, where gradle's per-task cache still hits on the rest.
+
+## Additional file emission
+
+`#project.files` maps filenames to values emitted under `.bayt/` without changing
+the names. `#target.files` inserts the target name before the final extension.
+Supported extensions are `yaml`, `yml`, `json`, `toml`, `cue` and `txt`. Text
+requires a string; other formats serialize the declared data. Generated JSON
+contains exactly that data, and generated CUE contains data without a package.
+
+The writer validates filenames, duplicate destinations and built-in output
+collisions before clearing the previous output tree. Only `.bayt/.env` survives
+the normal sweep; removed custom files do not. Target-level declarations ride
+in their target manifest. Consumers of project-level files declare the emitted
+paths as inputs.

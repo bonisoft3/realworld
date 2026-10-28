@@ -3,7 +3,7 @@ description: |
   Build + run a project's integration flow via `sayt integrate`. A thin
   wrapper: it assembles `sayt integrate <mode-flags> <flags> --target
   <target>` from the caller's inputs and runs it — the build axis,
-  capability flags, docker-in-docker bridging, and the builder to use
+  capability flags, the docker bridge, and the builder to use
   (`--with-buildx` resolves its own injection target when none is named
   — see `sayt integrate --help`) are all `sayt integrate`'s own concern,
   not this action's; it just makes sure a builder exists and is active
@@ -45,7 +45,7 @@ inputs:
   flags:
     description: |
       Extra flags forwarded to `sayt integrate`, appended after whatever
-      `mode` expands to — capability flags (`--dind`, `--dind-bridge`,
+      `mode` expands to — capability flags (`--with-docker`,
       `--with-buildx`, `--with-kube`, `--with-testcontainers`,
       `--with-host-env`), `--no-build`, cache escape hatches, or `--builder
       <name>` to point at a builder other than the active one (e.g. a
@@ -129,15 +129,35 @@ runs:
     # A fresh builder per job costs nothing on GitHub, where the runner dies
     # with it and remote caches carry state. An act replay has those caches
     # off, so it builds on the daemon's own builder, whose cache outlives the run.
+    # A runner that names a shared BuildKit (BUILDKIT_HOST, from its own
+    # environment, which `env.` expressions cannot see) builds there: that
+    # daemon must run the digest pinned below, or cache keys diverge.
+    # The summary reads only this action's builds out of the builder's history.
+    - name: Mark the build window
+      id: window
+      shell: bash
+      run: echo "since=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+    - name: Find a shared BuildKit
+      id: buildkit
+      if: ${{ !env.ACT }}
+      shell: bash
+      run: echo "host=${BUILDKIT_HOST:-}" >> "$GITHUB_OUTPUT"
+    - name: Set up Docker Buildx on the shared BuildKit
+      id: buildx-remote
+      if: ${{ !env.ACT && steps.buildkit.outputs.host != '' }}
+      uses: docker/setup-buildx-action@v4
+      with:
+        driver: remote
+        endpoint: ${{ steps.buildkit.outputs.host }}
     - name: Set up Docker Buildx
       id: buildx
-      if: ${{ !env.ACT }}
+      if: ${{ !env.ACT && steps.buildkit.outputs.host == '' }}
       uses: docker/setup-buildx-action@v4
       with:
         buildkitd-flags: ${{ inputs.buildkitd-flags }}
         # Pin buildkit by digest: cache-key determinism needs identical
         # buildkit across runs. Bump deliberately.
-        driver-opts: image=mirror.gcr.io/moby/buildkit:v0.30.0@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f
+        driver-opts: image=moby/buildkit:v0.30.0@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f
         # mirror.gcr.io: dodge Docker Hub's anonymous pull cap on buildkit pulls.
         buildkitd-config-inline: |
           [registry."docker.io"]
@@ -212,11 +232,12 @@ runs:
         cache_to="$CACHE_TO_INPUT"
         target_pattern="${CACHE_TARGET_PATTERN:-$TARGET}"
         if [ -z "$cache_from" ] && [ -n "$CACHE_SCOPE" ]; then
-          cache_from=$(printf 'type=gha,scope=%s-%s\ntype=gha,scope=main-%s\n' \
+          cache_from=$(printf 'type=gha,version=2,scope=%s-%s\ntype=gha,version=2,scope=main-%s\n' \
             "$CACHE_SCOPE" "$TARGET" "$TARGET")
         fi
         if [ -z "$cache_to" ] && [ -n "$CACHE_SCOPE" ]; then
-          cache_to="type=gha,scope=${CACHE_SCOPE}-${TARGET},mode=max"
+          # A cache the account cannot store is a slower next run, not a failed one.
+          cache_to="type=gha,version=2,scope=${CACHE_SCOPE}-${TARGET},mode=max,ignore-error=true"
         fi
         p1=""
         while IFS= read -r line; do
@@ -305,7 +326,7 @@ runs:
 
     # The actual work, delegated to the CLI — the one place that builds
     # and/or runs anything. Skipped only on a marker hit. No --builder is
-    # passed — see the top-level description and dind.nu's current-builder.
+    # passed — see the top-level description and docker-bridge.nu's current-builder.
     - name: sayt integrate
       if: ${{ steps.cache-gate.outputs.active != 'true' || steps.marker.outputs.cache-hit != 'true' }}
       shell: bash
@@ -375,5 +396,6 @@ runs:
       uses: ./plugins/sayt/.github/actions/sayt/summary
       with:
         name: ${{ steps.summary.outputs.name }}
-        builder: ${{ steps.buildx.outputs.name }}
+        builder: ${{ steps.buildx.outputs.name || steps.buildx-remote.outputs.name }}
+        since: ${{ steps.window.outputs.since }}
         debug: ${{ inputs.debug }}

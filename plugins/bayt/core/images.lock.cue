@@ -23,8 +23,8 @@ package bayt
 lock: images: {
 	// The runtime tree consumers COPY onto their PATH — built by
 	// plugins/bayt/Dockerfile.runtime, released on the `runtime/v*` stream.
-	bayt:         "bonitao/bayt-runtime:1.2.0@sha256:c308d331cc58cddb8c90cdbbec0562de86d8c0f17105bea63c8727f1d55e36ab"
-	lazybox:      "bonitao/lazybox:0.8.3@sha256:c896a6836673d8fd217f6021a2522351fd82d580ed985159feb2f10373018e73"
+	bayt:         "bonitao/bayt-runtime:1.2.2@sha256:a2e08b0fd123349e30e28843665ab2a2fde9fe25fddf82919fe499f3f01f1b8f"
+	lazybox:      "bonitao/lazybox:0.8.5@sha256:091a3b63ba222777000acc3bf8327faebfea4870e23ee07c6eb42431dadb2ac6"
 	busybox:      "busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223"
 	// Visual lint runs a real browser against a served app, so the
 	// browsers are the image's and their revisions are playwright's: the tag
@@ -32,12 +32,10 @@ lock: images: {
 	// the browsers it finds. Deno arrives as a binary because the playwright
 	// base ships node and the checker is a Deno script.
 	playwright:   "mcr.microsoft.com/playwright:v1.61.1-noble@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48"
-	deno_bin:     "denoland/deno:bin-2.5.5@sha256:a8dd9a073b2b4d1beb77a8174830c5af54e32517808dcc28249ed6c04fdac979"
-	docker:       "docker:29.7.1-cli@sha256:27a51d5ab1cd38d9eeaba7b415b8c07bc10c31e1cf1ec8d78f6413fcfab3f44f"
-	alpine_socat: "mirror.gcr.io/alpine/socat:1.8.0.0@sha256:a6be4c0262b339c53ddad723cdd178a1a13271e1137c65e27f90a08c16de02b8"
-	// depot CLI — static binary for the dindbox's inner depot bake. Multiplatform digest.
-	depot_cli:    "ghcr.io/depot/cli:2.101.78@sha256:71fc7e6cf9f10ee1699bdba40e9461387f3a8406bc7bb9a9b1857c38587a7254"
-	leap: "opensuse/leap:16.0@sha256:859560554b625c225fa767b76d61253d529b95d082c2d68579ad69168d5e3da7"
+	deno_bin:     "denoland/deno:bin-2.9.7@sha256:bc5aa4466e21b6d3021226a85ba2e1911f7c386254d97b9d797903ab74edace2"
+	docker:       "docker:29.9.1-cli@sha256:6fae2214c3121a28d5aa639d09032f61310b7c9c75ffbad1025f261a1b621800"
+	alpine_socat: "alpine/socat:1.8.0.0@sha256:a6be4c0262b339c53ddad723cdd178a1a13271e1137c65e27f90a08c16de02b8"
+	leap: "opensuse/leap:16.0@sha256:7f3aeccb6a613c0fc1690d3d3e5eb493fd477ee4587de20640017fc36d72f9b0"
 	// envoyproxy/envoy ships /usr/local/bin/envoy and /usr/bin/envsubst.
 	// Both are glibc-linked, so they COPY into any glibc-based stage
 	// when the matching /usr/lib shared libs are COPY'd alongside.
@@ -49,7 +47,7 @@ lock: images: {
 	// declarative environment file. Replaces mockserver, whose x86-only
 	// JVM image ran under qemu on Apple Silicon and never bound its port.
 	mockoon: "mockoon/cli:9.3.0@sha256:71b47e0ff0c4db496e63fc36a710ce971084e2e31f7504deb5cdf15555af598f"
-	// node:22-slim — glibc runtime base for Next.js standalone servers
+	// node slim — glibc runtime base for Next.js standalone servers
 	// (`node server.js`). Multiplatform digest (linux/amd64 + arm64).
-	node: "node:22-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c"
+	node: "node:26-slim@sha256:193fe51b64e77981119c98c2002c9e32a70e2f006fb4d25068ce0558998917f0"
 }

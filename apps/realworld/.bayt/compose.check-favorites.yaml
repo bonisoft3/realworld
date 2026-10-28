@@ -1,17 +1,22 @@
 # generated from bayt.cue — do not edit
 services:
-  apps_realworld-check-favorites:
+  realworld-check-favorites:
     build:
       additional_contexts:
-        apps_realworld-setup: service:apps_realworld-setup
-        apps_realworld-launch: service:apps_realworld-launch
-        root: ../../..
+        realworld-setup: service:realworld-setup
+        realworld-launch: service:realworld-launch
+        plugins_omnishell-runtime-image: >-
+          ${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/omnishell:0.20.2@sha256:0f7d84358244c875a76bf97f13974bf6336e15f639a2f01fa31ad3eb0ce0d8a7}${MONOREPO_COMPOSE_MODE:+:plugins_omnishell-runtime-image}
       context: ..
       dockerfile: .bayt/Dockerfile.check-favorites
       target: check-favorites
+      tags:
+      - bayt-realworld-check-favorites:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
+      - bayt-realworld-check-favorites:latest
       args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
     command:
     - mise
     - x
@@ -22,34 +27,38 @@ services:
       deno run --config tests/deno.json --no-lock --allow-env --allow-read
       --allow-net --unsafely-ignore-certificate-errors=caddy tests/favorites.ts .
     depends_on:
-      apps_realworld-launch:
+      realworld-launch:
         condition: service_healthy
         restart: true
     environment:
       APP_URL: https://caddy:8443
-    image: bayt-apps_realworld-check-favorites:${BAYT_IMAGE_TAG:-latest}
+      ORIGIN: ${ORIGIN:-https://localhost:${CADDY_TLS_HOST_PORT:-17995}}
+    image: bayt-realworld-check-favorites:${BAYT_IMAGE_TAG:-${COMPOSE_PROJECT_NAME}}
     scale: 0
-  apps_realworld-check-favorites_bayt:
+  realworld-check-favorites_bayt:
     build:
       additional_contexts:
-        apps_realworld-setup_bayt: service:apps_realworld-setup_bayt
-        apps_realworld-launch_bayt: service:apps_realworld-launch_bayt
-        workspaceroot-setup_bayt: service:workspaceroot-setup_bayt
+        realworld-setup_bayt: service:realworld-setup_bayt
+        realworld-launch_bayt: service:realworld-launch_bayt
       context: ..
       dockerfile: .bayt/Dockerfile.check-favorites
       target: check-favorites_bayt
       args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-    image: bayt-apps_realworld-check-favorites_bayt:latest
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-realworld-check-favorites_bayt:latest
     scale: 0
-  apps_realworld-check-favorites_srcs:
+  realworld-check-favorites_srcs:
     build:
+      additional_contexts:
+        realworld-setup_srcs: service:realworld-setup_srcs
       context: ..
       dockerfile: .bayt/Dockerfile.check-favorites
       target: check-favorites_srcs
       args:
+        BAYT_DIR: ${MONOREPO_COMPOSE_MODE:+apps/realworld}
         BUILDKIT_SYNTAX: >-
-          docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-    image: bayt-apps_realworld-check-favorites_srcs:latest
+          docker/dockerfile:1.27@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+    image: bayt-realworld-check-favorites_srcs:latest
     scale: 0

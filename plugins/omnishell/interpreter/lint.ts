@@ -5,8 +5,10 @@
 // nothing in this file touches the filesystem or an app.
 
 import {
+  embedDeps,
   machineCandidates,
   machineShape,
+  parseEmbeds,
   parseFilterSpec,
   parseLimit,
   parseOrder,
@@ -26,7 +28,8 @@ export type Entity = {
     type: string;
     pk?: boolean;
     unique?: boolean;
-    default?: string;
+    default?: string | number | boolean | null;
+    defaulted?: boolean;
     /** What the integer counts, where it counts money (schema.cue #Field). */
     money?: { currency: string; minorUnits: number };
   }[];
@@ -111,7 +114,7 @@ export type ScreenRead = {
    * once, as a slot binds one row. */
   lists: number[];
   route: "server" | "snapshot" | "whole" | "view";
-  /** Absent, as embeds is, where the server computes the read. */
+  /** Absent where the server computes the filter. */
   clauses?: { col: string; op: string }[];
   embeds?: string[];
   limit?: number;
@@ -149,7 +152,7 @@ function readOf(
     lists,
     route: routeOf(spec, embeds, limit),
     ...(spec === null ? {} : { clauses: spec.map(({ col, op }) => ({ col, op })) }),
-    ...(embeds === null ? {} : { embeds: embeds.map((e) => e.table) }),
+    embeds: embedDeps(select, table),
     ...(limit === undefined ? {} : { limit }),
     orders: [...new Set(orders.flatMap((o) => o.split(",").filter(Boolean).map((k) => k.split(".")[0])))],
   };
@@ -284,7 +287,7 @@ const attrsOf = (attrText: string) => ({
 /** A route hole and the region read that fills it; `filter` is the region's whole
  * data-filter, since whether the store answers it locally is decided over all of
  * its clauses. */
-export type ParamPlan = { route: string; param: string; table: string; column: string; op: string; filter: string };
+export type ParamPlan = { route: string; param: string; table: string; column: string; op: string; filter: string; select?: string };
 
 /**
  * Where each `:param` gets a real value, read off the SCREEN MARKUP.
@@ -318,28 +321,42 @@ export function paramPlans(
       const param = seg.slice(1);
       const key = `${route.path} ${param}`;
       wanted.set(key, { route: route.path, param });
-      for (const [, closing, , attrText] of strip(markup[route.path] ?? "").matchAll(ANY_TAG)) {
-        if (closing === "/") continue;
-        const { attr } = attrsOf(attrText);
-        const table = attr("data-live");
-        const filter = attr("data-filter");
-        if (table === undefined || filter === undefined) continue;
-        // e.g. `slug=eq.{param.slug}`, `created_at=lt.{param.when}`,
-        // `article_tag.tag=eq.{param.name}`, `search=plfts(simple).{param.q}`
-        // The placeholder must BE the value, not part of one: a composite like
-        // `bucket=eq.{param.month}:{id}` names the param without yielding
-        // anything a route can be filled with, and without the terminator the
-        // winner is whichever region is declared first.
-        const m = filter.match(
-          new RegExp(`([\\w.]+)=([a-z]+(?:\\([^)]*\\))?)\\.\\{param\\.${param}\\}(?=&|$)`),
-        );
-        if (!m) continue;
-        // An `eq` plan is the only one a reader can answer by echoing a row's
-        // value, so it wins over one the markup happened to declare first.
-        const found = { route: route.path, param, table, column: m[1], op: m[2], filter };
+      const re = new RegExp(`([\\w.]+)=([a-z]+(?:\\([^)]*\\))?)\\.(?:\\*\\{param\\.${param}\\}\\*|\\{param\\.${param}\\})(?=&|$)`);
+      const consider = (found: ParamPlan) => {
         const held = plans.get(key);
         if (held === undefined || (held.op !== "eq" && found.op === "eq")) plans.set(key, found);
-        if (found.op === "eq") break;
+      };
+      for (const [, closing, , attrText] of strip(markup[route.path] ?? "").matchAll(ANY_TAG)) {
+        if (closing === "/") continue;
+        const attrs = attrMap(attrText);
+        const table = attrs.get("data-live");
+        const filter = attrs.get("data-filter");
+        if (table !== undefined && filter !== undefined) {
+          // e.g. `slug=eq.{param.slug}`, `created_at=lt.{param.when}`,
+          // `article_tag.tag=eq.{param.name}`, `search=plfts(simple).{param.q}`
+          // The placeholder must BE the value, not part of one: a composite like
+          // `bucket=eq.{param.month}:{id}` names the param without yielding
+          // anything a route can be filled with, and without the terminator the
+          // winner is whichever region is declared first.
+          const m = filter.match(re);
+          if (m) {
+            // An `eq` plan is the only one a reader can answer by echoing a row's
+            // value, so it wins over one the markup happened to declare first.
+            const select = attrs.get("data-select");
+            consider({ route: route.path, param, table, column: m[1], op: m[2], filter, ...(select === undefined ? {} : { select }) });
+            if (plans.get(key)?.op === "eq") break;
+          }
+        }
+        for (const [name, value] of attrs) {
+          if (!name.startsWith("data-read-")) continue;
+          const read = parseReadSpec(value);
+          if (read.filter === undefined) continue;
+          const m = read.filter.match(re);
+          if (!m) continue;
+          consider({ route: route.path, param, table: read.table, column: m[1], op: m[2], filter: read.filter });
+          if (plans.get(key)?.op === "eq") break;
+        }
+        if (plans.get(key)?.op === "eq") break;
       }
     }
   }
@@ -365,7 +382,7 @@ export type MachineRegion = {
   enclosing: Enclosing[][];
 };
 
-type Enclosing = { table: string; filter?: string };
+type Enclosing = { table: string; filter?: string; select?: string };
 
 /** Every data-machine region in one screen's markup, with the attributes its
  * validity depends on. Single-quoted values are the norm here — a machine is
@@ -376,14 +393,14 @@ export function machineRegions(html: string): MachineRegion[] {
   const out: MachineRegion[] = [];
   // `named` is a template[data-item][data-name]: a chain stops there and goes
   // on through each region that stamps it, which `referrers` holds.
-  type Open = { tag: string; table?: string; filter?: string; named?: string };
+  type Open = { tag: string; table?: string; filter?: string; select?: string; named?: string };
   // The lexical regions up to the nearest named template, and that template.
   const reach = (stack: Open[]): { chain: Enclosing[]; via?: string } => {
     const chain: Enclosing[] = [];
     for (let i = stack.length - 1; i >= 0; i--) {
-      const { table, filter, named } = stack[i];
+      const { table, filter, select, named } = stack[i];
       if (named !== undefined) return { chain, via: named };
-      if (table !== undefined) chain.push({ table, filter });
+      if (table !== undefined) chain.push({ table, filter, ...(select === undefined ? {} : { select }) });
     }
     return { chain };
   };
@@ -408,13 +425,13 @@ export function machineRegions(html: string): MachineRegion[] {
     const { chain, via } = reach(stack);
     const ref = attr("data-template");
     if (ref !== undefined && attr("data-live") !== undefined) {
-      refer(ref, { chain: [{ table: attr("data-live") as string, filter: attr("data-filter") }, ...chain], via });
+      refer(ref, { chain: [{ table: attr("data-live") as string, filter: attr("data-filter"), ...(attr("data-select") === undefined ? {} : { select: attr("data-select") }) }, ...chain], via });
     }
     const named = tag === "template" && has("data-item") ? attr("data-name") : undefined;
     // hydrateRegion takes every item template whose nearest region it is,
     // named or not, so that region stamps it too.
     if (named !== undefined && lexical(stack)) refer(named, { chain, via });
-    const frame = { tag, table: attr("data-live"), filter: attr("data-filter"), named };
+    const frame = { tag, table: attr("data-live"), filter: attr("data-filter"), select: attr("data-select"), named };
     const machine = attr("data-machine");
     if (machine === undefined) return frame;
     const table = attr("data-live");
@@ -433,12 +450,13 @@ export function machineRegions(html: string): MachineRegion[] {
     for (const chart of raw) {
       if (chart && typeof chart === "object" && (chart as Record<string, unknown>).type === "parallel") {
         const p = chart as Record<string, unknown>;
+        if ("context" in p) throw new Error("chart context is not supported; declare the entity's field defaults");
         const states = (p.states ?? {}) as Record<string, Record<string, unknown>>;
         for (const [regionName, regionNode] of Object.entries(states)) {
+          if ("context" in regionNode) throw new Error("chart context is not supported; declare the entity's field defaults");
           parallelCharts.push({
             field: regionNode.field ?? regionName,
             initial: regionNode.initial,
-            context: regionNode.context ?? (regionNode.field ? p.context : undefined),
             on: { ...(p.on as object), ...(regionNode.on as object) },
             states: regionNode.states ?? {},
             after: regionNode.after,
@@ -557,6 +575,7 @@ function walkTags<F extends { tag: string }>(
 export type Slot = {
   table: string;
   filter?: string;
+  select?: string;
   /** Authored inside an item template, so the interpreter hydrates it from an
    * enclosing region's row — `syncNested` is its only non-top caller — and no
    * screen state stands for it. */
@@ -597,6 +616,8 @@ export function slotRegions(html: string): Slot[] {
         // interpreter reads, so presence is what counts, not a value.
         declares: has("data-empty") || has("data-empty-row") || has("data-machine"),
       };
+      const select = attr("data-select");
+      if (select !== undefined) open.slot.select = select;
       open.list = attr("data-template") !== undefined;
     }
     return open;
@@ -681,9 +702,8 @@ export type KindedRegion = { table: string; whens: (string | undefined)[]; proje
 
 /** Every region's item-template data-when list, in document order — only
  * regions owning at least one item template appear; undefined is a default
- * template. Ownership follows the interpreter's querySelectorAll: a template
- * belongs to every region between it and its nearest enclosing template,
- * because deeper content is invisible to the outer region. */
+ * template. Ownership follows the interpreter's nearest enclosing region,
+ * stopping at template content boundaries. */
 export function kindedRegions(html: string): KindedRegion[] {
   const out: KindedRegion[] = [];
   type Open = { tag: string; region?: KindedRegion };
@@ -714,7 +734,10 @@ export function kindedRegions(html: string): KindedRegion[] {
       const name = attr("data-name");
       if (name !== undefined) named.set(name, when);
       for (let i = stack.length - 1; i >= 0 && stack[i].tag !== "template"; i--) {
-        stack[i].region?.whens.push(when);
+        if (stack[i].region !== undefined) {
+          stack[i].region!.whens.push(when);
+          break;
+        }
       }
     }
     const table = attr("data-live");
@@ -962,6 +985,92 @@ export function unwitnessedControls(html: string): string[] {
   return out;
 }
 
+/** One `data-hatch` mount: the unit it names, the table of the nearest
+ * region — whose row its `data-prop-*` are read off, and so what the unit is
+ * handed — the tables that region reads, and the events its own `data-on-*`
+ * handle. The mount is read where it stands; a mount in an item template is
+ * one mount per row of the same region. */
+export type HatchSite = { unit: string; table?: string; reads: string[]; handles: string[]; props: string[] };
+
+export function hatchSites(html: string): HatchSite[] {
+  const out: HatchSite[] = [];
+  type Open = { tag: string; table?: string; reads?: string[] };
+  walkTags<Open>(html, (tag, attrText, stack) => {
+    const attrs = attrMap(attrText);
+    const live = attrs.get("data-live");
+    const frame: Open = { tag, table: live };
+    if (live !== undefined) {
+      const reads = [live, ...(attrs.get("data-reads") ?? "").split(",").map((t) => t.trim()).filter(Boolean)];
+      for (const [name, value] of attrs) if (name.startsWith("data-read-")) reads.push(parseReadSpec(value).table);
+      frame.reads = [...new Set(reads)];
+    }
+    const unit = attrs.get("data-hatch");
+    if (unit !== undefined) {
+      const region = live !== undefined ? frame : stack.findLast((f) => f.table !== undefined);
+      out.push({
+        unit,
+        table: region?.table,
+        reads: region?.reads ?? [],
+        handles: [...attrs.keys()].filter((k) => k.startsWith("data-on-")).map((k) => k.slice("data-on-".length)),
+        props: [...attrs.keys()].filter((k) => k.startsWith("data-prop-")).map((k) => k.slice("data-prop-".length)),
+      });
+    }
+    return frame;
+  });
+  return out;
+}
+
+/** A vendored unit as shell.yaml `units:` declares it to the terminal. */
+export type UnitPorts = { ports: { reads: string[]; raises: string[] }; memo?: { table: string; key: string[]; columns: string[] } };
+
+/** The reasons one screen's mounts disagree with their units' ports: a unit
+ * nobody declared, a mount fed a region's row the unit does not read, a
+ * mount handling an event the unit does not raise; and with a memo, a mount
+ * binding no `data-prop-` for a key field, or sitting in a region that does
+ * not read the memo's table, so the chart hearing the answer could not see
+ * the row. The interpreter refuses the unit, the read and the raise at the
+ * mount (screen.js bindHatches) and a question missing a key at the seat; the
+ * memo's region is this lint's alone, since a mount knows its region's table
+ * and not what else the region reads. */
+export function hatchLint(sites: HatchSite[], units: Record<string, UnitPorts>): string[] {
+  const out: string[] = [];
+  for (const s of sites) {
+    const unit = units[s.unit];
+    if (unit === undefined) {
+      out.push(`data-hatch="${s.unit}" names no unit in shell.yaml`);
+      continue;
+    }
+    if (s.table !== undefined && !unit.ports.reads.includes(s.table)) {
+      out.push(`data-hatch="${s.unit}" is fed the row of "${s.table}", which its ports do not read (reads: ${unit.ports.reads.join(", ") || "nothing"})`);
+    }
+    for (const ev of s.handles) {
+      if (!unit.ports.raises.includes(ev)) out.push(`data-hatch="${s.unit}" handles "${ev}", which its ports do not raise (raises: ${unit.ports.raises.join(", ") || "nothing"})`);
+    }
+    if (unit.memo === undefined) continue;
+    for (const k of unit.memo.key) {
+      if (!s.props.includes(k)) out.push(`data-hatch="${s.unit}" binds no data-prop-${k}, a key of its memo`);
+    }
+    if (!s.reads.includes(unit.memo.table)) {
+      out.push(`data-hatch="${s.unit}" sits in a region that does not read "${unit.memo.table}", its memo (reads: ${s.reads.join(", ") || "nothing"})`);
+    }
+  }
+  return out;
+}
+
+/** Over every screen's mounts: a raise no mount handles is an event the app
+ * declared and nothing hears — a port wired to nothing. */
+export function unhandledRaises(sites: HatchSite[], units: Record<string, UnitPorts>): string[] {
+  const out: string[] = [];
+  for (const [name, unit] of Object.entries(units)) {
+    for (const ev of unit.ports.raises) {
+      if (!sites.some((s) => s.unit === name && s.handles.includes(ev))) {
+        out.push(`unit "${name}" raises "${ev}", which no data-hatch mount handles`);
+      }
+    }
+  }
+  return out;
+}
+
 /** The value set a column admits, or null where it admits an open set. The
  * constraint language it is read out of is the program's, not the markup's,
  * so the reader is handed in: pronto derives it from the parsed cel, the
@@ -1006,7 +1115,7 @@ export function kindLint(whens: (string | undefined)[], e: Entity, enumOf: EnumO
     // DB-defaulted discriminant is absent until the synced row arrives — and
     // an eq admits no row missing its column. Only a default template can
     // render the pending row (decision-offline-note-path).
-    if (field?.default !== undefined) {
+    if (field?.defaulted === true) {
       return `"${col}" is DB-defaulted, so a pending row may lack it and no template would admit it; ` +
         `declare a default template`;
     }
@@ -1022,15 +1131,23 @@ export function kindLint(whens: (string | undefined)[], e: Entity, enumOf: EnumO
 }
 
 /** The slot cardinality witness: the reason a slot's read can never see two
- * rows, or the failure to say so. The witness is any pk, unique field, or
- * declared unique whose columns the filter pins with `eq`. A partial unique
+ * rows, or the failure to say so. Ungrouped root aggregates witness a single
+ * result even when their input is empty. Otherwise the witness is any pk,
+ * unique field, or declared unique whose columns the filter pins with `eq`. A partial unique
  * (`where:`) counts only when the slot's filter states every constraint of
  * its predicate — only then is every visible row inside the domain the
  * uniqueness holds over.
  *
  * Returns null when witnessed, else the message naming what the filter pins
  * and what nothing covers. */
-export function unwitnessedSlot(filter: string | undefined, e: Entity): string | null {
+export function unwitnessedSlot(filter: string | undefined, e: Entity, select?: string): string | null {
+  const selection = parseEmbeds(select);
+  // The parser separates root columns from embeds but preserves column text.
+  // A scalar alongside an aggregate groups its input; neither embeds nor
+  // a row limit prove the result's cardinality.
+  const aggregate = /^(?:[A-Za-z_]\w*:)?(?:count\(\)|[A-Za-z_]\w*(?:->>?(?:[A-Za-z_]\w*|-?\d+))*\.(?:count|sum|avg|max|min)\(\))(?:::[A-Za-z_]\w*)?$/;
+  if (selection !== null && selection.embeds.length === 0 && selection.cols.length > 0 &&
+      selection.cols.every((column: string) => aggregate.test(column))) return null;
   const spec: Spec = parseFilterSpec(filter ?? "");
   const pinned = new Set((spec ?? []).filter((p) => p.op === "eq").map((p) => p.col));
   const stated = (p: { col: string; op: string; value?: string }) =>
@@ -1057,12 +1174,20 @@ export function unwitnessedSlot(filter: string | undefined, e: Entity): string |
 const TRANSITION_KEYS = new Set(["guard", "target", "assign", "effect", "raise", "actions"]);
 const ACTION_KEYS = new Set(["assign", "effect", "raise"]);
 const REF_KEYS = new Set(["type", "params"]);
-const EFFECT_KEYS = new Set(["level", "op", "entity", "token", "filter", "values"]);
+const EFFECT_KEYS = new Set(["op", "entity", "token", "filter", "values"]);
 const EFFECT_OPS = new Set(["create", "update", "delete", "upsert"]);
-const EFFECT_LEVELS = new Set([
-  0, 1, 2, 3, 4,
-  "projection", "ephemeral", "compensable", "replicated", "exterior",
-]);
+/** What can be claimed of a write is the durability of the row it lands on
+ * (machine.cue #DurabilityEffectLevel): a chart states no level of its own. */
+export const DURABILITY_EFFECT_LEVEL: Record<string, string> = {
+  tab: "ephemeral",
+  device: "ephemeral",
+  offline: "compensable",
+  live: "compensable",
+  server: "replicated",
+};
+/** Where a chart's writes land: the region's table for an effect naming no
+ * entity, and the durability of any table the emitted schema declares. */
+export type Reach = { table: string; durabilityOf: (table: string) => string | undefined };
 
 /** The reason an object in a value position is not a well-formed {type,
  * params} reference (XState's spelling), or null. Strings and literals are not this rule's —
@@ -1104,12 +1229,9 @@ const lintActions = (actions: unknown): string | null => {
         if (effUnknown.length > 0) {
           return `effect carries ${effUnknown.map((k) => `"${k}"`).join(", ")} — outside the #Effect subset`;
         }
-        const e = eff as { op?: unknown; level?: unknown; values?: Record<string, unknown> };
+        const e = eff as { op?: unknown; values?: Record<string, unknown> };
         if (typeof e.op !== "string" || !EFFECT_OPS.has(e.op)) {
           return `effect op ${JSON.stringify(e.op)} is not in ${[...EFFECT_OPS].join(" | ")}`;
-        }
-        if (e.level !== undefined && !EFFECT_LEVELS.has(e.level as any)) {
-          return `effect level ${JSON.stringify(e.level)} is not in ${[...EFFECT_LEVELS].join(" | ")}`;
         }
         for (const r of Object.values(e.values ?? {})) {
           const why = badRef(r);
@@ -1138,7 +1260,6 @@ type Machine = {
   field?: string;
   type?: string;
   initial?: string;
-  context?: Record<string, unknown>;
   on?: Record<string, unknown>;
   onDone?: unknown;
   always?: unknown;
@@ -1178,9 +1299,15 @@ function collectStateActions(state: StateNode): unknown[] {
 /** Machine lint: the reason a data-machine's leaves or cascade are unsound,
  * or null. References (guards, non-numeric after keys) must name modules in
  * `available`; every raised type must be handled by some state or root `on:`
- * (the cascade stays drawable); context never carries the machine's own
- * field — one fact, one writer. */
-export function machineLint(machine: Machine, available: Set<string>): string | null {
+ * (the cascade stays drawable); the entity owns the row defaults; and a
+ * write whose row the server may refuse
+ * (a compensable effect, read off the entity's durability through `reach`)
+ * is drawn in a chart that hears `refused`, since one deaf to the no has a
+ * zombie state by construction. */
+export function machineLint(machine: Machine, available: Set<string>, reach: Reach): string | null {
+  const contextIn = (node: object): boolean => "context" in node ||
+    Object.values((node as {states?: Record<string, object>}).states ?? {}).some(contextIn);
+  if (contextIn(machine)) return "chart context is not supported; declare the entity's field defaults";
   const values: unknown[] = [
     ...Object.values(machine.on ?? {}),
     ...Object.values(machine.states ?? {}).flatMap(collectValues),
@@ -1210,12 +1337,9 @@ export function machineLint(machine: Machine, available: Set<string>): string | 
           if (effUnknown.length > 0) {
             return `effect carries ${effUnknown.map((k) => `"${k}"`).join(", ")} — outside the #Effect subset`;
           }
-          const e = eff as { op?: unknown; level?: unknown; values?: Record<string, unknown> };
+          const e = eff as { op?: unknown; values?: Record<string, unknown> };
           if (typeof e.op !== "string" || !EFFECT_OPS.has(e.op)) {
             return `effect op ${JSON.stringify(e.op)} is not in ${[...EFFECT_OPS].join(" | ")}`;
-          }
-          if (e.level !== undefined && !EFFECT_LEVELS.has(e.level as any)) {
-            return `effect level ${JSON.stringify(e.level)} is not in ${[...EFFECT_LEVELS].join(" | ")}`;
           }
           for (const r of Object.values(e.values ?? {})) {
             const why = badRef(r);
@@ -1229,12 +1353,13 @@ export function machineLint(machine: Machine, available: Set<string>): string | 
     const why = lintActions(act);
     if (why !== null) return why;
   }
-  const shape = machineShape(machine) as ReturnType<typeof machineShape> & { effects?: { level?: unknown; entity?: string }[] };
+  const shape = machineShape(machine) as ReturnType<typeof machineShape> & { effects?: { entity?: string }[] };
   for (const eff of shape.effects ?? []) {
-    if (eff.level === 2 || eff.level === "compensable") {
-      if (!shape.handled.includes("refused")) {
-        return `compensable effect on "${eff.entity ?? "entity"}" requires "refused" transition in machine to handle server conflict/rollback`;
-      }
+    const table = eff.entity ?? reach.table;
+    const durability = reach.durabilityOf(table);
+    if (durability === undefined) return `effect on "${table}", which the emitted schema does not declare`;
+    if (DURABILITY_EFFECT_LEVEL[durability] === "compensable" && !shape.handled.includes("refused")) {
+      return `effect on "${table}" is compensable (${durability}) and the chart draws no "refused" arrow: a chart deaf to the no has a zombie state`;
     }
   }
   const dangling = shape.refs.filter((r) => !available.has(r));
@@ -1245,16 +1370,14 @@ export function machineLint(machine: Machine, available: Set<string>): string | 
   if (unraisable.length > 0) {
     return `raise ${unraisable.map((r) => `"${r}"`).join(", ")} is handled by no state or root on: — the cascade has an undrawn arrow`;
   }
-  if (machine.context !== undefined && machine.field && machine.field in machine.context) {
-    return `context carries the machine's own field "${machine.field}" — one fact, one writer (initial: is the declaration)`;
-  }
   return null;
 }
 
 export type Write = { col: string; value: string | number | boolean };
+const WHOLE_PLACEHOLDER = new RegExp(`^${PLACEHOLDER.source}$`);
 
 /** Every literal a machine region persists into a column: the machine's
- * context, its assign literals, and the data-empty-row — a transition
+ * initial, its assign literals, and the data-empty-row — a transition
  * concluding from the synthesized fallback row restates that row verbatim, so
  * its values are written, not merely bound. A `{type, params}` assign is a
  * module's return, which nothing declares a type for; it carries no literal
@@ -1267,9 +1390,12 @@ export function machineWrites(machine: Machine, emptyRow?: string): Write[] {
     }
   };
   if (emptyRow !== undefined) {
-    for (const [k, v] of Object.entries(JSON.parse(emptyRow) as Record<string, unknown>)) push(k, v);
+    for (const [k, v] of Object.entries(JSON.parse(emptyRow) as Record<string, unknown>)) {
+      // Whole placeholders retain their enclosing value's type in screen.js.
+      if (typeof v === "string" && WHOLE_PLACEHOLDER.test(v)) continue;
+      push(k, v);
+    }
   }
-  for (const [k, v] of Object.entries(machine.context ?? {})) push(k, v);
   const values: unknown[] = [
     ...Object.values(machine.on ?? {}),
     ...Object.values(machine.states ?? {}).flatMap(collectValues),
@@ -1368,7 +1494,9 @@ const holesOf = (pattern: string): string[] =>
 export function linkLint(html: string, routes: LinkRoute[]): string[] {
   const out: string[] = [];
   const byScreen = new Map(routes.map((r) => [r.screen, r]));
-  for (const [, closing, tag, attrText] of strip(html).matchAll(ANY_TAG)) {
+  const stripped = strip(html);
+  for (const match of stripped.matchAll(ANY_TAG)) {
+    const [whole, closing, tag, attrText] = match;
     if (closing === "/") continue;
     const { attr } = attrsOf(attrText);
     const href = attr("href");
@@ -1395,6 +1523,12 @@ export function linkLint(html: string, routes: LinkRoute[]): string[] {
     const given = new Set<string>();
     for (const [, name] of ` ${attrText}`.matchAll(ATTR)) {
       if (name.startsWith("data-param-")) given.add(name.slice("data-param-".length));
+    }
+    // A navigate form fills the route's holes from its named controls at submit.
+    if (tag.toLowerCase() === "form" && attr("data-action") === "navigate") {
+      const start = match.index! + whole.length;
+      const end = stripped.indexOf("</form", start);
+      for (const m of stripped.slice(start, end < 0 ? undefined : end).matchAll(/<(?:input|select|textarea)\b[^>]*\sname=(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi)) given.add(m[1] ?? m[2] ?? m[3]);
     }
     for (const hole of holes) {
       if (!given.has(hole)) out.push(`data-route="${screen}" fills no :${hole} of "${route.path}"`);

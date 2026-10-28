@@ -5,7 +5,7 @@ pairs:
     of: auth
     accepts:
       - accept-signin-handle
-    says: 'One tap on the passkey, or one click on guest, yields a token whose bearer the community can name; the auth service inserts AppUser (id, handle) and the 014 trigger provisions Me in the same transaction, so the ownership probe answers on the first paint rather than after a CDC round trip.'
+    says: 'A passkey, guest click, or completed Google sign-in yields a token whose bearer the community can name; the auth service inserts AppUser (id, handle) and the 014 trigger provisions Me in the same transaction, so the ownership probe answers on the first paint rather than after a CDC round trip.'
     given:
       gesture: passkey
     when: signin

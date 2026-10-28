@@ -22,8 +22,9 @@ deno run -A --unsafely-ignore-certificate-errors scripts/seed.ts
 
 ### The app is https-only
 
-`https://localhost:8443/`. The door, its certificate and trusting it are
-[the proxy's](../../libraries/mecha/docs/proxy.md).
+`https://localhost:<port>/`, the app's own port (`docker compose port
+realworld-caddy 8443` names it; `CADDY_TLS_HOST_PORT` moves it). The door, its certificate and
+trusting it are [the proxy's](../../libraries/mecha/docs/proxy.md).
 
 ### Every launch empties the database
 

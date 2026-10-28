@@ -4,6 +4,8 @@ Pronto is a programming language where the source code is markdown and the compi
 
 The insight: AI can generate anything, but "anything" is where bugs live. Pronto constrains generation to an architecture where entire categories of bugs — deployment drift, data inconsistency, infrastructure misconfiguration — cannot exist. The same way Rust constrains C to gain memory safety, Pronto constrains AI-generated code to gain architectural safety.
 
+For LLM agents generating or modifying Pronto applications, see [`llms.txt`](../../llms.txt) for the machine-readable specification, contract grammar, and DOM truth tables.
+
 ## Installation
 
 Install the Pronto plugin for your agent. The plugin packages the [`pronto-turn`](skills/pronto-turn/SKILL.md) outer-loop skill, specialist studio seats, and project bootstrap knowledge.
@@ -74,7 +76,7 @@ Pronto cannot express every computation. Four escapes, ranked; all appear as box
 | Escape | Guarantee | Runs where |
 |--------|-----------|-----------|
 | **Pre-compiled WASM** (preferred) | Sandboxed; touches Pronto state only through its CUE-contracted interface | Every tier — the same `.wasm` runs in the tab, in CDC pipelines, and server-side |
-| **Vendored unit** (terminal-tier hatch) | Trusted, audited component or worker mounted by the terminal at a declared point; CUE-contracted props-in/events-out with declared isolation (compartment, iframe, or worker) and capabilities | Browser surface, every tier |
+| **Vendored unit** (terminal-tier hatch) | Trusted, audited component or worker mounted by the terminal at a declared point; CUE-contracted props-in/events-out with declared isolation (compartment, realm, or agent) and ports (the entities it reads, the events it raises) | Browser surface, every tier |
 | **Container** | Full escape | Real container at the container and cloud tiers; at the browser tier it binds to a **declared shim** (mock or degraded WASM stand-in), consistent with mecha's best-effort browser consistency model |
 | **External API endpoint** | Clean trust boundary: the Pronto database is only touched by Pronto; beyond HTTP is the external world | Every tier |
 
@@ -157,7 +159,7 @@ What you give up in expressiveness (real-time collaboration, GPU compute, sub-10
 - [`docs/localization.md`](docs/localization.md#addresses) — localized routing, BCP 47 paths, and Caddy's path matchers
 - [`docs/screens.md`](docs/screens.md#how-a-routes-first-document-is-rendered) — server-side rendering: a route's ssr mode crossed with its read scope, pronto's policy over omnishell's mechanism, and which cells are built
 - [`docs/lattice.md`](docs/lattice.md#which-joins-the-code-enforces) — cross-cutting concerns via CUE unification: durability, effect safety spectrum, interaction lifecycles, and verification budgets, and which joins the code enforces
-- [`docs/release-targets.md`](docs/release-targets.md) — release targets: a program declares them, each is a sayt platform on a tier of mecha's ladder, `release@pages` bundles the app into one HTML file for one user, and `release@cloudflare` (one Durable Object on the free plan for everyone), `release@gcp`, `release@aws`, `release@azure` and `release@k8s` (mecha's images on managed services above a floor of one small database) are designed and not built
+- [`docs/release-targets.md`](docs/release-targets.md) — release targets: a program declares them, each is a sayt platform on a tier of mecha's ladder, `release@pages` bundles the app into one HTML file for one user, `release@cloudflare` runs it for every user in one Durable Object over PGlite, `release@docker` packages the app as a single-container standalone appliance, and `release@gcp`, `release@aws`, `release@azure` and `release@k8s` (mecha's images on managed services above a floor of one small database) are designed and not built
 - [`../omnishell/docs/machines.md`](../omnishell/docs/machines.md) — unbreakable machines, closed effects, DuckDB synthetic seeds, statechart storybook battery, and formal verification
 - `docs/` — one document per subsystem, and the decisions not yet built
 - [`docs/index.md`](docs/index.md) — every document, with its type and status

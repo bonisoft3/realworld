@@ -23,7 +23,7 @@ the more it delegates to the build graph.*
 The standalone, non-bayt path. The project's `compose.yaml` is assumed to carry
 **no** `x-bake.cache-*`, so the action wires caching itself:
 
-- `action-cache-scope` set → injects `type=gha` per-scope + `main` fallback
+- `action-cache-scope` set → injects `type=gha,version=2` per-scope + `main` fallback
   on the import, `mode=max` on the export.
 - `action-cache-from` / `action-cache-to` set explicitly → those win verbatim
   (e.g. a `type=registry` ref for projects whose layer set overflows GHA's
@@ -58,7 +58,7 @@ bayt is **not** mandatory here: the `x-bake.cache-*` refs can be bayt-generated
 
 The phase flow (`full`, or `build` then `run`), the registry-mediated image
 distribution through `.bayt/depot.hcl`, and the declared `CACHE_SCOPE` (branch + depot project + frontend
-pin) all assume bayt's emission — per-target `x-bake` refs, the dindbox inject
+pin) all assume bayt's emission — per-target `x-bake` refs, the bkid inject
 body, the `bayt_image_ns` / `cache_scope` secrets. There is no non-bayt depot
 path.
 

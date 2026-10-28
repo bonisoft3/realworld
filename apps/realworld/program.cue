@@ -21,7 +21,7 @@ _catalogues: _ @embed(glob="messages/*.json")
 code: pronto.#App & {
 	meta: name:        "realworld"
 	meta: description: "A community writing space — read pieces, follow their authors, and keep the ones that matter."
-	meta: ir: sha256: "57e2636133f0a85c5a871a303f4d81a9f89140dc1905514a3942f83eaa5a4107"
+	meta: ir: sha256: "6cfb23fba4a90dc7d25f24040a885fd2b133af5d5713f3adaacdb4a3786c4855"
 	// The browser tier is declared unsupported rather than quietly broken
 	// (ir decision-browser-tier-unsupported).
 	meta: targets: []
@@ -56,7 +56,14 @@ code: pronto.#App & {
 	// `self` is what the strip needs to name a reader and lead somewhere: their
 	// own public page, and the column their chosen name lives in
 	// (ir decision-identity-chrome).
+	capabilities: resources: readerPictures: {
+		kind: "img"
+		source: "https:"
+		note: "readers supply profile, cover and article image URLs; their hosts receive the image requests"
+	}
+
 	capabilities: auth: {
+		providers: ["google"]
 		required: true
 		service:  "/auth"
 		self: {
@@ -115,10 +122,8 @@ code: pronto.#App & {
 			id: "0xa590918c3d7bc870"
 			table: "me"
 			durability: "live"
-			// The non-forms arm of the two-value vocabulary; the actual writer is
-			// the 014 trigger, so a guest's row exists on the first paint
-			// (ir decision-me-row).
-			writers: "pipeline"
+			// Written by the 014 trigger, so a guest's row exists on the first
+			// paint (ir decision-me-row).
 			// A row RLS-scoped to auth_uid() whose mere visibility answers "is this
 			// mine": the interpreter has no session binding, so the probe's :empty
 			// state is the only mechanism (ir decision-me-row, decision-probe-empty).
@@ -228,13 +233,7 @@ code: pronto.#App & {
 				{ordinal: 5, name: "deleted_at", type: "timestamp", required: false},
 			]
 			indexes: [{on: "article_id"}]
-			// The article's author is one reference away, which CEL cannot
-			// reach: a reader may not favorite what they wrote.
-			validations: "own-article": {
-				src:  "shell/validations/own-article.js"
-				via:  ["article_id"]
-				note: "a reader cannot favorite what they wrote"
-			}
+
 		}
 		Bookmark: {
 			id: "0x9f9da42612642009"
@@ -276,7 +275,6 @@ code: pronto.#App & {
 			id: "0xa8012732a778199b"
 			table:   "favorite_count"
 			durability: "live"
-			writers: "pipeline"
 			// Private to its reader: a reader may know whether the count
 			// included THEM, and nothing about anyone else.
 			access: {scope: "private", owner: "user_id"}
@@ -299,7 +297,6 @@ code: pronto.#App & {
 			id: "0x9a91dc318d94d5ee"
 			table:   "article_stats"
 			durability: "live"
-			writers: "pipeline"
 			access: {scope: "public"}
 			// No seed: the row appears with the article's first favorite, and the
 			// reading regions carry data-empty-row {"favorite_count":0}
@@ -322,7 +319,6 @@ code: pronto.#App & {
 			id: "0x86d7de1cf29fee6f"
 			table:   "tag_count"
 			durability: "live"
-			writers: "pipeline"
 			access: {scope: "public"}
 			fields: [
 				// Read as a list, and a list region keys nodes on String(row.id), so
@@ -335,7 +331,6 @@ code: pronto.#App & {
 			id: "0x9826a4461b100e6d"
 			table:   "favorite_index"
 			durability: "live"
-			writers: "pipeline"
 			access: {scope: "public"}
 			fields: [
 				{ordinal: 1, name: "id", type: "string", pk: true, cel: "this.size() > 0"},
@@ -352,6 +347,19 @@ code: pronto.#App & {
 	}
 	// Parents before children: a `ref` emits REFERENCES and Postgres needs the
 	// target table first; the three sinks last.
+	state: machines: FavoriteRules: {
+		entity: "Favorite"
+		guards: "own-article": {
+			src: "shell/validations/own-article.js"
+			via: ["article_id"]
+			note: "a reader cannot favorite what they wrote"
+		}
+		on: {
+			insert: guard: "own-article"
+			update: guard: "own-article"
+		}
+	}
+
 	state: entityOrder: ["AppUser", "Me", "Article", "ArticleTag", "Comment", "Favorite", "Bookmark", "Follow", "FavoriteCount", "ArticleStats", "TagCount", "FavoriteIndex"]
 
 	state: pipelines: {
@@ -434,7 +442,7 @@ code: pronto.#App & {
 			title: "Community"
 			label: "nav_home"
 			route: "/"
-			ssr:   "ssr"
+			ssr:   "spa"
 			forms: [
 				{
 					id:     "favorite"
@@ -653,7 +661,7 @@ code: pronto.#App & {
 		"older": {
 			title: "Older writing"
 			route: "/older/:when"
-			ssr:   "ssr"
+			ssr:   "spa"
 			forms: [
 				{
 					id:     "favorite"
@@ -745,7 +753,7 @@ code: pronto.#App & {
 		"article": {
 			title: "Article"
 			route: "/article/:slug"
-			ssr:   "ssr"
+			ssr:   "spa"
 			forms: [
 				{
 					id:     "leave-comment"
@@ -886,7 +894,7 @@ code: pronto.#App & {
 		"profile": {
 			title: "Profile"
 			route: "/profile/:handle"
-			ssr:   "ssr"
+			ssr:   "spa"
 			forms: [
 				{
 					// Inherits Follow's row invariant, so one's own page refuses
@@ -951,7 +959,7 @@ code: pronto.#App & {
 		"profile-favorites": {
 			title: "Favorited"
 			route: "/profile/:handle/favorites"
-			ssr:   "ssr"
+			ssr:   "spa"
 			forms: [
 				{
 					id:     "follow"
@@ -1010,7 +1018,7 @@ code: pronto.#App & {
 		"tag": {
 			title: "Tag"
 			route: "/tag/:name"
-			ssr:   "ssr"
+			ssr:   "spa"
 			forms: [
 				{
 					id:     "favorite"
@@ -1055,7 +1063,7 @@ code: pronto.#App & {
 		"search": {
 			title: "Search"
 			route: "/search/:q"
-			ssr:   "ssr"
+			ssr:   "spa"
 			forms: [
 				{
 					id:     "favorite"
@@ -1129,7 +1137,7 @@ code: pronto.#App & {
 	meta: tests: {
 		"test-signin-handle": {
 			of: "auth"
-			says: "One tap on the passkey, or one click on guest, yields a token whose bearer the community can name; the auth service inserts AppUser (id, handle) and the 014 trigger provisions Me in the same transaction, so the ownership probe answers on the first paint rather than after a CDC round trip."
+			says: "A passkey, guest click, or completed Google sign-in yields a token whose bearer the community can name; the auth service inserts AppUser (id, handle) and the 014 trigger provisions Me in the same transaction, so the ownership probe answers on the first paint rather than after a CDC round trip."
 			given: {gesture: "passkey"}
 			when:  "signin"
 			then:  "output.handle.size() > 0 && output.role == 'app_user' && output.sub == output.user_id && output.me.id == output.user_id"
@@ -1552,11 +1560,7 @@ cluster: (pronto.#DefaultCluster & {"code": code, statics: terminal.surface.stat
 
 loop: (pronto.#DefaultLoop & {"code": code, "cluster": cluster, "terminal": terminal}).out
 
-// The article screen mounted whole on a clock the test steps. It is the app's
-// only parametrized route with a subject, and the visual battery fills route
-// params with slugs no fixture row carries — so every value this screen derives
-// from a row, and every region that interpolates {id} or {created_at} out of
-// it, is invisible above this tier.
+// The article screen mounted whole on a clock the test steps.
 loop: surface: checks: "article": {
 	verb: "test"
 	cmds: [
@@ -1584,7 +1588,30 @@ loop: surface: checks: "editor": {
 	note: "the blank sheet: author from me region, form validation, and article publish create mutation"
 }
 
-build: (pronto.#DefaultBuild & {"code": code, "loop": loop, "cluster": cluster}).out
+loop: surface: checks: "google-auth": {
+	verb: "test"
+	cmds: ["deno test --config tests/deno.json --no-lock --no-check --allow-env --allow-read tests/google-auth.test.ts"]
+	note: "Google reaches both auth planes with runtime credentials and preserves the localized return query"
+}
+
+build: (pronto.#DefaultBuild & {"code": code, "loop": loop, "cluster": cluster, "terminal": terminal}).out
+
+// The visual checker resolves route parameters from the same stack it photographs.
+build: project: targets: "integrate": {
+	srcs: defaultGlobs: "visual-fixture": {glob: "tests/visual-fixture.ts"}
+	compose: entrypoint: ["sh", "-c", "deno run --allow-env --allow-net --unsafely-ignore-certificate-errors=caddy tests/visual-fixture.ts && exec \"$$@\"", "visual"]
+}
+
+// Process Compose and nested Compose inside these disposable check images run
+// without the host's environment; the fixture client enables guest/passkey
+// checks, never Google.
+build: project: targets: {
+	for name in ["ci", "ci-visual", "ci-replay", "ci-favorites"] {
+		(name): dockerfile: defaultPreamble: "google-check-client": {
+			line: "ENV OIDC_GOOGLE_CLIENT_ID=realworld-ci.apps.googleusercontent.com"
+		}
+	}
+}
 
 // No other rung writes a row and reads back what the pipelines made of it,
 // and both of their watermarks are int64 carriers.

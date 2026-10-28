@@ -36,25 +36,98 @@ def format-export [name: string, value: string] {
   }
 }
 
-# Run an external command, streaming stdout/stderr live, and return its exit
-# code. Bare `^cmd` raises mid-block on non-zero exit, and `do { ^cmd } |
-# complete` buffers everything until the command exits — killing live
-# `--progress=plain` output during long builds. try/catch is the streaming
-# equivalent of `complete`.
+# How much a long command prints. `verbose` streams its output live, `normal`
+# shows the command, a heartbeat and a verdict and keeps the output in a log,
+# `quiet` prints nothing unless it fails. `sayt -v`/`-q` sets SAYT_VERBOSITY
+# once and every nested sayt process inherits it; unset, a terminal or CI
+# (whose log is the only record once the job ends) is verbose and anything
+# else (an agent's tool call, whose whole output becomes context) is normal.
+export def verbosity []: nothing -> string {
+	let level = ($env.SAYT_VERBOSITY? | default "")
+	if $level in ["quiet" "normal" "verbose"] { return $level }
+	if ($level | is-not-empty) { error make {msg: $"SAYT_VERBOSITY is quiet, normal or verbose, not ($level)"} }
+	if (is-terminal --stdout) or ($env.CI? | is-not-empty) { "verbose" } else { "normal" }
+}
+
+# Run an external command and return its exit code. Verbose streams it
+# straight through: bare `^cmd` raises mid-block on non-zero exit, and
+# `do { ^cmd } | complete` buffers everything until the command exits, so
+# try/catch is the unbuffered equivalent of `complete`. Below verbose,
+# run-logged keeps the output.
 export def --wrapped run-live [cmd, ...args] {
-	try { ^$cmd ...$args; 0 } catch { |err| $err.exit_code }
+	run-named (command-name $cmd $args) $cmd $args
 }
 
-# run-live's contract over vrun: stream with the env/cmd preamble and
-# return the exit code instead of raising. Callers that need the
-# external's stdout keep plain vrun (its pipeline output is the
-# command's output — a capture wrapper would discard it).
+# run-live with the verdict's name given. Not --wrapped, so the command's own
+# flags (a `--name`, say) stay its own.
+export def run-named [name: string, cmd, args: list]: nothing -> int {
+	if (verbosity) == "verbose" {
+		try { ^$cmd ...$args; 0 } catch { |err| $err.exit_code }
+	} else {
+		run-logged $name $cmd $args
+	}
+}
+
+# What a verdict calls a command: the tool under a mise wrapper and its first
+# two words that are neither flags nor a flag's value, so `mise exec -- task
+# -t .bayt/Taskfile.yml bayt:test` reads `task bayt:test`.
+def command-name [cmd, args: list]: nothing -> string {
+	let given = ([$cmd ...$args] | each { into string })
+	# A tool by its name, not its file: Windows runs mise as mise.exe or a .cmd shim.
+	let tool = { |w| $w | path basename | str replace -r '(?i)\.(exe|cmd|bat)$' '' }
+	let inner = if (do $tool $given.0) != "mise" { [] } else {
+		match $given.1? {
+			"exec" => ($given | skip 2 | skip while { |w| $w != "--" } | skip 1)
+			"tool-stub" => ($given | skip 3 | prepend ($given.2? | default "" | path basename | str replace -r '(\.musl)?\.toml$' ''))
+			_ => ($given | skip 1)
+		}
+	}
+	let words = if ($inner | is-empty) { $given } else { $inner }
+	# In `$words | skip 1`, the word before item i is $words.i.
+	let rest = ($words | skip 1 | enumerate | where { |w|
+		not ($w.item | str starts-with "-") and not ($words | get $w.index | str starts-with "-")
+	} | get item | first 2 | each { path basename })
+	[(do $tool $words.0) ...$rest] | str join " "
+}
+
+# run-live's contract over vrun: the env/cmd preamble, then run-live under
+# the env overlay. Callers that need the external's stdout keep plain vrun
+# (its pipeline output is the command's output — a capture wrapper would
+# discard it).
 export def --wrapped vrun-live [--envs: record = {}, cmd, ...args] {
-	try { vrun --envs $envs $cmd ...$args; 0 } catch { |err| $err.exit_code }
+	vrun-named (command-name $cmd $args) $envs $cmd $args
 }
 
-# Diagnostics go to stderr: callers capture stdout for the command's output alone.
-export def --wrapped vrun [--trail="\n", --envs: record = {}, cmd, ...args] {
+def vrun-named [name: string, envs: record, cmd, args: list]: nothing -> int {
+	if (verbosity) != "quiet" { print-preamble $envs $cmd $args "\n" }
+	with-env $envs { run-named $name $cmd $args }
+}
+
+# The log lives in SAYT_LOG_DIR, one private temp directory per sayt run. A
+# failure prints all of it: sayt does not guess which lines name the failure.
+def run-logged [name: string, cmd, args: list]: nothing -> int {
+	let normal = ((verbosity) == "normal")
+	let dir = ($env.SAYT_LOG_DIR? | default (mktemp -d -t sayt.XXXXXX))
+	mkdir $dir
+	let log = (mktemp -p $dir --suffix .log $"($cmd | path basename).XXXXXX")
+	let started = (date now)
+	let elapsed = {|| (date now) - $started | format duration sec | str replace -r '\.\d+' '' }
+	let every = ($env.SAYT_HEARTBEAT_SECS? | default "60" | into int | into duration --unit sec)
+	let beat = if $normal {
+		job spawn { loop { sleep $every; print -e $"… ($name) still running \((do $elapsed), log: ($log)\)" } }
+	}
+	let code = (try { ^$cmd ...$args o+e> $log; 0 } catch { |err| $err.exit_code })
+	if $beat != null { job kill $beat }
+	if $code != 0 {
+		open --raw $log | print --raw
+		print -e $"✗ ($name) exit ($code) after (do $elapsed), log: ($log)"
+	} else if $normal {
+		print -e $"✓ ($name) \((open --raw $log | lines | length) lines, (do $elapsed), log: ($log)\)"
+	}
+	$code
+}
+
+def print-preamble [envs: record, cmd, args: list, trail: string] {
   let quoted_args = $args | each { |arg|
     if ($arg | into string | str contains ' ') { $arg | to nuon } else { $arg } }
   let env_pairs = if ($envs | is-empty) { [] } else { $envs | transpose name value }
@@ -64,8 +137,19 @@ export def --wrapped vrun [--trail="\n", --envs: record = {}, cmd, ...args] {
       print -e (format-export $row.name $shown)
     }
   }
+  print -e -n $"($cmd) ($quoted_args | str join ' ')($trail)"
+}
+
+# A progress or success line, which `quiet` drops; failures print at every level.
+export def note [--stdout, msg: string] {
+	if (verbosity) == "quiet" { return }
+	if $stdout { print $msg } else { print -e $msg }
+}
+
+# Diagnostics go to stderr: callers capture stdout for the command's output alone.
+export def --wrapped vrun [--trail="\n", --envs: record = {}, cmd, ...args] {
+  if (verbosity) != "quiet" { print-preamble $envs $cmd $args $trail }
   with-env $envs {
-    print -e -n $"($cmd) ($quoted_args | str join ' ')($trail)"
     $in | ^$cmd ...$args
   }
 }
@@ -144,12 +228,16 @@ export def --wrapped run-mise [...args] {
 
 # run-mise's trust handling with vrun-live's contract, plus an env overlay.
 export def --wrapped run-mise-live [--envs: record = {}, ...args] {
+  mise-live (command-name mise $args) $envs $args
+}
+
+def mise-live [name: string, envs: record, args: list]: nothing -> int {
   with-env (mise-env) {
     hide-env -i MISE_LOCKED
     mise-trust $env.SAYT_MISE_BIN
     let unlocked = ($args.0? in ["tool-stub" "lock"])
     with-env (if $unlocked { {MISE_LOCKED: "0"} } else { {} }) {
-      vrun-live --envs $envs $env.SAYT_MISE_BIN ...$args
+      vrun-named $name $envs $env.SAYT_MISE_BIN $args
     }
   }
 }
@@ -190,13 +278,22 @@ export def --wrapped run-git-cliff [...args] {
   run-mise tool-stub $stub ...$args
 }
 
-# goreleaser's builders and hooks run in the project's mise environment.
+# Tool stubs isolate PATH; GoReleaser's hooks need the project's toolchain.
 export def --wrapped run-goreleaser [...args] {
   let stub = stub-path "goreleaser"
+  run-mise tool-stub $stub --version | ignore
+  let version = (open --raw $stub | from toml | get version)
+  let executable = (run-mise which goreleaser --tool $"http:($stub | path basename)@($version)" | str trim)
   let project = (run-mise env --json | from json)
   # Windows names it Path.
-  let path_key = ($project | columns | where { |c| ($c | str downcase) == "path" } | first)
-  with-env ($project | update $path_key { split row (char esep) }) { run-mise tool-stub $stub ...$args }
+  let path_key = ($project | columns | where { |c| ($c | str lowercase) == "path" } | first)
+  with-env ($project | update $path_key { split row (char esep) }) { vrun $executable ...$args }
+}
+
+# run-nu with run-live's contract, named by the caller: a `nu -c` script's
+# words say nothing about what it is.
+export def run-nu-named [name: string, args: list]: nothing -> int {
+	mise-live $name {} ["tool-stub" (stub-path "nu") ...$args]
 }
 
 export def --wrapped run-nu [...args] {

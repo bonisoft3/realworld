@@ -1,5 +1,7 @@
 # vscode.nu — VS Code tasks.json task runner
-use tools.nu [run-cue vrun]
+use tools.nu [run-cue run-mise]
+
+const _self_dir = (path self | path dirname)
 
 def vtr-to-argv [task: record] {
   let cmd_tokens = if ($task.cmd | str contains ' ') { $task.cmd | split row ' ' } else { [ $task.cmd ] }
@@ -21,6 +23,27 @@ def vtr-resolve-cwd [task: record] {
   if ($resolved | path exists) { $resolved } else { null }
 }
 
+def run-task [argv: list<string>, envs: record] {
+  let script = '
+    let argv = ($env._SAYT_VTR_ARGV | from json)
+    let envs = ($env._SAYT_VTR_ENVS | from json)
+    hide-env _SAYT_VTR_ARGV _SAYT_VTR_ENVS
+    # Mise preserves inherited PATH order in children; active pins must lead it.
+    let tools = (^$env.SAYT_MISE_BIN bin-paths --json | from json | each { |tool| $tool.path | path dirname } | uniq)
+    $env.PATH = ($tools ++ $env.PATH | uniq)
+    let found = (which --all ($argv | first) | where type == external | get 0?.path)
+    if ($found | is-not-empty) {
+      with-env $envs { ^$found ...($argv | skip 1) }
+    } else {
+      let cmd = ($argv | each { |a| if ($a | into string | str contains " ") { $a | to nuon } else { $a } } | str join " ")
+      with-env $envs { ^$nu.current-exe -c $cmd }
+    }
+  '
+  with-env {_SAYT_VTR_ARGV: ($argv | to json --raw), _SAYT_VTR_ENVS: ($envs | to json --raw)} {
+    run-mise exec -- $nu.current-exe -c $script
+  }
+}
+
 export def --wrapped vtr [...args: string] {
   if (not (".vscode/tasks.json" | path exists)) {
     print -e "vscode tasks file not found at .vscode/tasks.json"
@@ -28,7 +51,7 @@ export def --wrapped vtr [...args: string] {
   }
   let label = if ($args | is-empty) { "build" } else { $args | first }
   let extra_args = $args | skip 1
-  let script_dir = ($env.FILE_PWD? | default ($env.PWD | path join "plugins/sayt"))
+  let script_dir = $_self_dir
   let platform = match $nu.os-info.name { "windows" => "windows", "macos" => "osx", _ => "linux" }
   let cue_result = (run-cue export -p vscode ($script_dir | path join "vscode.cue") ($script_dir | path join "vscode_runner.cue") .vscode/tasks.json -t $'label=($label)' -t $'platform=($platform)' --out json | from json)
 
@@ -40,7 +63,7 @@ export def --wrapped vtr [...args: string] {
     if $dep_cwd != null {
       cd $dep_cwd
     }
-    with-env ($dep.env? | default {}) { vrun ($dep_argv | first) ...($dep_argv | skip 1) }
+    run-task $dep_argv ($dep.env? | default {})
     cd $orig_pwd
   }
 
@@ -51,6 +74,6 @@ export def --wrapped vtr [...args: string] {
   if $cmd_cwd != null {
     cd $cmd_cwd
   }
-  with-env ($cue_result.command.env? | default {}) { vrun ($argv | first) ...($argv | skip 1) }
+  run-task $argv ($cue_result.command.env? | default {})
   cd $orig_pwd
 }

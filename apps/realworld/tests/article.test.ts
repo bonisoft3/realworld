@@ -58,7 +58,7 @@ const piece = (over: Row): Row => ({
   ...over,
 });
 
-// The tables the screen's regions declare, all of them: memoryStore throws on a
+// The tables the screen's regions declare, all of them: fakeDataSync throws on a
 // table it was not given, and an embed resolves against the joined table too.
 const world = (over: Record<string, Row[]> = {}): Record<string, Row[]> => ({
   app_user: [

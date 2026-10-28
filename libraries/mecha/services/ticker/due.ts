@@ -9,7 +9,9 @@ import { Cron } from "croner";
 
 export type Schedule = {
   name: string;
-  cron: string;
+  /** A cadence, or null for a one-shot row due at `due_at`. */
+  cron: string | null;
+  due_at?: string | null;
   time_zone: string;
   max_lateness_seconds: number;
   /** The watermark: the last tick this schedule is known to have resolved. */
@@ -35,11 +37,8 @@ const WALK_CAP = 512;
  * refused rather than silently matching nothing, which would make a schedule
  * that never fires look healthy.
  *
- * A bare `n` means the single value n, but `n/step` means n to the end of the
- * field — `5/10` in minutes is 5, 15, 25 … 55, not 5 alone. Reading it as a
- * single value is silent tick loss of precisely the kind this whole file
- * exists to refuse: croner emits every one of them and the gap check throws
- * all but the first away.
+ * A step steps over `*` or a range, as croner 10 reads it: `n/step` is
+ * refused, since a bare `n` is the single value n and croner refuses it too.
  */
 function admits(field: string, value: number, first: number, last: number): boolean {
   return field.split(",").some((term) => {
@@ -49,8 +48,9 @@ function admits(field: string, value: number, first: number, last: number): bool
     let lo = first, hi = last;
     if (spec !== "*") {
       const dash = spec.indexOf("-");
+      if (dash === -1 && stepText !== undefined) throw new Error(`cron: "${term}" steps from a single value; write */step or a-b/step`);
       lo = Number(dash === -1 ? spec : spec.slice(0, dash));
-      hi = dash === -1 ? (stepText === undefined ? lo : last) : Number(spec.slice(dash + 1));
+      hi = dash === -1 ? lo : Number(spec.slice(dash + 1));
       if (!Number.isInteger(lo) || !Number.isInteger(hi)) {
         throw new Error(`cron: bad range "${term}"`);
       }
@@ -110,6 +110,14 @@ function onTheWallClock(minute: string, hour: string, at: Date, zone: string): b
  * without walking the whole backlog to count it.
  */
 export function due(s: Schedule, now: Date, cap: number = WALK_CAP): Tick[] {
+  if (s.cron === null) {
+    // One instant: owed once it has passed and the watermark has not reached
+    // it. Clearing the watermark owes it again, which is how a row is re-armed.
+    if (s.due_at === null || s.due_at === undefined) throw new Error(`${s.name}: a schedule states a cron or a due_at`);
+    const at = new Date(s.due_at);
+    if (at > now || (s.last_tick_at !== null && new Date(s.last_tick_at) >= at)) return [];
+    return [{ schedule: s.name, tick_at: at.toISOString(), late: false }];
+  }
   const fields = s.cron.trim().split(/\s+/);
   if (fields.length !== 5) {
     throw new Error(`${s.name}: five-field cron required, got "${s.cron}"`);
@@ -147,6 +155,39 @@ export function due(s: Schedule, now: Date, cap: number = WALK_CAP): Tick[] {
     out.push({ schedule: s.name, tick_at: next.toISOString(), late: false });
   }
   return out;
+}
+
+/**
+ * The next instant a schedule owes a runnable tick: a one-shot's `due_at`
+ * while its watermark has not reached it; a cron's first occurrence after its
+ * watermark, or after its lateness horizon where the watermark is behind it,
+ * that the calendar has. An occurrence behind the horizon is not owed here:
+ * due() records one per call and runs none, so a sweep that runs for any
+ * other reason records it. The edge object's alarm; at or before `now` means
+ * owed now.
+ */
+export function nextOwed(s: Schedule, now: Date): Date | null {
+  if (s.cron === null) {
+    if (s.due_at === null || s.due_at === undefined) throw new Error(`${s.name}: a schedule states a cron or a due_at`);
+    const at = new Date(s.due_at);
+    return s.last_tick_at !== null && new Date(s.last_tick_at) >= at ? null : at;
+  }
+  const fields = s.cron.trim().split(/\s+/);
+  if (fields.length !== 5) {
+    throw new Error(`${s.name}: five-field cron required, got "${s.cron}"`);
+  }
+  const [minute, hour] = fields;
+  const horizon = new Date(now.getTime() - s.max_lateness_seconds * 1000);
+  const mark = s.last_tick_at === null ? null : new Date(s.last_tick_at);
+  const cron = new Cron(s.cron, { timezone: s.time_zone });
+  let cursor = mark !== null && mark >= horizon ? mark : horizon;
+  for (let i = 0; i < WALK_CAP; i++) {
+    const next = cron.nextRun(cursor);
+    if (next === null) return null;
+    if (onTheWallClock(minute, hour, next, s.time_zone)) return next;
+    cursor = next;
+  }
+  throw new Error(`${s.name}: no occurrence the calendar has within ${WALK_CAP} steps of "${s.cron}"`);
 }
 
 /**
