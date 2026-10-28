@@ -136,6 +136,28 @@
             }
           }
         },
+        "release": {
+          "rulemap": {
+            "cloudflare": {
+              "cmds": [
+                {
+                  "do": "if ($env.SAY_RELEASE_ARGS_FROM? | is-empty) { use tools.nu [run-mise]; let pronto = (run-mise where github:bonisoft3/pronto | str trim); run-mise exec -- deno run -A --config ($pronto | path join bundle deno.json) ($pronto | path join bundle derived.ts) . --tables article_stats,favorite_count,favorite_index,me,tag_count --streams realworld-favorite-count,realworld-favorite-index,realworld-favorite-recount,realworld-tag-recount --out dist/derived.sql }"
+                },
+                {
+                  "do": "use tools.nu [run-mise]; let pronto = (run-mise where github:bonisoft3/pronto | str trim); let data = if ($env.SAY_RELEASE_ARGS_FROM? | is-not-empty) { ['--from' $env.SAY_RELEASE_ARGS_FROM] } else { ['--derived' 'dist/derived.sql'] }; run-mise exec -- deno run -A --config ($pronto | path join bundle deno.json) ($pronto | path join bundle edge.ts) . --omnishell (run-mise where github:bonisoft3/omnishell | str trim) --mecha (run-mise where github:bonisoft3/mecha | str trim) --out dist/cloudflare ...$data --ice-servers '[{\"urls\":\"stun:stun.cloudflare.com:3478\"}]'"
+                },
+                {
+                  "do": "if ($env.SAY_RELEASE_ARGS_SNAPSHOT? | is-empty) { release --skip=validate --clean } else { release --snapshot --skip=validate --clean }",
+                  "use": "./release.nu"
+                },
+                {
+                  "do": "if ($env.SAY_RELEASE_ARGS_SNAPSHOT? | is-empty) { use tools.nu [run-mise]; let pronto = (run-mise where github:bonisoft3/pronto | str trim); run-mise exec -- deno run -A --config ($pronto | path join bundle deno.json) ($pronto | path join bundle publish-edge.ts) dist/cloudflare --mecha (run-mise where github:bonisoft3/mecha | str trim) ...(if ($env.SAY_RELEASE_ARGS_RESET? | is-empty) { [] } else { ['--reset'] }) ...(if ($env.SAY_RELEASE_ARGS_TEMPORARY? | is-empty) { [] } else { ['--temporary'] }) }"
+                }
+              ],
+              "platform": "cloudflare"
+            }
+          }
+        },
         "self": {
           "version": "v0.45.1"
         },
@@ -235,6 +257,20 @@
                 }
               ]
             },
+            "auth": {
+              "cmds": [
+                {
+                  "do": "deno test --config tests/deno.json --no-lock --no-check --allow-env --allow-read tests/auth.test.ts"
+                }
+              ]
+            },
+            "edge-projections": {
+              "cmds": [
+                {
+                  "do": "deno test --config tests/deno.json --lock tests/deno.lock --frozen --allow-read tests/edge-projections.test.ts"
+                }
+              ]
+            },
             "machines": {
               "cmds": [
                 {
@@ -255,42 +291,6 @@
                   "do": "use tools.nu [run-mise]; run-mise exec -- omnishell check battery ."
                 }
               ]
-            },
-            "auth": {
-              "cmds": [
-                {
-                  "do": "deno test --config tests/deno.json --no-lock --no-check --allow-env --allow-read tests/auth.test.ts"
-                }
-              ]
-            },
-            "edge-projections": {
-              "cmds": [
-                {
-                  "do": "deno test --config tests/deno.json --lock tests/deno.lock --frozen --allow-read tests/edge-projections.test.ts"
-                }
-              ]
-            }
-          }
-        },
-        "release": {
-          "rulemap": {
-            "cloudflare": {
-              "cmds": [
-                {
-                  "do": "if ($env.SAY_RELEASE_ARGS_FROM? | is-empty) { use tools.nu [run-mise]; let pronto = (run-mise where github:bonisoft3/pronto | str trim); run-mise exec -- deno run -A --config ($pronto | path join bundle deno.json) ($pronto | path join bundle derived.ts) . --tables article_stats,favorite_count,favorite_index,me,tag_count --streams realworld-favorite-count,realworld-favorite-index,realworld-favorite-recount,realworld-tag-recount --out dist/derived.sql }"
-                },
-                {
-                  "do": "use tools.nu [run-mise]; let pronto = (run-mise where github:bonisoft3/pronto | str trim); let data = if ($env.SAY_RELEASE_ARGS_FROM? | is-not-empty) { ['--from' $env.SAY_RELEASE_ARGS_FROM] } else { ['--derived' 'dist/derived.sql'] }; run-mise exec -- deno run -A --config ($pronto | path join bundle deno.json) ($pronto | path join bundle edge.ts) . --omnishell (run-mise where github:bonisoft3/omnishell | str trim) --mecha (run-mise where github:bonisoft3/mecha | str trim) --out dist/cloudflare ...$data --ice-servers '[{\"urls\":\"stun:stun.cloudflare.com:3478\"}]'"
-                },
-                {
-                  "do": "if ($env.SAY_RELEASE_ARGS_SNAPSHOT? | is-empty) { release --skip=validate --clean } else { release --snapshot --skip=validate --clean }",
-                  "use": "./release.nu"
-                },
-                {
-                  "do": "if ($env.SAY_RELEASE_ARGS_SNAPSHOT? | is-empty) { use tools.nu [run-mise]; let pronto = (run-mise where github:bonisoft3/pronto | str trim); run-mise exec -- deno run -A --config ($pronto | path join bundle deno.json) ($pronto | path join bundle publish-edge.ts) dist/cloudflare --mecha (run-mise where github:bonisoft3/mecha | str trim) ...(if ($env.SAY_RELEASE_ARGS_RESET? | is-empty) { [] } else { ['--reset'] }) ...(if ($env.SAY_RELEASE_ARGS_TEMPORARY? | is-empty) { [] } else { ['--temporary'] }) }"
-                }
-              ],
-              "platform": "cloudflare"
             }
           }
         },
@@ -1551,18 +1551,18 @@
             "condition": "service_healthy"
           }
         },
-        "environment": {
-          "APP_URL": "https://caddy:8443",
-          "SETTLE_TIMEOUT_MS": "50000"
-        },
-        "ports": [],
-        "volumes": [],
         "entrypoint": [
           "sh",
           "-c",
           "deno run --allow-env --allow-net --unsafely-ignore-certificate-errors=caddy tests/visual-fixture.ts && exec \"$$@\"",
           "visual"
-        ]
+        ],
+        "environment": {
+          "APP_URL": "https://caddy:8443",
+          "SETTLE_TIMEOUT_MS": "50000"
+        },
+        "ports": [],
+        "volumes": []
       },
       "taskfile": {
         "run": "once",
@@ -3197,982 +3197,6 @@
         "similar": false
       }
     },
-    "served": {
-      "name": "served",
-      "project": "realworld",
-      "dir": ".",
-      "srcs": {
-        "globs": [
-          "shell/index.html",
-          "shell/shell.css",
-          "shell/boot.js",
-          "offline-first-sw.js",
-          "shell/shell.yaml",
-          "shell/shell.json",
-          "shell/design.css",
-          "shell/screens/home.html",
-          "shell/screens/home.css",
-          "shell/screens/feed.html",
-          "shell/screens/feed.css",
-          "shell/screens/reading-list.html",
-          "shell/screens/reading-list.css",
-          "shell/screens/editor.html",
-          "shell/screens/editor.css",
-          "shell/screens/settings.html",
-          "shell/screens/settings.css",
-          "shell/screens/older.html",
-          "shell/screens/older.css",
-          "shell/screens/feed-older.html",
-          "shell/screens/feed-older.css",
-          "shell/screens/article.html",
-          "shell/screens/article.css",
-          "shell/screens/edit-article.html",
-          "shell/screens/edit-article.css",
-          "shell/screens/profile.html",
-          "shell/screens/profile.css",
-          "shell/screens/profile-favorites.html",
-          "shell/screens/profile-favorites.css",
-          "shell/screens/tag.html",
-          "shell/screens/tag.css",
-          "shell/screens/search.html",
-          "shell/screens/search.css",
-          "shell/renderers/markdown.js",
-          "shell/shared/chrome.css",
-          "shell/shared/system.css",
-          "pipelines/favorite-recount.js",
-          "messages/en.json",
-          "messages/zh.json",
-          "messages/hi.json",
-          "messages/es.json",
-          "messages/fr.json",
-          "messages/ar.json",
-          "messages/bn.json",
-          "messages/pt.json",
-          "messages/ru.json",
-          "messages/ur.json",
-          "messages/id.json",
-          "messages/de.json",
-          "messages/ja.json",
-          "messages/sw.json",
-          "messages/tr.json",
-          "brief.html",
-          "ir.html",
-          "ir/card.css",
-          "acceptance.md",
-          "DESIGN.md",
-          "robots.txt",
-          "sitemap.xml"
-        ],
-        "defaultGlobs": null,
-        "exclude": [],
-        "defaultExclude": null
-      },
-      "outs": {
-        "globs": [],
-        "exclude": []
-      },
-      "state": {
-        "globs": []
-      },
-      "visibility": "internal",
-      "activate": "",
-      "cmd": {
-        "builtin": null
-      },
-      "env": {},
-      "deps": [],
-      "dockerfile": {
-        "from": {
-          "name": "denoland/deno:debian-2.9.7@sha256:fa335acdf6b72106eda2cb6a8cb5f4187e7630e357467489db4b2e7352d5e432"
-        },
-        "workdir": "/app",
-        "preamble": [],
-        "defaultPreamble": null,
-        "add": [],
-        "mounts": [],
-        "secrets": {},
-        "extra_hosts": [],
-        "copy": [
-          {
-            "from": {
-              "name": "plugins_omnishell-runtime-image"
-            },
-            "srcs": [
-              "/"
-            ],
-            "dst": "/omnishell",
-            "link": true,
-            "parents": false,
-            "exclude": []
-          }
-        ],
-        "epilogue": [
-          "RUN set -e; install -D -m 644 '/omnishell/interpreter/shell.js' '/served/omnishell/interpreter/shell.js'; install -D -m 644 '/omnishell/interpreter/chrome.js' '/served/omnishell/interpreter/chrome.js'; install -D -m 644 '/omnishell/interpreter/screen.js' '/served/omnishell/interpreter/screen.js'; install -D -m 644 '/omnishell/interpreter/fragment.js' '/served/omnishell/interpreter/fragment.js'; install -D -m 644 '/omnishell/interpreter/data-sync.js' '/served/omnishell/interpreter/data-sync.js'; install -D -m 644 '/omnishell/interpreter/validate.js' '/served/omnishell/interpreter/validate.js'; install -D -m 644 '/omnishell/interpreter/render.js' '/served/omnishell/interpreter/render.js'; install -D -m 644 '/omnishell/interpreter/release-plan.js' '/served/omnishell/interpreter/release-plan.js'; install -D -m 644 '/omnishell/interpreter/preloads.js' '/served/omnishell/interpreter/preloads.js'; install -D -m 644 '/omnishell/interpreter/link-prefetch.js' '/served/omnishell/interpreter/link-prefetch.js'; install -D -m 644 '/omnishell/interpreter/markup.js' '/served/omnishell/interpreter/markup.js'; install -D -m 644 '/omnishell/interpreter/script-url.js' '/served/omnishell/interpreter/script-url.js'; install -D -m 644 '/omnishell/interpreter/deferred-boot.js' '/served/omnishell/interpreter/deferred-boot.js'; install -D -m 644 '/omnishell/interpreter/host-dom.js' '/served/omnishell/interpreter/host-dom.js'; install -D -m 644 '/omnishell/interpreter/hatch.js' '/served/omnishell/interpreter/hatch.js'; install -D -m 644 '/omnishell/interpreter/hatch-worker.js' '/served/omnishell/interpreter/hatch-worker.js'; install -D -m 644 '/omnishell/interpreter/hatch-presenter.js' '/served/omnishell/interpreter/hatch-presenter.js'; install -D -m 644 '/omnishell/interpreter/presenter-realm.js' '/served/omnishell/interpreter/presenter-realm.js'; install -D -m 644 '/omnishell/interpreter/presenter.js' '/served/omnishell/interpreter/presenter.js'; install -D -m 644 '/omnishell/interpreter/storybook.js' '/served/omnishell/interpreter/storybook.js'; install -D -m 644 '/omnishell/interpreter/jessie.js' '/served/omnishell/interpreter/jessie.js'; install -D -m 644 '/omnishell/interpreter/kinetic.js' '/served/omnishell/interpreter/kinetic.js'; install -D -m 644 '/omnishell/interpreter/kinetic-milestones.js' '/served/omnishell/interpreter/kinetic-milestones.js'; install -D -m 644 '/omnishell/interpreter/kinetic-session.js' '/served/omnishell/interpreter/kinetic-session.js'; install -D -m 644 '/omnishell/interpreter/kinetic-sound.js' '/served/omnishell/interpreter/kinetic-sound.js'; install -D -m 644 '/omnishell/interpreter/kinetic-mount.js' '/served/omnishell/interpreter/kinetic-mount.js'; install -D -m 644 '/omnishell/interpreter/rtc-channel.js' '/served/omnishell/interpreter/rtc-channel.js'; install -D -m 644 '/omnishell/interpreter/prng.js' '/served/omnishell/interpreter/prng.js'; install -D -m 644 '/omnishell/interpreter/vendor/mecha-client.js' '/served/omnishell/interpreter/vendor/mecha-client.js'; install -D -m 644 '/omnishell/interpreter/vendor/js-yaml.js' '/served/omnishell/interpreter/vendor/js-yaml.js'; install -D -m 644 '/omnishell/interpreter/vendor/ses.umd.min.js' '/served/omnishell/interpreter/vendor/ses.umd.min.js'; install -D -m 644 '/omnishell/interpreter/vendor/morphlex.js' '/served/omnishell/interpreter/vendor/morphlex.js'; install -D -m 644 '/omnishell/interpreter/vendor/messages.js' '/served/omnishell/interpreter/vendor/messages.js'; install -D -m 644 '/omnishell/interpreter/vendor/game-inputs.js' '/served/omnishell/interpreter/vendor/game-inputs.js'; install -D -m 644 '/omnishell/interpreter/vendor/ggrs/ggrs_wasm.js' '/served/omnishell/interpreter/vendor/ggrs/ggrs_wasm.js'; install -D -m 644 '/omnishell/interpreter/vendor/ggrs/ggrs_wasm_bg.wasm' '/served/omnishell/interpreter/vendor/ggrs/ggrs_wasm_bg.wasm'; install -D -m 644 '/omnishell/components/wallclock.js' '/served/omnishell/components/wallclock.js'; install -D -m 644 '/app/shell/index.html' '/served/shell/index.html'; install -D -m 644 '/app/shell/shell.css' '/served/shell/shell.css'; install -D -m 644 '/app/shell/boot.js' '/served/shell/boot.js'; install -D -m 644 '/app/offline-first-sw.js' '/served/offline-first-sw.js'; install -D -m 644 '/app/shell/shell.yaml' '/served/shell/shell.yaml'; install -D -m 644 '/app/shell/shell.json' '/served/shell/shell.json'; install -D -m 644 '/app/shell/design.css' '/served/shell/design.css'; install -D -m 644 '/app/shell/screens/home.html' '/served/shell/screens/home.html'; install -D -m 644 '/app/shell/screens/home.css' '/served/shell/screens/home.css'; install -D -m 644 '/app/shell/screens/feed.html' '/served/shell/screens/feed.html'; install -D -m 644 '/app/shell/screens/feed.css' '/served/shell/screens/feed.css'; install -D -m 644 '/app/shell/screens/reading-list.html' '/served/shell/screens/reading-list.html'; install -D -m 644 '/app/shell/screens/reading-list.css' '/served/shell/screens/reading-list.css'; install -D -m 644 '/app/shell/screens/editor.html' '/served/shell/screens/editor.html'; install -D -m 644 '/app/shell/screens/editor.css' '/served/shell/screens/editor.css'; install -D -m 644 '/app/shell/screens/settings.html' '/served/shell/screens/settings.html'; install -D -m 644 '/app/shell/screens/settings.css' '/served/shell/screens/settings.css'; install -D -m 644 '/app/shell/screens/older.html' '/served/shell/screens/older.html'; install -D -m 644 '/app/shell/screens/older.css' '/served/shell/screens/older.css'; install -D -m 644 '/app/shell/screens/feed-older.html' '/served/shell/screens/feed-older.html'; install -D -m 644 '/app/shell/screens/feed-older.css' '/served/shell/screens/feed-older.css'; install -D -m 644 '/app/shell/screens/article.html' '/served/shell/screens/article.html'; install -D -m 644 '/app/shell/screens/article.css' '/served/shell/screens/article.css'; install -D -m 644 '/app/shell/screens/edit-article.html' '/served/shell/screens/edit-article.html'; install -D -m 644 '/app/shell/screens/edit-article.css' '/served/shell/screens/edit-article.css'; install -D -m 644 '/app/shell/screens/profile.html' '/served/shell/screens/profile.html'; install -D -m 644 '/app/shell/screens/profile.css' '/served/shell/screens/profile.css'; install -D -m 644 '/app/shell/screens/profile-favorites.html' '/served/shell/screens/profile-favorites.html'; install -D -m 644 '/app/shell/screens/profile-favorites.css' '/served/shell/screens/profile-favorites.css'; install -D -m 644 '/app/shell/screens/tag.html' '/served/shell/screens/tag.html'; install -D -m 644 '/app/shell/screens/tag.css' '/served/shell/screens/tag.css'; install -D -m 644 '/app/shell/screens/search.html' '/served/shell/screens/search.html'; install -D -m 644 '/app/shell/screens/search.css' '/served/shell/screens/search.css'; install -D -m 644 '/app/shell/renderers/markdown.js' '/served/shell/renderers/markdown.js'; install -D -m 644 '/app/shell/shared/chrome.css' '/served/shell/shared/chrome.css'; install -D -m 644 '/app/shell/shared/system.css' '/served/shell/shared/system.css'; install -D -m 644 '/app/pipelines/favorite-recount.js' '/served/pipelines/favorite-recount.js'; install -D -m 644 '/app/messages/en.json' '/served/messages/en.json'; install -D -m 644 '/app/messages/zh.json' '/served/messages/zh.json'; install -D -m 644 '/app/messages/hi.json' '/served/messages/hi.json'; install -D -m 644 '/app/messages/es.json' '/served/messages/es.json'; install -D -m 644 '/app/messages/fr.json' '/served/messages/fr.json'; install -D -m 644 '/app/messages/ar.json' '/served/messages/ar.json'; install -D -m 644 '/app/messages/bn.json' '/served/messages/bn.json'; install -D -m 644 '/app/messages/pt.json' '/served/messages/pt.json'; install -D -m 644 '/app/messages/ru.json' '/served/messages/ru.json'; install -D -m 644 '/app/messages/ur.json' '/served/messages/ur.json'; install -D -m 644 '/app/messages/id.json' '/served/messages/id.json'; install -D -m 644 '/app/messages/de.json' '/served/messages/de.json'; install -D -m 644 '/app/messages/ja.json' '/served/messages/ja.json'; install -D -m 644 '/app/messages/sw.json' '/served/messages/sw.json'; install -D -m 644 '/app/messages/tr.json' '/served/messages/tr.json'; install -D -m 644 '/app/brief.html' '/served/docs/brief.html'; install -D -m 644 '/app/ir.html' '/served/docs/ir.html'; install -D -m 644 '/app/ir/card.css' '/served/docs/ir/card.css'; install -D -m 644 '/app/acceptance.md' '/served/docs/acceptance.md'; install -D -m 644 '/app/DESIGN.md' '/served/docs/DESIGN.md'; install -D -m 644 '/app/robots.txt' '/served/robots.txt'; install -D -m 644 '/app/sitemap.xml' '/served/sitemap.xml'; deno cache --frozen --config /omnishell/server/deno.json /omnishell/server/address.ts && deno run --frozen --cached-only --config /omnishell/server/deno.json --allow-read=/served --allow-write=/served,/served.scripts /omnishell/server/address.ts /served /served.scripts"
-        ],
-        "defaultCopy": null,
-        "healthcheck": null,
-        "expose": [],
-        "entrypoint": null,
-        "incremental": false,
-        "cmd": null,
-        "finalCopy": [
-          "/served",
-          "/served.scripts"
-        ]
-      },
-      "compose": {
-        "up": false,
-        "manual": false,
-        "build": {
-          "additional_contexts": {
-            "plugins_omnishell-runtime-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/omnishell:0.20.2@sha256:0f7d84358244c875a76bf97f13974bf6336e15f639a2f01fa31ad3eb0ce0d8a7}${MONOREPO_COMPOSE_MODE:+:plugins_omnishell-runtime-image}"
-          },
-          "secrets": [],
-          "args": {}
-        },
-        "environment": {},
-        "ports": [],
-        "volumes": [],
-        "depends_on": {},
-        "networks": {
-          "default": {
-            "aliases": [
-              "served"
-            ]
-          }
-        }
-      },
-      "cmds": [],
-      "cache": {
-        "full": false,
-        "similar": false
-      }
-    },
-    "database": {
-      "name": "database",
-      "project": "realworld",
-      "dir": ".",
-      "srcs": {
-        "globs": [
-          "services/database/migrations/000_extensions.sql",
-          "services/database/migrations/001_roles.sql",
-          "services/database/migrations/002_grants.sql",
-          "services/database/migrations/004_types.sql",
-          "services/database/migrations/005_create_tables.sql",
-          "services/database/migrations/006_policies.sql",
-          "services/database/migrations/007_txid.sql",
-          "services/database/migrations/008_publication.sql",
-          "services/database/migrations/011_owner_writes.sql",
-          "services/database/migrations/012_me_readonly.sql",
-          "services/database/migrations/013_article_tag_sync.sql",
-          "services/database/migrations/014_me_provision.sql",
-          "services/database/migrations/015_default_privileges.sql",
-          "services/database/migrations/016_edge_projections.sql",
-          "services/database/migrations/017_demo_content.sql",
-          "services/database/migrations/018_favorite_guard.sql"
-        ],
-        "defaultGlobs": null,
-        "exclude": [],
-        "defaultExclude": null
-      },
-      "outs": {
-        "globs": [],
-        "exclude": []
-      },
-      "state": {
-        "globs": []
-      },
-      "visibility": "internal",
-      "activate": "",
-      "cmd": {
-        "builtin": null
-      },
-      "env": {},
-      "deps": [],
-      "dockerfile": {
-        "from": {
-          "name": "libraries_mecha-database-image"
-        },
-        "preamble": [],
-        "defaultPreamble": null,
-        "add": [],
-        "mounts": [],
-        "secrets": {},
-        "extra_hosts": [],
-        "epilogue": [],
-        "copy": [
-          {
-            "from": null,
-            "srcs": [
-              "services/database/migrations/000_extensions.sql",
-              "services/database/migrations/001_roles.sql",
-              "services/database/migrations/002_grants.sql",
-              "services/database/migrations/004_types.sql",
-              "services/database/migrations/005_create_tables.sql",
-              "services/database/migrations/006_policies.sql",
-              "services/database/migrations/007_txid.sql",
-              "services/database/migrations/008_publication.sql",
-              "services/database/migrations/011_owner_writes.sql",
-              "services/database/migrations/012_me_readonly.sql",
-              "services/database/migrations/013_article_tag_sync.sql",
-              "services/database/migrations/014_me_provision.sql",
-              "services/database/migrations/015_default_privileges.sql",
-              "services/database/migrations/016_edge_projections.sql",
-              "services/database/migrations/017_demo_content.sql",
-              "services/database/migrations/018_favorite_guard.sql"
-            ],
-            "dst": "/docker-entrypoint-initdb.d/",
-            "link": true,
-            "parents": false,
-            "exclude": []
-          },
-          {
-            "from": {
-              "name": "libraries_mecha-database-image"
-            },
-            "srcs": [
-              "/usr/share/mecha/initdb/899_role_passwords.sh"
-            ],
-            "dst": "/docker-entrypoint-initdb.d/899_role_passwords.sh",
-            "link": true,
-            "parents": false,
-            "exclude": []
-          }
-        ],
-        "defaultCopy": null,
-        "healthcheck": {
-          "test": [
-            "CMD",
-            "pg_isready",
-            "-h",
-            "localhost",
-            "-p",
-            "5432",
-            "-d",
-            "${POSTGRES_DB:-realworld}",
-            "-U",
-            "${POSTGRES_USER:-postgres}"
-          ],
-          "interval": "1s",
-          "timeout": "5s",
-          "retries": 30,
-          "start_period": "5m"
-        },
-        "expose": [],
-        "entrypoint": null,
-        "incremental": false,
-        "cmd": null
-      },
-      "compose": {
-        "up": false,
-        "manual": false,
-        "build": {
-          "additional_contexts": {
-            "libraries_mecha-database-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-database:0.18.0@sha256:b44f283f271dfefd5c6453874f81b8626ac2e9dac755123e21e3e9eeb8eca18a}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-database-image}"
-          },
-          "secrets": [],
-          "args": {}
-        },
-        "environment": {
-          "POSTGRES_USER": "${POSTGRES_USER:-postgres}",
-          "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-postgres}",
-          "POSTGRES_DB": "${POSTGRES_DB:-realworld}",
-          "ELECTRIC_PASSWORD": "${ELECTRIC_PASSWORD:-dev-electric-password}",
-          "AUTHENTICATOR_PASSWORD": "${AUTHENTICATOR_PASSWORD:-dev-authenticator-password}",
-          "POSTGRES_INITDB_ARGS": "--no-sync --encoding=UTF8 --auth=trust --locale-provider=icu --icu-locale=und --locale=C"
-        },
-        "ports": [
-          "5432"
-        ],
-        "volumes": [],
-        "depends_on": {},
-        "networks": {
-          "default": {
-            "aliases": [
-              "database"
-            ]
-          }
-        },
-        "healthcheck": {
-          "test": [
-            "CMD",
-            "pg_isready",
-            "-h",
-            "localhost",
-            "-p",
-            "5432",
-            "-d",
-            "${POSTGRES_DB:-realworld}",
-            "-U",
-            "${POSTGRES_USER:-postgres}"
-          ],
-          "interval": "1s",
-          "timeout": "5s",
-          "retries": 30,
-          "start_period": "5m",
-          "start_interval": "100ms"
-        },
-        "develop": {
-          "watch": [
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/000_extensions.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/001_roles.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/002_grants.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/004_types.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/005_create_tables.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/006_policies.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/007_txid.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/008_publication.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/011_owner_writes.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/012_me_readonly.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/013_article_tag_sync.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/014_me_provision.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/015_default_privileges.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/016_edge_projections.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/017_demo_content.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            },
-            {
-              "action": "rebuild",
-              "path": "../services/database/migrations/018_favorite_guard.sql",
-              "target": "/docker-entrypoint-initdb.d"
-            }
-          ]
-        }
-      },
-      "healthcheck": {
-        "template": "postgres",
-        "db": "${POSTGRES_DB:-realworld}",
-        "user": "${POSTGRES_USER:-postgres}",
-        "port": 5432,
-        "host": "localhost",
-        "start_interval": "100ms",
-        "interval": "1s",
-        "timeout": "5s",
-        "retries": 30,
-        "start_period": "5m"
-      },
-      "entrypoint": {
-        "name": "entrypoint",
-        "do": "docker-entrypoint.sh postgres -c wal_level=logical -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c shared_buffers=32MB -c max_connections=200",
-        "priority": 0,
-        "shell": "exec",
-        "stop": false,
-        "srcs": {
-          "globs": [],
-          "defaultGlobs": null,
-          "exclude": [],
-          "defaultExclude": null
-        },
-        "env": {
-          "POSTGRES_USER": "${POSTGRES_USER:-postgres}",
-          "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-postgres}",
-          "POSTGRES_DB": "${POSTGRES_DB:-realworld}",
-          "ELECTRIC_PASSWORD": "${ELECTRIC_PASSWORD:-dev-electric-password}",
-          "AUTHENTICATOR_PASSWORD": "${AUTHENTICATOR_PASSWORD:-dev-authenticator-password}",
-          "POSTGRES_INITDB_ARGS": "--no-sync --encoding=UTF8 --auth=trust --locale-provider=icu --icu-locale=und --locale=C"
-        },
-        "after": {},
-        "host": true
-      },
-      "expose": {
-        "pg": {
-          "port": 5432
-        }
-      },
-      "cmds": [],
-      "cache": {
-        "full": false,
-        "similar": false
-      }
-    },
-    "auth": {
-      "name": "auth",
-      "project": "realworld",
-      "dir": ".",
-      "srcs": {
-        "globs": [],
-        "defaultGlobs": null,
-        "exclude": [],
-        "defaultExclude": null
-      },
-      "outs": {
-        "globs": [],
-        "exclude": []
-      },
-      "state": {
-        "globs": []
-      },
-      "visibility": "internal",
-      "activate": "",
-      "cmd": {
-        "builtin": null
-      },
-      "env": {},
-      "deps": [
-        ":database:outs"
-      ],
-      "dockerfile": {
-        "from": {
-          "name": "libraries_mecha-auth-image"
-        },
-        "workdir": "/app",
-        "preamble": [],
-        "defaultPreamble": null,
-        "add": [],
-        "mounts": [],
-        "secrets": {},
-        "extra_hosts": [],
-        "epilogue": [
-          "RUN mkdir -p /monorepo"
-        ],
-        "copy": [],
-        "defaultCopy": null,
-        "healthcheck": null,
-        "expose": [],
-        "entrypoint": null,
-        "incremental": false,
-        "cmd": null
-      },
-      "compose": {
-        "up": false,
-        "manual": false,
-        "build": {
-          "additional_contexts": {
-            "libraries_mecha-auth-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-auth:0.18.0@sha256:fc880aa71831b5bdcaa8bc6181bddd161f2bf4af24833afb14a94b402094133c}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-auth-image}"
-          },
-          "secrets": [],
-          "args": {}
-        },
-        "environment": {
-          "DATABASE_URL": "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-realworld}",
-          "AUTH_STATEMENT_TIMEOUT_MS": "5000",
-          "PGRST_JWT_SECRET": "${PGRST_JWT_SECRET:-mecha-dev-secret-please-override-32ch}",
-          "WEBAUTHN_RP_ID": "${WEBAUTHN_RP_ID:-localhost}",
-          "WEBAUTHN_ORIGIN": "${WEBAUTHN_ORIGIN:-https://localhost:*}",
-          "OIDC_PROVIDERS": ""
-        },
-        "ports": [],
-        "volumes": [],
-        "depends_on": {
-          "realworld-database": {
-            "condition": "service_healthy"
-          }
-        },
-        "networks": {
-          "default": {
-            "aliases": [
-              "auth"
-            ]
-          }
-        }
-      },
-      "entrypoint": {
-        "name": "entrypoint",
-        "do": "deno run --allow-net --allow-env --config /app/deno.json /app/main.ts",
-        "priority": 0,
-        "shell": "exec",
-        "stop": false,
-        "srcs": {
-          "globs": [],
-          "defaultGlobs": null,
-          "exclude": [],
-          "defaultExclude": null
-        },
-        "env": {
-          "DATABASE_URL": "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-realworld}",
-          "AUTH_STATEMENT_TIMEOUT_MS": "5000",
-          "PGRST_JWT_SECRET": "${PGRST_JWT_SECRET:-mecha-dev-secret-please-override-32ch}",
-          "WEBAUTHN_RP_ID": "${WEBAUTHN_RP_ID:-localhost}",
-          "WEBAUTHN_ORIGIN": "${WEBAUTHN_ORIGIN:-https://localhost:*}",
-          "OIDC_PROVIDERS": ""
-        },
-        "after": {
-          "database": "healthy"
-        },
-        "host": true
-      },
-      "expose": {
-        "http": {
-          "port": 9999
-        }
-      },
-      "cmds": [],
-      "cache": {
-        "full": false,
-        "similar": false
-      }
-    },
-    "mesh-events": {
-      "name": "mesh-events",
-      "project": "realworld",
-      "dir": ".",
-      "srcs": {
-        "globs": [],
-        "defaultGlobs": null,
-        "exclude": [],
-        "defaultExclude": null
-      },
-      "outs": {
-        "globs": [],
-        "exclude": []
-      },
-      "state": {
-        "globs": []
-      },
-      "visibility": "internal",
-      "activate": "",
-      "cmd": {
-        "builtin": null
-      },
-      "env": {},
-      "deps": [
-        ":caddy:outs",
-        ":redis:outs"
-      ],
-      "dockerfile": {
-        "from": {
-          "name": "libraries_mecha-mesh-image"
-        },
-        "preamble": [],
-        "defaultPreamble": null,
-        "add": [],
-        "mounts": [],
-        "secrets": {},
-        "extra_hosts": [],
-        "epilogue": [],
-        "copy": [],
-        "defaultCopy": {
-          "portcheck": {
-            "from": {
-              "name": "tarampampam/microcheck:1@sha256:79c187c05bfa67518078bf4db117771942fa8fe107dc79a905861c75ddf28dfa"
-            },
-            "name": "portcheck",
-            "srcs": [
-              "/bin/portcheck"
-            ],
-            "dst": "/usr/local/bin/portcheck",
-            "chmod": "755",
-            "link": true,
-            "parents": false,
-            "exclude": []
-          }
-        },
-        "healthcheck": {
-          "test": [
-            "CMD",
-            "portcheck",
-            "--port",
-            "3500"
-          ],
-          "interval": "5s",
-          "timeout": "5s",
-          "retries": 30,
-          "start_period": "30s"
-        },
-        "expose": [],
-        "entrypoint": null,
-        "incremental": false,
-        "cmd": null
-      },
-      "compose": {
-        "up": false,
-        "manual": false,
-        "build": {
-          "additional_contexts": {
-            "libraries_mecha-mesh-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-mesh:0.18.0@sha256:04ad88869e10f421813db7af7f32102ec233095205f37ae5f2103587e669aeb3}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-mesh-image}"
-          },
-          "secrets": [],
-          "args": {}
-        },
-        "environment": {},
-        "ports": [],
-        "volumes": [],
-        "depends_on": {
-          "realworld-caddy": {
-            "condition": "service_started"
-          },
-          "realworld-redis": {
-            "condition": "service_started"
-          }
-        },
-        "networks": {
-          "default": {
-            "aliases": [
-              "mesh-events"
-            ]
-          }
-        },
-        "restart": "on-failure",
-        "healthcheck": {
-          "test": [
-            "CMD",
-            "portcheck",
-            "--port",
-            "3500"
-          ],
-          "interval": "5s",
-          "timeout": "5s",
-          "retries": 30,
-          "start_period": "30s",
-          "start_interval": "500ms"
-        }
-      },
-      "healthcheck": {
-        "template": "tcp",
-        "port": 3500,
-        "interval": "5s",
-        "start_interval": "500ms",
-        "timeout": "5s",
-        "retries": 30,
-        "start_period": "30s"
-      },
-      "cmds": [],
-      "cache": {
-        "full": false,
-        "similar": false
-      }
-    },
-    "conduit": {
-      "name": "conduit",
-      "project": "realworld",
-      "dir": ".",
-      "srcs": {
-        "globs": [
-          "docker/conduit-pipeline.yaml"
-        ],
-        "defaultGlobs": null,
-        "exclude": [],
-        "defaultExclude": null
-      },
-      "outs": {
-        "globs": [],
-        "exclude": []
-      },
-      "state": {
-        "globs": []
-      },
-      "visibility": "internal",
-      "activate": "",
-      "cmd": {
-        "builtin": null
-      },
-      "env": {},
-      "deps": [
-        ":database:outs",
-        ":mesh-events:outs"
-      ],
-      "dockerfile": {
-        "from": {
-          "name": "libraries_mecha-conduit-image"
-        },
-        "workdir": "/app",
-        "preamble": [],
-        "defaultPreamble": null,
-        "add": [],
-        "mounts": [],
-        "secrets": {},
-        "extra_hosts": [],
-        "epilogue": [],
-        "copy": [
-          {
-            "from": null,
-            "srcs": [
-              "docker/conduit-pipeline.yaml"
-            ],
-            "dst": "/conduit/cdc-to-bus.yaml.tmpl",
-            "link": true,
-            "parents": false,
-            "exclude": []
-          }
-        ],
-        "defaultCopy": {
-          "httpcheck": {
-            "from": {
-              "name": "tarampampam/microcheck:1@sha256:79c187c05bfa67518078bf4db117771942fa8fe107dc79a905861c75ddf28dfa"
-            },
-            "name": "httpcheck",
-            "srcs": [
-              "/bin/httpcheck"
-            ],
-            "dst": "/usr/local/bin/httpcheck",
-            "chmod": "755",
-            "link": true,
-            "parents": false,
-            "exclude": []
-          }
-        },
-        "healthcheck": {
-          "test": [
-            "CMD",
-            "httpcheck",
-            "http://127.0.0.1:8080/healthz"
-          ],
-          "interval": "5s",
-          "timeout": "5s",
-          "retries": 20,
-          "start_period": "120s"
-        },
-        "expose": [],
-        "entrypoint": null,
-        "incremental": false,
-        "cmd": [
-          "sh",
-          "-c",
-          "mkdir -p /conduit/pipelines && envsubst < /conduit/cdc-to-bus.yaml.tmpl > /conduit/pipelines/cdc-to-bus.yaml && exec /app/conduit run"
-        ]
-      },
-      "compose": {
-        "up": false,
-        "manual": false,
-        "build": {
-          "additional_contexts": {
-            "libraries_mecha-conduit-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-conduit:0.18.0@sha256:a9e01015f31e369b10268025d097ab39ad02493e9b256640b92321f2cd2c20c3}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-conduit-image}"
-          },
-          "secrets": [],
-          "args": {}
-        },
-        "environment": {
-          "DATABASE_URL": "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-realworld}",
-          "CONDUIT_PIPELINES_PATH": "/conduit/pipelines",
-          "CONDUIT_DB_TYPE": "inmemory"
-        },
-        "ports": [],
-        "volumes": [],
-        "depends_on": {
-          "realworld-database": {
-            "condition": "service_healthy"
-          },
-          "realworld-mesh-events": {
-            "condition": "service_started"
-          }
-        },
-        "networks": {
-          "default": {
-            "aliases": [
-              "conduit"
-            ]
-          }
-        },
-        "restart": "on-failure",
-        "healthcheck": {
-          "test": [
-            "CMD",
-            "httpcheck",
-            "http://127.0.0.1:8080/healthz"
-          ],
-          "interval": "5s",
-          "timeout": "5s",
-          "retries": 20,
-          "start_period": "120s",
-          "start_interval": "500ms"
-        },
-        "develop": {
-          "watch": [
-            {
-              "action": "sync+restart",
-              "path": "../docker/conduit-pipeline.yaml",
-              "target": "/conduit/cdc-to-bus.yaml.tmpl"
-            }
-          ]
-        }
-      },
-      "healthcheck": {
-        "template": "http",
-        "url": "http://127.0.0.1:8080/healthz",
-        "authorization": null,
-        "headers": [],
-        "interval": "5s",
-        "retries": 20,
-        "start_interval": "500ms",
-        "start_period": "120s",
-        "timeout": "5s"
-      },
-      "cmds": [],
-      "cache": {
-        "full": false,
-        "similar": false
-      }
-    },
-    "launch-action": {
-      "name": "launch-action",
-      "project": "realworld",
-      "dir": ".",
-      "srcs": {
-        "globs": [],
-        "defaultGlobs": null,
-        "exclude": [],
-        "defaultExclude": null
-      },
-      "outs": {
-        "globs": [],
-        "exclude": []
-      },
-      "state": {
-        "globs": []
-      },
-      "visibility": "internal",
-      "cmd": {
-        "builtin": {
-          "name": "builtin",
-          "priority": 0,
-          "do": "^nu -I (^mise where github:bonisoft3/sayt | str trim) -c 'use task-leaf.nu; task-leaf launch'",
-          "shell": "nu",
-          "stop": false,
-          "srcs": {
-            "globs": [],
-            "defaultGlobs": null,
-            "exclude": [],
-            "defaultExclude": null
-          }
-        }
-      },
-      "deps": [
-        ":build"
-      ],
-      "env": {},
-      "taskfile": {
-        "incremental": false,
-        "run": "always",
-        "preconditions": []
-      },
-      "cmds": [
-        {
-          "do": "^nu -I (^mise where github:bonisoft3/sayt | str trim) -c 'use task-leaf.nu; task-leaf launch'",
-          "shell": "nu",
-          "name": "builtin",
-          "stop": false,
-          "srcs": {
-            "globs": [],
-            "defaultGlobs": null,
-            "exclude": [],
-            "defaultExclude": null
-          }
-        }
-      ],
-      "cache": {
-        "full": false,
-        "similar": false
-      }
-    },
-    "integrate-action": {
-      "name": "integrate-action",
-      "project": "realworld",
-      "dir": ".",
-      "srcs": {
-        "globs": [],
-        "defaultGlobs": null,
-        "exclude": [],
-        "defaultExclude": null
-      },
-      "outs": {
-        "globs": [],
-        "exclude": []
-      },
-      "state": {
-        "globs": []
-      },
-      "visibility": "internal",
-      "cmd": {
-        "builtin": {
-          "name": "builtin",
-          "priority": 0,
-          "do": "^nu -I (^mise where github:bonisoft3/sayt | str trim) -c 'use task-leaf.nu; task-leaf integrate'",
-          "shell": "nu",
-          "stop": false,
-          "srcs": {
-            "globs": [],
-            "defaultGlobs": null,
-            "exclude": [],
-            "defaultExclude": null
-          }
-        }
-      },
-      "deps": [
-        ":build"
-      ],
-      "env": {},
-      "taskfile": {
-        "incremental": false,
-        "run": "always",
-        "preconditions": []
-      },
-      "cmds": [
-        {
-          "do": "^nu -I (^mise where github:bonisoft3/sayt | str trim) -c 'use task-leaf.nu; task-leaf integrate'",
-          "shell": "nu",
-          "name": "builtin",
-          "stop": false,
-          "srcs": {
-            "globs": [],
-            "defaultGlobs": null,
-            "exclude": [],
-            "defaultExclude": null
-          }
-        }
-      ],
-      "cache": {
-        "full": false,
-        "similar": false
-      }
-    },
     "check-favorites": {
       "name": "check-favorites",
       "project": "realworld",
@@ -5067,6 +4091,982 @@
               "steps": []
             }
           },
+          "name": "builtin",
+          "stop": false,
+          "srcs": {
+            "globs": [],
+            "defaultGlobs": null,
+            "exclude": [],
+            "defaultExclude": null
+          }
+        }
+      ],
+      "cache": {
+        "full": false,
+        "similar": false
+      }
+    },
+    "served": {
+      "name": "served",
+      "project": "realworld",
+      "dir": ".",
+      "srcs": {
+        "globs": [
+          "shell/index.html",
+          "shell/shell.css",
+          "shell/boot.js",
+          "offline-first-sw.js",
+          "shell/shell.yaml",
+          "shell/shell.json",
+          "shell/design.css",
+          "shell/screens/home.html",
+          "shell/screens/home.css",
+          "shell/screens/feed.html",
+          "shell/screens/feed.css",
+          "shell/screens/reading-list.html",
+          "shell/screens/reading-list.css",
+          "shell/screens/editor.html",
+          "shell/screens/editor.css",
+          "shell/screens/settings.html",
+          "shell/screens/settings.css",
+          "shell/screens/older.html",
+          "shell/screens/older.css",
+          "shell/screens/feed-older.html",
+          "shell/screens/feed-older.css",
+          "shell/screens/article.html",
+          "shell/screens/article.css",
+          "shell/screens/edit-article.html",
+          "shell/screens/edit-article.css",
+          "shell/screens/profile.html",
+          "shell/screens/profile.css",
+          "shell/screens/profile-favorites.html",
+          "shell/screens/profile-favorites.css",
+          "shell/screens/tag.html",
+          "shell/screens/tag.css",
+          "shell/screens/search.html",
+          "shell/screens/search.css",
+          "shell/renderers/markdown.js",
+          "shell/shared/chrome.css",
+          "shell/shared/system.css",
+          "pipelines/favorite-recount.js",
+          "messages/en.json",
+          "messages/zh.json",
+          "messages/hi.json",
+          "messages/es.json",
+          "messages/fr.json",
+          "messages/ar.json",
+          "messages/bn.json",
+          "messages/pt.json",
+          "messages/ru.json",
+          "messages/ur.json",
+          "messages/id.json",
+          "messages/de.json",
+          "messages/ja.json",
+          "messages/sw.json",
+          "messages/tr.json",
+          "brief.html",
+          "ir.html",
+          "ir/card.css",
+          "acceptance.md",
+          "DESIGN.md",
+          "robots.txt",
+          "sitemap.xml"
+        ],
+        "defaultGlobs": null,
+        "exclude": [],
+        "defaultExclude": null
+      },
+      "outs": {
+        "globs": [],
+        "exclude": []
+      },
+      "state": {
+        "globs": []
+      },
+      "visibility": "internal",
+      "activate": "",
+      "cmd": {
+        "builtin": null
+      },
+      "env": {},
+      "deps": [],
+      "dockerfile": {
+        "from": {
+          "name": "denoland/deno:debian-2.9.7@sha256:fa335acdf6b72106eda2cb6a8cb5f4187e7630e357467489db4b2e7352d5e432"
+        },
+        "workdir": "/app",
+        "preamble": [],
+        "defaultPreamble": null,
+        "add": [],
+        "mounts": [],
+        "secrets": {},
+        "extra_hosts": [],
+        "copy": [
+          {
+            "from": {
+              "name": "plugins_omnishell-runtime-image"
+            },
+            "srcs": [
+              "/"
+            ],
+            "dst": "/omnishell",
+            "link": true,
+            "parents": false,
+            "exclude": []
+          }
+        ],
+        "epilogue": [
+          "RUN set -e; install -D -m 644 '/omnishell/interpreter/shell.js' '/served/omnishell/interpreter/shell.js'; install -D -m 644 '/omnishell/interpreter/chrome.js' '/served/omnishell/interpreter/chrome.js'; install -D -m 644 '/omnishell/interpreter/screen.js' '/served/omnishell/interpreter/screen.js'; install -D -m 644 '/omnishell/interpreter/fragment.js' '/served/omnishell/interpreter/fragment.js'; install -D -m 644 '/omnishell/interpreter/data-sync.js' '/served/omnishell/interpreter/data-sync.js'; install -D -m 644 '/omnishell/interpreter/validate.js' '/served/omnishell/interpreter/validate.js'; install -D -m 644 '/omnishell/interpreter/render.js' '/served/omnishell/interpreter/render.js'; install -D -m 644 '/omnishell/interpreter/release-plan.js' '/served/omnishell/interpreter/release-plan.js'; install -D -m 644 '/omnishell/interpreter/preloads.js' '/served/omnishell/interpreter/preloads.js'; install -D -m 644 '/omnishell/interpreter/link-prefetch.js' '/served/omnishell/interpreter/link-prefetch.js'; install -D -m 644 '/omnishell/interpreter/markup.js' '/served/omnishell/interpreter/markup.js'; install -D -m 644 '/omnishell/interpreter/script-url.js' '/served/omnishell/interpreter/script-url.js'; install -D -m 644 '/omnishell/interpreter/deferred-boot.js' '/served/omnishell/interpreter/deferred-boot.js'; install -D -m 644 '/omnishell/interpreter/host-dom.js' '/served/omnishell/interpreter/host-dom.js'; install -D -m 644 '/omnishell/interpreter/hatch.js' '/served/omnishell/interpreter/hatch.js'; install -D -m 644 '/omnishell/interpreter/hatch-worker.js' '/served/omnishell/interpreter/hatch-worker.js'; install -D -m 644 '/omnishell/interpreter/hatch-presenter.js' '/served/omnishell/interpreter/hatch-presenter.js'; install -D -m 644 '/omnishell/interpreter/presenter-realm.js' '/served/omnishell/interpreter/presenter-realm.js'; install -D -m 644 '/omnishell/interpreter/presenter.js' '/served/omnishell/interpreter/presenter.js'; install -D -m 644 '/omnishell/interpreter/storybook.js' '/served/omnishell/interpreter/storybook.js'; install -D -m 644 '/omnishell/interpreter/jessie.js' '/served/omnishell/interpreter/jessie.js'; install -D -m 644 '/omnishell/interpreter/kinetic.js' '/served/omnishell/interpreter/kinetic.js'; install -D -m 644 '/omnishell/interpreter/kinetic-milestones.js' '/served/omnishell/interpreter/kinetic-milestones.js'; install -D -m 644 '/omnishell/interpreter/kinetic-session.js' '/served/omnishell/interpreter/kinetic-session.js'; install -D -m 644 '/omnishell/interpreter/kinetic-sound.js' '/served/omnishell/interpreter/kinetic-sound.js'; install -D -m 644 '/omnishell/interpreter/kinetic-mount.js' '/served/omnishell/interpreter/kinetic-mount.js'; install -D -m 644 '/omnishell/interpreter/rtc-channel.js' '/served/omnishell/interpreter/rtc-channel.js'; install -D -m 644 '/omnishell/interpreter/prng.js' '/served/omnishell/interpreter/prng.js'; install -D -m 644 '/omnishell/interpreter/vendor/mecha-client.js' '/served/omnishell/interpreter/vendor/mecha-client.js'; install -D -m 644 '/omnishell/interpreter/vendor/js-yaml.js' '/served/omnishell/interpreter/vendor/js-yaml.js'; install -D -m 644 '/omnishell/interpreter/vendor/ses.umd.min.js' '/served/omnishell/interpreter/vendor/ses.umd.min.js'; install -D -m 644 '/omnishell/interpreter/vendor/morphlex.js' '/served/omnishell/interpreter/vendor/morphlex.js'; install -D -m 644 '/omnishell/interpreter/vendor/messages.js' '/served/omnishell/interpreter/vendor/messages.js'; install -D -m 644 '/omnishell/interpreter/vendor/game-inputs.js' '/served/omnishell/interpreter/vendor/game-inputs.js'; install -D -m 644 '/omnishell/interpreter/vendor/ggrs/ggrs_wasm.js' '/served/omnishell/interpreter/vendor/ggrs/ggrs_wasm.js'; install -D -m 644 '/omnishell/interpreter/vendor/ggrs/ggrs_wasm_bg.wasm' '/served/omnishell/interpreter/vendor/ggrs/ggrs_wasm_bg.wasm'; install -D -m 644 '/omnishell/components/wallclock.js' '/served/omnishell/components/wallclock.js'; install -D -m 644 '/app/shell/index.html' '/served/shell/index.html'; install -D -m 644 '/app/shell/shell.css' '/served/shell/shell.css'; install -D -m 644 '/app/shell/boot.js' '/served/shell/boot.js'; install -D -m 644 '/app/offline-first-sw.js' '/served/offline-first-sw.js'; install -D -m 644 '/app/shell/shell.yaml' '/served/shell/shell.yaml'; install -D -m 644 '/app/shell/shell.json' '/served/shell/shell.json'; install -D -m 644 '/app/shell/design.css' '/served/shell/design.css'; install -D -m 644 '/app/shell/screens/home.html' '/served/shell/screens/home.html'; install -D -m 644 '/app/shell/screens/home.css' '/served/shell/screens/home.css'; install -D -m 644 '/app/shell/screens/feed.html' '/served/shell/screens/feed.html'; install -D -m 644 '/app/shell/screens/feed.css' '/served/shell/screens/feed.css'; install -D -m 644 '/app/shell/screens/reading-list.html' '/served/shell/screens/reading-list.html'; install -D -m 644 '/app/shell/screens/reading-list.css' '/served/shell/screens/reading-list.css'; install -D -m 644 '/app/shell/screens/editor.html' '/served/shell/screens/editor.html'; install -D -m 644 '/app/shell/screens/editor.css' '/served/shell/screens/editor.css'; install -D -m 644 '/app/shell/screens/settings.html' '/served/shell/screens/settings.html'; install -D -m 644 '/app/shell/screens/settings.css' '/served/shell/screens/settings.css'; install -D -m 644 '/app/shell/screens/older.html' '/served/shell/screens/older.html'; install -D -m 644 '/app/shell/screens/older.css' '/served/shell/screens/older.css'; install -D -m 644 '/app/shell/screens/feed-older.html' '/served/shell/screens/feed-older.html'; install -D -m 644 '/app/shell/screens/feed-older.css' '/served/shell/screens/feed-older.css'; install -D -m 644 '/app/shell/screens/article.html' '/served/shell/screens/article.html'; install -D -m 644 '/app/shell/screens/article.css' '/served/shell/screens/article.css'; install -D -m 644 '/app/shell/screens/edit-article.html' '/served/shell/screens/edit-article.html'; install -D -m 644 '/app/shell/screens/edit-article.css' '/served/shell/screens/edit-article.css'; install -D -m 644 '/app/shell/screens/profile.html' '/served/shell/screens/profile.html'; install -D -m 644 '/app/shell/screens/profile.css' '/served/shell/screens/profile.css'; install -D -m 644 '/app/shell/screens/profile-favorites.html' '/served/shell/screens/profile-favorites.html'; install -D -m 644 '/app/shell/screens/profile-favorites.css' '/served/shell/screens/profile-favorites.css'; install -D -m 644 '/app/shell/screens/tag.html' '/served/shell/screens/tag.html'; install -D -m 644 '/app/shell/screens/tag.css' '/served/shell/screens/tag.css'; install -D -m 644 '/app/shell/screens/search.html' '/served/shell/screens/search.html'; install -D -m 644 '/app/shell/screens/search.css' '/served/shell/screens/search.css'; install -D -m 644 '/app/shell/renderers/markdown.js' '/served/shell/renderers/markdown.js'; install -D -m 644 '/app/shell/shared/chrome.css' '/served/shell/shared/chrome.css'; install -D -m 644 '/app/shell/shared/system.css' '/served/shell/shared/system.css'; install -D -m 644 '/app/pipelines/favorite-recount.js' '/served/pipelines/favorite-recount.js'; install -D -m 644 '/app/messages/en.json' '/served/messages/en.json'; install -D -m 644 '/app/messages/zh.json' '/served/messages/zh.json'; install -D -m 644 '/app/messages/hi.json' '/served/messages/hi.json'; install -D -m 644 '/app/messages/es.json' '/served/messages/es.json'; install -D -m 644 '/app/messages/fr.json' '/served/messages/fr.json'; install -D -m 644 '/app/messages/ar.json' '/served/messages/ar.json'; install -D -m 644 '/app/messages/bn.json' '/served/messages/bn.json'; install -D -m 644 '/app/messages/pt.json' '/served/messages/pt.json'; install -D -m 644 '/app/messages/ru.json' '/served/messages/ru.json'; install -D -m 644 '/app/messages/ur.json' '/served/messages/ur.json'; install -D -m 644 '/app/messages/id.json' '/served/messages/id.json'; install -D -m 644 '/app/messages/de.json' '/served/messages/de.json'; install -D -m 644 '/app/messages/ja.json' '/served/messages/ja.json'; install -D -m 644 '/app/messages/sw.json' '/served/messages/sw.json'; install -D -m 644 '/app/messages/tr.json' '/served/messages/tr.json'; install -D -m 644 '/app/brief.html' '/served/docs/brief.html'; install -D -m 644 '/app/ir.html' '/served/docs/ir.html'; install -D -m 644 '/app/ir/card.css' '/served/docs/ir/card.css'; install -D -m 644 '/app/acceptance.md' '/served/docs/acceptance.md'; install -D -m 644 '/app/DESIGN.md' '/served/docs/DESIGN.md'; install -D -m 644 '/app/robots.txt' '/served/robots.txt'; install -D -m 644 '/app/sitemap.xml' '/served/sitemap.xml'; deno cache --frozen --config /omnishell/server/deno.json /omnishell/server/address.ts && deno run --frozen --cached-only --config /omnishell/server/deno.json --allow-read=/served --allow-write=/served,/served.scripts /omnishell/server/address.ts /served /served.scripts"
+        ],
+        "finalCopy": [
+          "/served",
+          "/served.scripts"
+        ],
+        "defaultCopy": null,
+        "healthcheck": null,
+        "expose": [],
+        "entrypoint": null,
+        "incremental": false,
+        "cmd": null
+      },
+      "compose": {
+        "up": false,
+        "manual": false,
+        "build": {
+          "additional_contexts": {
+            "plugins_omnishell-runtime-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/omnishell:0.20.2@sha256:0f7d84358244c875a76bf97f13974bf6336e15f639a2f01fa31ad3eb0ce0d8a7}${MONOREPO_COMPOSE_MODE:+:plugins_omnishell-runtime-image}"
+          },
+          "secrets": [],
+          "args": {}
+        },
+        "environment": {},
+        "ports": [],
+        "volumes": [],
+        "depends_on": {},
+        "networks": {
+          "default": {
+            "aliases": [
+              "served"
+            ]
+          }
+        }
+      },
+      "cmds": [],
+      "cache": {
+        "full": false,
+        "similar": false
+      }
+    },
+    "database": {
+      "name": "database",
+      "project": "realworld",
+      "dir": ".",
+      "srcs": {
+        "globs": [
+          "services/database/migrations/000_extensions.sql",
+          "services/database/migrations/001_roles.sql",
+          "services/database/migrations/002_grants.sql",
+          "services/database/migrations/004_types.sql",
+          "services/database/migrations/005_create_tables.sql",
+          "services/database/migrations/006_policies.sql",
+          "services/database/migrations/007_txid.sql",
+          "services/database/migrations/008_publication.sql",
+          "services/database/migrations/011_owner_writes.sql",
+          "services/database/migrations/012_me_readonly.sql",
+          "services/database/migrations/013_article_tag_sync.sql",
+          "services/database/migrations/014_me_provision.sql",
+          "services/database/migrations/015_default_privileges.sql",
+          "services/database/migrations/016_edge_projections.sql",
+          "services/database/migrations/017_demo_content.sql",
+          "services/database/migrations/018_favorite_guard.sql"
+        ],
+        "defaultGlobs": null,
+        "exclude": [],
+        "defaultExclude": null
+      },
+      "outs": {
+        "globs": [],
+        "exclude": []
+      },
+      "state": {
+        "globs": []
+      },
+      "visibility": "internal",
+      "activate": "",
+      "cmd": {
+        "builtin": null
+      },
+      "env": {},
+      "deps": [],
+      "dockerfile": {
+        "from": {
+          "name": "libraries_mecha-database-image"
+        },
+        "preamble": [],
+        "defaultPreamble": null,
+        "add": [],
+        "mounts": [],
+        "secrets": {},
+        "extra_hosts": [],
+        "epilogue": [],
+        "copy": [
+          {
+            "from": null,
+            "srcs": [
+              "services/database/migrations/000_extensions.sql",
+              "services/database/migrations/001_roles.sql",
+              "services/database/migrations/002_grants.sql",
+              "services/database/migrations/004_types.sql",
+              "services/database/migrations/005_create_tables.sql",
+              "services/database/migrations/006_policies.sql",
+              "services/database/migrations/007_txid.sql",
+              "services/database/migrations/008_publication.sql",
+              "services/database/migrations/011_owner_writes.sql",
+              "services/database/migrations/012_me_readonly.sql",
+              "services/database/migrations/013_article_tag_sync.sql",
+              "services/database/migrations/014_me_provision.sql",
+              "services/database/migrations/015_default_privileges.sql",
+              "services/database/migrations/016_edge_projections.sql",
+              "services/database/migrations/017_demo_content.sql",
+              "services/database/migrations/018_favorite_guard.sql"
+            ],
+            "dst": "/docker-entrypoint-initdb.d/",
+            "link": true,
+            "parents": false,
+            "exclude": []
+          },
+          {
+            "from": {
+              "name": "libraries_mecha-database-image"
+            },
+            "srcs": [
+              "/usr/share/mecha/initdb/899_role_passwords.sh"
+            ],
+            "dst": "/docker-entrypoint-initdb.d/899_role_passwords.sh",
+            "link": true,
+            "parents": false,
+            "exclude": []
+          }
+        ],
+        "defaultCopy": null,
+        "healthcheck": {
+          "test": [
+            "CMD",
+            "pg_isready",
+            "-h",
+            "localhost",
+            "-p",
+            "5432",
+            "-d",
+            "${POSTGRES_DB:-realworld}",
+            "-U",
+            "${POSTGRES_USER:-postgres}"
+          ],
+          "interval": "1s",
+          "timeout": "5s",
+          "retries": 30,
+          "start_period": "5m"
+        },
+        "expose": [],
+        "entrypoint": null,
+        "incremental": false,
+        "cmd": null
+      },
+      "compose": {
+        "up": false,
+        "manual": false,
+        "build": {
+          "additional_contexts": {
+            "libraries_mecha-database-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-database:0.19.1@sha256:38ab2c098b58f2224fe1a54cb6e27638f039987666a8e97701d8fbf3800b53ad}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-database-image}"
+          },
+          "secrets": [],
+          "args": {}
+        },
+        "environment": {
+          "POSTGRES_USER": "${POSTGRES_USER:-postgres}",
+          "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-postgres}",
+          "POSTGRES_DB": "${POSTGRES_DB:-realworld}",
+          "ELECTRIC_PASSWORD": "${ELECTRIC_PASSWORD:-dev-electric-password}",
+          "AUTHENTICATOR_PASSWORD": "${AUTHENTICATOR_PASSWORD:-dev-authenticator-password}",
+          "POSTGRES_INITDB_ARGS": "--no-sync --encoding=UTF8 --auth=trust --locale-provider=icu --icu-locale=und --locale=C"
+        },
+        "ports": [
+          "5432"
+        ],
+        "volumes": [],
+        "depends_on": {},
+        "networks": {
+          "default": {
+            "aliases": [
+              "database"
+            ]
+          }
+        },
+        "healthcheck": {
+          "test": [
+            "CMD",
+            "pg_isready",
+            "-h",
+            "localhost",
+            "-p",
+            "5432",
+            "-d",
+            "${POSTGRES_DB:-realworld}",
+            "-U",
+            "${POSTGRES_USER:-postgres}"
+          ],
+          "interval": "1s",
+          "timeout": "5s",
+          "retries": 30,
+          "start_period": "5m",
+          "start_interval": "100ms"
+        },
+        "develop": {
+          "watch": [
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/000_extensions.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/001_roles.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/002_grants.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/004_types.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/005_create_tables.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/006_policies.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/007_txid.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/008_publication.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/011_owner_writes.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/012_me_readonly.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/013_article_tag_sync.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/014_me_provision.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/015_default_privileges.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/016_edge_projections.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/017_demo_content.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            },
+            {
+              "action": "rebuild",
+              "path": "../services/database/migrations/018_favorite_guard.sql",
+              "target": "/docker-entrypoint-initdb.d"
+            }
+          ]
+        }
+      },
+      "healthcheck": {
+        "template": "postgres",
+        "db": "${POSTGRES_DB:-realworld}",
+        "user": "${POSTGRES_USER:-postgres}",
+        "port": 5432,
+        "host": "localhost",
+        "start_interval": "100ms",
+        "interval": "1s",
+        "timeout": "5s",
+        "retries": 30,
+        "start_period": "5m"
+      },
+      "entrypoint": {
+        "name": "entrypoint",
+        "do": "docker-entrypoint.sh postgres -c wal_level=logical -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c shared_buffers=32MB -c max_connections=200",
+        "priority": 0,
+        "shell": "exec",
+        "stop": false,
+        "srcs": {
+          "globs": [],
+          "defaultGlobs": null,
+          "exclude": [],
+          "defaultExclude": null
+        },
+        "env": {
+          "POSTGRES_USER": "${POSTGRES_USER:-postgres}",
+          "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:-postgres}",
+          "POSTGRES_DB": "${POSTGRES_DB:-realworld}",
+          "ELECTRIC_PASSWORD": "${ELECTRIC_PASSWORD:-dev-electric-password}",
+          "AUTHENTICATOR_PASSWORD": "${AUTHENTICATOR_PASSWORD:-dev-authenticator-password}",
+          "POSTGRES_INITDB_ARGS": "--no-sync --encoding=UTF8 --auth=trust --locale-provider=icu --icu-locale=und --locale=C"
+        },
+        "after": {},
+        "host": true
+      },
+      "expose": {
+        "pg": {
+          "port": 5432
+        }
+      },
+      "cmds": [],
+      "cache": {
+        "full": false,
+        "similar": false
+      }
+    },
+    "auth": {
+      "name": "auth",
+      "project": "realworld",
+      "dir": ".",
+      "srcs": {
+        "globs": [],
+        "defaultGlobs": null,
+        "exclude": [],
+        "defaultExclude": null
+      },
+      "outs": {
+        "globs": [],
+        "exclude": []
+      },
+      "state": {
+        "globs": []
+      },
+      "visibility": "internal",
+      "activate": "",
+      "cmd": {
+        "builtin": null
+      },
+      "env": {},
+      "deps": [
+        ":database:outs"
+      ],
+      "dockerfile": {
+        "from": {
+          "name": "libraries_mecha-auth-image"
+        },
+        "workdir": "/app",
+        "preamble": [],
+        "defaultPreamble": null,
+        "add": [],
+        "mounts": [],
+        "secrets": {},
+        "extra_hosts": [],
+        "epilogue": [
+          "RUN mkdir -p /monorepo"
+        ],
+        "copy": [],
+        "defaultCopy": null,
+        "healthcheck": null,
+        "expose": [],
+        "entrypoint": null,
+        "incremental": false,
+        "cmd": null
+      },
+      "compose": {
+        "up": false,
+        "manual": false,
+        "build": {
+          "additional_contexts": {
+            "libraries_mecha-auth-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-auth:0.19.1@sha256:92e796be2e47481f9e5163dba469833501b4b4695eb335253845c145fa6c7252}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-auth-image}"
+          },
+          "secrets": [],
+          "args": {}
+        },
+        "environment": {
+          "DATABASE_URL": "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-realworld}",
+          "AUTH_STATEMENT_TIMEOUT_MS": "5000",
+          "PGRST_JWT_SECRET": "${PGRST_JWT_SECRET:-mecha-dev-secret-please-override-32ch}",
+          "WEBAUTHN_RP_ID": "${WEBAUTHN_RP_ID:-localhost}",
+          "WEBAUTHN_ORIGIN": "${WEBAUTHN_ORIGIN:-https://localhost:*}",
+          "OIDC_PROVIDERS": ""
+        },
+        "ports": [],
+        "volumes": [],
+        "depends_on": {
+          "realworld-database": {
+            "condition": "service_healthy"
+          }
+        },
+        "networks": {
+          "default": {
+            "aliases": [
+              "auth"
+            ]
+          }
+        }
+      },
+      "entrypoint": {
+        "name": "entrypoint",
+        "do": "deno run --allow-net --allow-env --config /app/deno.json /app/main.ts",
+        "priority": 0,
+        "shell": "exec",
+        "stop": false,
+        "srcs": {
+          "globs": [],
+          "defaultGlobs": null,
+          "exclude": [],
+          "defaultExclude": null
+        },
+        "env": {
+          "DATABASE_URL": "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-realworld}",
+          "AUTH_STATEMENT_TIMEOUT_MS": "5000",
+          "PGRST_JWT_SECRET": "${PGRST_JWT_SECRET:-mecha-dev-secret-please-override-32ch}",
+          "WEBAUTHN_RP_ID": "${WEBAUTHN_RP_ID:-localhost}",
+          "WEBAUTHN_ORIGIN": "${WEBAUTHN_ORIGIN:-https://localhost:*}",
+          "OIDC_PROVIDERS": ""
+        },
+        "after": {
+          "database": "healthy"
+        },
+        "host": true
+      },
+      "expose": {
+        "http": {
+          "port": 9999
+        }
+      },
+      "cmds": [],
+      "cache": {
+        "full": false,
+        "similar": false
+      }
+    },
+    "mesh-events": {
+      "name": "mesh-events",
+      "project": "realworld",
+      "dir": ".",
+      "srcs": {
+        "globs": [],
+        "defaultGlobs": null,
+        "exclude": [],
+        "defaultExclude": null
+      },
+      "outs": {
+        "globs": [],
+        "exclude": []
+      },
+      "state": {
+        "globs": []
+      },
+      "visibility": "internal",
+      "activate": "",
+      "cmd": {
+        "builtin": null
+      },
+      "env": {},
+      "deps": [
+        ":caddy:outs",
+        ":redis:outs"
+      ],
+      "dockerfile": {
+        "from": {
+          "name": "libraries_mecha-mesh-image"
+        },
+        "preamble": [],
+        "defaultPreamble": null,
+        "add": [],
+        "mounts": [],
+        "secrets": {},
+        "extra_hosts": [],
+        "epilogue": [],
+        "copy": [],
+        "defaultCopy": {
+          "portcheck": {
+            "from": {
+              "name": "tarampampam/microcheck:1@sha256:79c187c05bfa67518078bf4db117771942fa8fe107dc79a905861c75ddf28dfa"
+            },
+            "name": "portcheck",
+            "srcs": [
+              "/bin/portcheck"
+            ],
+            "dst": "/usr/local/bin/portcheck",
+            "chmod": "755",
+            "link": true,
+            "parents": false,
+            "exclude": []
+          }
+        },
+        "healthcheck": {
+          "test": [
+            "CMD",
+            "portcheck",
+            "--port",
+            "3500"
+          ],
+          "interval": "5s",
+          "timeout": "5s",
+          "retries": 30,
+          "start_period": "30s"
+        },
+        "expose": [],
+        "entrypoint": null,
+        "incremental": false,
+        "cmd": null
+      },
+      "compose": {
+        "up": false,
+        "manual": false,
+        "build": {
+          "additional_contexts": {
+            "libraries_mecha-mesh-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-mesh:0.19.1@sha256:04ad88869e10f421813db7af7f32102ec233095205f37ae5f2103587e669aeb3}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-mesh-image}"
+          },
+          "secrets": [],
+          "args": {}
+        },
+        "environment": {},
+        "ports": [],
+        "volumes": [],
+        "depends_on": {
+          "realworld-caddy": {
+            "condition": "service_started"
+          },
+          "realworld-redis": {
+            "condition": "service_started"
+          }
+        },
+        "networks": {
+          "default": {
+            "aliases": [
+              "mesh-events"
+            ]
+          }
+        },
+        "restart": "on-failure",
+        "healthcheck": {
+          "test": [
+            "CMD",
+            "portcheck",
+            "--port",
+            "3500"
+          ],
+          "interval": "5s",
+          "timeout": "5s",
+          "retries": 30,
+          "start_period": "30s",
+          "start_interval": "500ms"
+        }
+      },
+      "healthcheck": {
+        "template": "tcp",
+        "port": 3500,
+        "interval": "5s",
+        "start_interval": "500ms",
+        "timeout": "5s",
+        "retries": 30,
+        "start_period": "30s"
+      },
+      "cmds": [],
+      "cache": {
+        "full": false,
+        "similar": false
+      }
+    },
+    "conduit": {
+      "name": "conduit",
+      "project": "realworld",
+      "dir": ".",
+      "srcs": {
+        "globs": [
+          "docker/conduit-pipeline.yaml"
+        ],
+        "defaultGlobs": null,
+        "exclude": [],
+        "defaultExclude": null
+      },
+      "outs": {
+        "globs": [],
+        "exclude": []
+      },
+      "state": {
+        "globs": []
+      },
+      "visibility": "internal",
+      "activate": "",
+      "cmd": {
+        "builtin": null
+      },
+      "env": {},
+      "deps": [
+        ":database:outs",
+        ":mesh-events:outs"
+      ],
+      "dockerfile": {
+        "from": {
+          "name": "libraries_mecha-conduit-image"
+        },
+        "workdir": "/app",
+        "preamble": [],
+        "defaultPreamble": null,
+        "add": [],
+        "mounts": [],
+        "secrets": {},
+        "extra_hosts": [],
+        "epilogue": [],
+        "copy": [
+          {
+            "from": null,
+            "srcs": [
+              "docker/conduit-pipeline.yaml"
+            ],
+            "dst": "/conduit/cdc-to-bus.yaml.tmpl",
+            "link": true,
+            "parents": false,
+            "exclude": []
+          }
+        ],
+        "defaultCopy": {
+          "httpcheck": {
+            "from": {
+              "name": "tarampampam/microcheck:1@sha256:79c187c05bfa67518078bf4db117771942fa8fe107dc79a905861c75ddf28dfa"
+            },
+            "name": "httpcheck",
+            "srcs": [
+              "/bin/httpcheck"
+            ],
+            "dst": "/usr/local/bin/httpcheck",
+            "chmod": "755",
+            "link": true,
+            "parents": false,
+            "exclude": []
+          }
+        },
+        "healthcheck": {
+          "test": [
+            "CMD",
+            "httpcheck",
+            "http://127.0.0.1:8080/healthz"
+          ],
+          "interval": "5s",
+          "timeout": "5s",
+          "retries": 20,
+          "start_period": "120s"
+        },
+        "expose": [],
+        "entrypoint": null,
+        "incremental": false,
+        "cmd": [
+          "sh",
+          "-c",
+          "mkdir -p /conduit/pipelines && envsubst < /conduit/cdc-to-bus.yaml.tmpl > /conduit/pipelines/cdc-to-bus.yaml && exec /app/conduit run"
+        ]
+      },
+      "compose": {
+        "up": false,
+        "manual": false,
+        "build": {
+          "additional_contexts": {
+            "libraries_mecha-conduit-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-conduit:0.19.1@sha256:da40c0acf0897cf86da293135f6daad3f02609710b91cb6efc28dc5e6d93841a}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-conduit-image}"
+          },
+          "secrets": [],
+          "args": {}
+        },
+        "environment": {
+          "DATABASE_URL": "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-realworld}",
+          "CONDUIT_PIPELINES_PATH": "/conduit/pipelines",
+          "CONDUIT_DB_TYPE": "inmemory"
+        },
+        "ports": [],
+        "volumes": [],
+        "depends_on": {
+          "realworld-database": {
+            "condition": "service_healthy"
+          },
+          "realworld-mesh-events": {
+            "condition": "service_started"
+          }
+        },
+        "networks": {
+          "default": {
+            "aliases": [
+              "conduit"
+            ]
+          }
+        },
+        "restart": "on-failure",
+        "healthcheck": {
+          "test": [
+            "CMD",
+            "httpcheck",
+            "http://127.0.0.1:8080/healthz"
+          ],
+          "interval": "5s",
+          "timeout": "5s",
+          "retries": 20,
+          "start_period": "120s",
+          "start_interval": "500ms"
+        },
+        "develop": {
+          "watch": [
+            {
+              "action": "sync+restart",
+              "path": "../docker/conduit-pipeline.yaml",
+              "target": "/conduit/cdc-to-bus.yaml.tmpl"
+            }
+          ]
+        }
+      },
+      "healthcheck": {
+        "template": "http",
+        "url": "http://127.0.0.1:8080/healthz",
+        "authorization": null,
+        "headers": [],
+        "interval": "5s",
+        "retries": 20,
+        "start_interval": "500ms",
+        "start_period": "120s",
+        "timeout": "5s"
+      },
+      "cmds": [],
+      "cache": {
+        "full": false,
+        "similar": false
+      }
+    },
+    "launch-action": {
+      "name": "launch-action",
+      "project": "realworld",
+      "dir": ".",
+      "srcs": {
+        "globs": [],
+        "defaultGlobs": null,
+        "exclude": [],
+        "defaultExclude": null
+      },
+      "outs": {
+        "globs": [],
+        "exclude": []
+      },
+      "state": {
+        "globs": []
+      },
+      "visibility": "internal",
+      "cmd": {
+        "builtin": {
+          "name": "builtin",
+          "priority": 0,
+          "do": "^nu -I (^mise where github:bonisoft3/sayt | str trim) -c 'use task-leaf.nu; task-leaf launch'",
+          "shell": "nu",
+          "stop": false,
+          "srcs": {
+            "globs": [],
+            "defaultGlobs": null,
+            "exclude": [],
+            "defaultExclude": null
+          }
+        }
+      },
+      "deps": [
+        ":build"
+      ],
+      "env": {},
+      "taskfile": {
+        "incremental": false,
+        "run": "always",
+        "preconditions": []
+      },
+      "cmds": [
+        {
+          "do": "^nu -I (^mise where github:bonisoft3/sayt | str trim) -c 'use task-leaf.nu; task-leaf launch'",
+          "shell": "nu",
+          "name": "builtin",
+          "stop": false,
+          "srcs": {
+            "globs": [],
+            "defaultGlobs": null,
+            "exclude": [],
+            "defaultExclude": null
+          }
+        }
+      ],
+      "cache": {
+        "full": false,
+        "similar": false
+      }
+    },
+    "integrate-action": {
+      "name": "integrate-action",
+      "project": "realworld",
+      "dir": ".",
+      "srcs": {
+        "globs": [],
+        "defaultGlobs": null,
+        "exclude": [],
+        "defaultExclude": null
+      },
+      "outs": {
+        "globs": [],
+        "exclude": []
+      },
+      "state": {
+        "globs": []
+      },
+      "visibility": "internal",
+      "cmd": {
+        "builtin": {
+          "name": "builtin",
+          "priority": 0,
+          "do": "^nu -I (^mise where github:bonisoft3/sayt | str trim) -c 'use task-leaf.nu; task-leaf integrate'",
+          "shell": "nu",
+          "stop": false,
+          "srcs": {
+            "globs": [],
+            "defaultGlobs": null,
+            "exclude": [],
+            "defaultExclude": null
+          }
+        }
+      },
+      "deps": [
+        ":build"
+      ],
+      "env": {},
+      "taskfile": {
+        "incremental": false,
+        "run": "always",
+        "preconditions": []
+      },
+      "cmds": [
+        {
+          "do": "^nu -I (^mise where github:bonisoft3/sayt | str trim) -c 'use task-leaf.nu; task-leaf integrate'",
+          "shell": "nu",
           "name": "builtin",
           "stop": false,
           "srcs": {
