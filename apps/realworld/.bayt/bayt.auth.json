@@ -16,13 +16,7 @@
       "PGRST_JWT_SECRET": "${PGRST_JWT_SECRET:-mecha-dev-secret-please-override-32ch}",
       "WEBAUTHN_RP_ID": "${WEBAUTHN_RP_ID:-localhost}",
       "WEBAUTHN_ORIGIN": "${WEBAUTHN_ORIGIN:-https://localhost:*}",
-      "OIDC_PROVIDERS": "google",
-      "OIDC_GOOGLE_CLIENT_ID": "${OIDC_GOOGLE_CLIENT_ID:?OIDC_GOOGLE_CLIENT_ID is required: the cluster signs in through google}",
-      "OIDC_GOOGLE_ISSUER": "${OIDC_GOOGLE_ISSUER:-}",
-      "OIDC_GOOGLE_INTERNAL": "${OIDC_GOOGLE_INTERNAL:-}",
-      "OIDC_GOOGLE_CLIENT_SECRET": "${OIDC_GOOGLE_CLIENT_SECRET:-}",
-      "OIDC_GOOGLE_SCOPE": "${OIDC_GOOGLE_SCOPE:-}",
-      "OIDC_GOOGLE_AUTHORIZE_PARAMS": "${OIDC_GOOGLE_AUTHORIZE_PARAMS:-}"
+      "OIDC_PROVIDERS": ""
     },
     "ports": [],
     "volumes": [],
@@ -69,13 +63,7 @@
       "PGRST_JWT_SECRET": "${PGRST_JWT_SECRET:-mecha-dev-secret-please-override-32ch}",
       "WEBAUTHN_RP_ID": "${WEBAUTHN_RP_ID:-localhost}",
       "WEBAUTHN_ORIGIN": "${WEBAUTHN_ORIGIN:-https://localhost:*}",
-      "OIDC_PROVIDERS": "google",
-      "OIDC_GOOGLE_CLIENT_ID": "${OIDC_GOOGLE_CLIENT_ID:?OIDC_GOOGLE_CLIENT_ID is required: the cluster signs in through google}",
-      "OIDC_GOOGLE_ISSUER": "${OIDC_GOOGLE_ISSUER:-}",
-      "OIDC_GOOGLE_INTERNAL": "${OIDC_GOOGLE_INTERNAL:-}",
-      "OIDC_GOOGLE_CLIENT_SECRET": "${OIDC_GOOGLE_CLIENT_SECRET:-}",
-      "OIDC_GOOGLE_SCOPE": "${OIDC_GOOGLE_SCOPE:-}",
-      "OIDC_GOOGLE_AUTHORIZE_PARAMS": "${OIDC_GOOGLE_AUTHORIZE_PARAMS:-}"
+      "OIDC_PROVIDERS": ""
     },
     "after": {
       "database": "healthy"

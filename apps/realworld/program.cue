@@ -21,10 +21,8 @@ _catalogues: _ @embed(glob="messages/*.json")
 code: pronto.#App & {
 	meta: name:        "realworld"
 	meta: description: "A community writing space — read pieces, follow their authors, and keep the ones that matter."
-	meta: ir: sha256: "6cfb23fba4a90dc7d25f24040a885fd2b133af5d5713f3adaacdb4a3786c4855"
-	// The browser tier is declared unsupported rather than quietly broken
-	// (ir decision-browser-tier-unsupported).
-	meta: targets: []
+	meta: ir: sha256: "a1d0f3d05c317304ea3d2e120ba49e33b106c33c4c160e39779992d9f8e29d1f"
+	meta: targets: ["cloudflare"]
 	// Fifteen most-spoken languages, en unprefixed as the default. Every tag
 	// is checked canonical against Intl.getCanonicalLocales before being
 	// written here — none of the fifteen carries a region subtag, so each
@@ -63,7 +61,6 @@ code: pronto.#App & {
 	}
 
 	capabilities: auth: {
-		providers: ["google"]
 		required: true
 		service:  "/auth"
 		self: {
@@ -91,6 +88,9 @@ code: pronto.#App & {
 		{name: "013_article_tag_sync.sql", src: "services/database/sql/013_article_tag_sync.sql"},
 		{name: "014_me_provision.sql", src: "services/database/sql/014_me_provision.sql"},
 		{name: "015_default_privileges.sql", src: "services/database/sql/015_default_privileges.sql"},
+		{name: "016_edge_projections.sql", src: "services/database/sql/016_edge_projections.sql"},
+		{name: "017_demo_content.sql", src: "services/database/sql/017_demo_content.sql"},
+		{name: "018_favorite_guard.sql", src: "services/database/sql/018_favorite_guard.sql"},
 	]
 
 	surface: design: (pronto.#DesignMd & {text: _designMd}).design
@@ -347,20 +347,12 @@ code: pronto.#App & {
 	}
 	// Parents before children: a `ref` emits REFERENCES and Postgres needs the
 	// target table first; the three sinks last.
-	state: machines: FavoriteRules: {
-		entity: "Favorite"
-		guards: "own-article": {
-			src: "shell/validations/own-article.js"
-			via: ["article_id"]
-			note: "a reader cannot favorite what they wrote"
-		}
-		on: {
-			insert: guard: "own-article"
-			update: guard: "own-article"
-		}
-	}
 
 	state: entityOrder: ["AppUser", "Me", "Article", "ArticleTag", "Comment", "Favorite", "Bookmark", "Follow", "FavoriteCount", "ArticleStats", "TagCount", "FavoriteIndex"]
+
+	state: drains: {
+		"edge-projections": {on: ["favorite", "article_tag"], call: "refresh_edge_projections", stream: false}
+	}
 
 	state: pipelines: {
 		// All three read absolutely (the CDC event triggers, never carries a
@@ -1588,10 +1580,16 @@ loop: surface: checks: "editor": {
 	note: "the blank sheet: author from me region, form validation, and article publish create mutation"
 }
 
-loop: surface: checks: "google-auth": {
+loop: surface: checks: "auth": {
 	verb: "test"
-	cmds: ["deno test --config tests/deno.json --no-lock --no-check --allow-env --allow-read tests/google-auth.test.ts"]
-	note: "Google reaches both auth planes with runtime credentials and preserves the localized return query"
+	cmds: ["deno test --config tests/deno.json --no-lock --no-check --allow-env --allow-read tests/auth.test.ts"]
+	note: "the gated guest and passkey door needs no social provider credentials"
+}
+
+loop: surface: checks: "edge-projections": {
+	verb: "test"
+	cmds: ["deno test --config tests/deno.json --lock tests/deno.lock --frozen --allow-read tests/edge-projections.test.ts"]
+	note: "edge projections and favorite ownership"
 }
 
 build: (pronto.#DefaultBuild & {"code": code, "loop": loop, "cluster": cluster, "terminal": terminal}).out
@@ -1600,17 +1598,6 @@ build: (pronto.#DefaultBuild & {"code": code, "loop": loop, "cluster": cluster, 
 build: project: targets: "integrate": {
 	srcs: defaultGlobs: "visual-fixture": {glob: "tests/visual-fixture.ts"}
 	compose: entrypoint: ["sh", "-c", "deno run --allow-env --allow-net --unsafely-ignore-certificate-errors=caddy tests/visual-fixture.ts && exec \"$$@\"", "visual"]
-}
-
-// Process Compose and nested Compose inside these disposable check images run
-// without the host's environment; the fixture client enables guest/passkey
-// checks, never Google.
-build: project: targets: {
-	for name in ["ci", "ci-visual", "ci-replay", "ci-favorites"] {
-		(name): dockerfile: defaultPreamble: "google-check-client": {
-			line: "ENV OIDC_GOOGLE_CLIENT_ID=realworld-ci.apps.googleusercontent.com"
-		}
-	}
 }
 
 // No other rung writes a row and reads back what the pipelines made of it,

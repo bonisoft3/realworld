@@ -46,7 +46,6 @@
       "COPY --from=bayt . /monorepo/plugins/bayt/runtime",
       "RUN cd /opt/bkid && mise trust -y && mise install && mise exec -- sh -c 'cp \"$(mise which task)\" /usr/local/bin/task && cp \"$(mise which depot)\" /usr/local/bin/depot'",
       "ENV PATH=/monorepo/plugins/bayt/runtime:${PATH}",
-      "ENV OIDC_GOOGLE_CLIENT_ID=realworld-ci.apps.googleusercontent.com",
       "ARG MONOREPO_COMPOSE_MODE",
       "ENV MONOREPO_COMPOSE_MODE=$MONOREPO_COMPOSE_MODE",
       "ARG BAYT_RUNTIME",
@@ -741,13 +740,14 @@
           "services/database/migrations/006_policies.sql",
           "services/database/migrations/007_txid.sql",
           "services/database/migrations/008_publication.sql",
-          "services/database/migrations/009_validations.sql",
-          "services/database/migrations/010_machines.sql",
           "services/database/migrations/011_owner_writes.sql",
           "services/database/migrations/012_me_readonly.sql",
           "services/database/migrations/013_article_tag_sync.sql",
           "services/database/migrations/014_me_provision.sql",
-          "services/database/migrations/015_default_privileges.sql"
+          "services/database/migrations/015_default_privileges.sql",
+          "services/database/migrations/016_edge_projections.sql",
+          "services/database/migrations/017_demo_content.sql",
+          "services/database/migrations/018_favorite_guard.sql"
         ],
         "exclude": []
       }

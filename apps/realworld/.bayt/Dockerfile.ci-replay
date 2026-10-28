@@ -7,7 +7,6 @@ FROM fetch_ci-replay_0_$TARGETARCH AS fetch_ci-replay_0
 FROM realworld-database AS ci-replay
 ARG BAYT_DIR
 WORKDIR /monorepo/${BAYT_DIR}
-ENV OIDC_GOOGLE_CLIENT_ID=realworld-ci.apps.googleusercontent.com
 ENV PATH=/root/.local/bin:/root/.local/share/lazybox/bin:$PATH
 ENV MISE_TRUSTED_CONFIG_PATHS=/monorepo
 ENV CADDY_TLS_HOST_PORT=8443

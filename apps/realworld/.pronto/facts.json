@@ -564,14 +564,13 @@
     {"path":"shell/screens/settings.css","token":"--link-gutter"}
   ],
   "artifact": [
-    {"path":"program.cue","sha256":"531a72931732e40e0efc9f684960b2e5b2d586e3da6b41fd66ef59a4d0176b10","derived":false},
+    {"path":"program.cue","sha256":"4010bd26c98bbef8ca3b41771431eca5a31ffb1ded54ec0927b2c6a8843cfe55","derived":false},
     {"path":"DESIGN.md","sha256":"2a7f91c620848c4427ef9a8641ed4b33b1c59eeeb46e3b5d9a844c4e0054142e","derived":false},
-    {"path":"ir.html","sha256":"6cfb23fba4a90dc7d25f24040a885fd2b133af5d5713f3adaacdb4a3786c4855","derived":false},
+    {"path":"ir.html","sha256":"a1d0f3d05c317304ea3d2e120ba49e33b106c33c4c160e39779992d9f8e29d1f","derived":false},
     {"path":"acceptance.md","sha256":"a06ae05fa8b4680819d7c6b54fba688f89d00b52780da6d672856cd76ad22d3d","derived":false},
     {"path":".pronto/cel.json","sha256":"1d3f57dc2c651bbead02c4f7d205b9fea272b4083f7aa95042d6c2041b687276","derived":true},
     {"path":"program_cel.cue","sha256":"4b1a7e6fc4ea7e8cfa36135f30080ef1253020d5fbee8818508e959695d3b97e","derived":true},
-    {"path":"program_derived.cue","sha256":"b34547ad8d3b8c5ee078855c19084dee9009fb06dfcf5633f5a806293d38924a","derived":true},
-    {"path":"program_validations.cue","sha256":"e01c4d4910bd45bf08091a4f3d9f09e30517464b741bc280506c41372d10234e","derived":true},
+    {"path":"program_derived.cue","sha256":"d93259bf6b2d9921551c5fd90539450279e639f00256594c714f1c1782c0d9f5","derived":true},
     {"path":"shell/screens/article.css","sha256":"04030a9238c97a8742eb40eedc0ba7939e0d57511daee07777396548f6d0a3f2","derived":false},
     {"path":"shell/screens/edit-article.css","sha256":"fe57fc711d7df9a2938d88af26162fd591f675e27add2c180212a3d08ee13343","derived":false},
     {"path":"shell/screens/editor.css","sha256":"4dd5aa975a9488cd2866f8634e040c2a69bae3d3f1cbb97a356ceb2829c46caa","derived":false},
@@ -981,12 +980,11 @@
     {"rung":"ir","kind":"entity","id":"ArticleStats","where":null,"owed":null},
     {"rung":"ir","kind":"entity","id":"TagCount","where":null,"owed":null},
     {"rung":"ir","kind":"entity","id":"FavoriteIndex","where":null,"owed":null},
-    {"rung":"ir","kind":"machine","id":"FavoriteRules","where":null,"owed":null},
-    {"rung":"ir","kind":"validation","id":"own-article","where":null,"owed":null},
     {"rung":"ir","kind":"pipeline","id":"favorite-count","where":null,"owed":null},
     {"rung":"ir","kind":"pipeline","id":"favorite-recount","where":null,"owed":null},
     {"rung":"ir","kind":"pipeline","id":"favorite-index","where":null,"owed":null},
     {"rung":"ir","kind":"pipeline","id":"tag-recount","where":null,"owed":null},
+    {"rung":"ir","kind":"pipeline","id":"edge-projections","where":null,"owed":null},
     {"rung":"ir","kind":"screen","id":"home","where":null,"owed":null},
     {"rung":"ir","kind":"screen","id":"feed","where":null,"owed":null},
     {"rung":"ir","kind":"screen","id":"reading-list","where":null,"owed":null},
@@ -1203,6 +1201,7 @@
     {"rung":"program","kind":"pipeline","id":"favorite-count","where":"pipelines.favorite-count","owed":true},
     {"rung":"program","kind":"pipeline","id":"favorite-index","where":"pipelines.favorite-index","owed":true},
     {"rung":"program","kind":"pipeline","id":"tag-recount","where":"pipelines.tag-recount","owed":true},
+    {"rung":"program","kind":"pipeline","id":"edge-projections","where":"drains.edge-projections","owed":true},
     {"rung":"program","kind":"screen","id":"article","where":"screens.article","owed":true},
     {"rung":"program","kind":"screen","id":"edit-article","where":"screens.edit-article","owed":true},
     {"rung":"program","kind":"screen","id":"editor","where":"screens.editor","owed":true},
@@ -1320,7 +1319,6 @@
     {"rung":"program","kind":"decision","id":"decision-narrow-recount","where":"decisions.decision-narrow-recount","owed":true},
     {"rung":"program","kind":"decision","id":"decision-optimistic-count","where":"decisions.decision-optimistic-count","owed":true},
     {"rung":"program","kind":"decision","id":"decision-reading-progress","where":"decisions.decision-reading-progress","owed":true},
-    {"rung":"program","kind":"machine","id":"FavoriteRules","where":"machines.FavoriteRules","owed":true},
     {"rung":"program","kind":"state","id":"article-loading","where":"screens.article.states.loading","owed":true},
     {"rung":"program","kind":"state","id":"article-populated","where":"screens.article.states.populated","owed":true},
     {"rung":"program","kind":"state","id":"article-validation-error","where":"screens.article.states.validation-error","owed":true},
@@ -1385,8 +1383,7 @@
     {"rung":"program","kind":"state","id":"tag-loading","where":"screens.tag.states.loading","owed":true},
     {"rung":"program","kind":"state","id":"tag-populated","where":"screens.tag.states.populated","owed":true},
     {"rung":"program","kind":"state","id":"tag-empty","where":"screens.tag.states.empty","owed":true},
-    {"rung":"program","kind":"state","id":"tag-populated-dark","where":"screens.tag.states.populated-dark","owed":true},
-    {"rung":"program","kind":"validation","id":"own-article","where":"entities.Favorite.validations.own-article","owed":true}
+    {"rung":"program","kind":"state","id":"tag-populated-dark","where":"screens.tag.states.populated-dark","owed":true}
   ],
   "denied_identifier": [
     {"name":"window","reason":"handlers run in an SES compartment with no endowments","except_role":""},
@@ -1401,6 +1398,7 @@
     {"name":"Date","reason":"handlers run in an SES compartment with no endowments","except_role":"adapter"},
     {"name":"Intl","reason":"only an adapter or a module granted Intl via manifest endowments is endowed with Intl","except_role":"adapter"},
     {"name":"Crypto","reason":"safe platform primitives require opt-in via manifest endowments","except_role":""},
+    {"name":"Cheerio","reason":"safe platform primitives require opt-in via manifest endowments","except_role":""},
     {"name":"TextEncoder","reason":"safe platform primitives require opt-in via manifest endowments","except_role":""},
     {"name":"TextDecoder","reason":"safe platform primitives require opt-in via manifest endowments","except_role":""},
     {"name":"URL","reason":"safe platform primitives require opt-in via manifest endowments","except_role":""},
@@ -1634,7 +1632,7 @@
     {"block":":root","token":"--shell-rule","ref":"--border"}
   ],
   "diagram_edge": [
-    {"diagram":1,"source":"login","target":"auth","stroke":"normal","label":"passkey, guest or Google"},
+    {"diagram":1,"source":"login","target":"auth","stroke":"normal","label":"passkey or guest"},
     {"diagram":1,"source":"auth","target":"AppUser","stroke":"normal","label":"mints (id, handle)"},
     {"diagram":1,"source":"auth","target":"home","stroke":"normal","label":"user JWT, role app_user"},
     {"diagram":1,"source":"AppUser","target":"Me","stroke":"normal","label":"meprov trigger, same transaction"},
@@ -1679,7 +1677,6 @@
     {"diagram":2,"source":"a1","target":"a2","stroke":"normal","label":""},
     {"diagram":2,"source":"a2","target":"auth","stroke":"normal","label":"passkey tap"},
     {"diagram":2,"source":"a2","target":"auth","stroke":"normal","label":"guest click"},
-    {"diagram":2,"source":"a2","target":"auth","stroke":"normal","label":"Google redirect and callback"},
     {"diagram":2,"source":"auth","target":"AppUser","stroke":"normal","label":"insert (id, handle)"},
     {"diagram":2,"source":"AppUser","target":"Me","stroke":"normal","label":"014 trigger, same transaction"},
     {"diagram":2,"source":"auth","target":"home","stroke":"normal","label":"JWT role app_user"},
@@ -1798,7 +1795,7 @@
     {"diagram":1,"id":"tag-recount","label":"tag-recount (pipeline)","shape":"subroutine","name":"tag-recount","kind":"pipeline"},
     {"diagram":1,"id":"ArticleStats","label":"ArticleStats (live)","shape":"cylinder","name":"ArticleStats","kind":"live"},
     {"diagram":2,"id":"a1","label":"terminal door","shape":"circle","name":null,"kind":null},
-    {"diagram":2,"id":"a2","label":"passkey, guest or Google","shape":"diamond","name":null,"kind":null},
+    {"diagram":2,"id":"a2","label":"passkey or guest","shape":"diamond","name":null,"kind":null},
     {"diagram":2,"id":"auth","label":"auth (service)","shape":"subroutine","name":"auth","kind":"service"},
     {"diagram":2,"id":"AppUser","label":"AppUser","shape":"cylinder","name":null,"kind":null},
     {"diagram":2,"id":"Me","label":"Me","shape":"cylinder","name":null,"kind":null},
@@ -1984,8 +1981,7 @@
   ],
   "handler": [
     {"path":"pipelines/favorite-recount.js","completion":"exports","role":"fold"},
-    {"path":"shell/renderers/markdown.js","completion":"name","role":"renderer"},
-    {"path":"shell/validations/own-article.js","completion":"arrow","role":"validation"}
+    {"path":"shell/renderers/markdown.js","completion":"name","role":"renderer"}
   ],
   "handler_reference": [
 
@@ -2011,7 +2007,6 @@
     {"default_locale":"en"}
   ],
   "ir_nest": [
-    {"id":"FavoriteRules","kind":"machine","inside":"Favorite","inside_kind":"entity"},
     {"id":"home-loading","kind":"state","inside":"home","inside_kind":"screen"},
     {"id":"home-empty","kind":"state","inside":"home","inside_kind":"screen"},
     {"id":"home-populated","kind":"state","inside":"home","inside_kind":"screen"},
@@ -4710,7 +4705,7 @@
   "read_mode": [
     {"entity":"AppUser","table":"app_user","mode":"eager","reason":"the strip reads the signed-in person's name from it"},
     {"entity":"Me","table":"me","mode":"eager","reason":"Me is private, and a view cannot restate its visibility"},
-    {"entity":"Article","table":"article","mode":"eager","reason":"validation Favorite.own-article walks to it"},
+    {"entity":"Article","table":"article","mode":"lazy","reason":"each active query demands its own subset or complete snapshot"},
     {"entity":"ArticleTag","table":"article_tag","mode":"lazy","reason":"each active query demands its own subset or complete snapshot"},
     {"entity":"Comment","table":"comment","mode":"lazy","reason":"each active query demands its own subset or complete snapshot"},
     {"entity":"Favorite","table":"favorite","mode":"eager","reason":"the fold favorite-recount projects the reader's own contribution from it"},
@@ -5243,7 +5238,6 @@
     {"file":"shell/shared/chrome.css","target":"/srv/shell/shared/chrome.css"},
     {"file":"shell/shared/system.css","target":"/srv/shell/shared/system.css"},
     {"file":"pipelines/favorite-recount.js","target":"/srv/pipelines/favorite-recount.js"},
-    {"file":"shell/validations/own-article.js","target":"/srv/shell/validations/own-article.js"},
     {"file":"messages/en.json","target":"/srv/messages/en.json"},
     {"file":"messages/zh.json","target":"/srv/messages/zh.json"},
     {"file":"messages/hi.json","target":"/srv/messages/hi.json"},

@@ -44,9 +44,6 @@
   },
   "app": "realworld",
   "auth": {
-    "providers": [
-      "google"
-    ],
     "required": true,
     "service": "/auth",
     "self": {
@@ -117,6 +114,7 @@
   },
   "native": true,
   "read": {
+    "article": "lazy",
     "article_tag": "lazy",
     "comment": "lazy",
     "article_stats": "lazy",
@@ -1460,13 +1458,14 @@
     "services/database/migrations/006_policies.sql",
     "services/database/migrations/007_txid.sql",
     "services/database/migrations/008_publication.sql",
-    "services/database/migrations/009_validations.sql",
-    "services/database/migrations/010_machines.sql",
     "services/database/migrations/011_owner_writes.sql",
     "services/database/migrations/012_me_readonly.sql",
     "services/database/migrations/013_article_tag_sync.sql",
     "services/database/migrations/014_me_provision.sql",
-    "services/database/migrations/015_default_privileges.sql"
+    "services/database/migrations/015_default_privileges.sql",
+    "services/database/migrations/016_edge_projections.sql",
+    "services/database/migrations/017_demo_content.sql",
+    "services/database/migrations/018_favorite_guard.sql"
   ],
   "pipelines": [
     {
@@ -1546,34 +1545,5 @@
         "article_id"
       ]
     ]
-  },
-  "validations": {
-    "favorite": {
-      "own-article": {
-        "src": "shell/validations/own-article.js",
-        "edges": [
-          {
-            "table": "article",
-            "key": "id",
-            "from": "article_id"
-          }
-        ],
-        "on": [
-          "insert",
-          "update"
-        ],
-        "order": {
-          "insert": [
-            0,
-            0
-          ],
-          "update": [
-            0,
-            0
-          ]
-        },
-        "machine": "FavoriteRules"
-      }
-    }
   }
 }

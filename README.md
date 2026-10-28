@@ -21,4 +21,4 @@ what it means to conform to RealWorld.
 The [[ir.html|application design]] describes the implemented behavior, and
 [[DESIGN.md|visual design]] describes the authored presentation.
 
-See [[docs/index|documentation]] for Google sign-in setup.
+See [[docs/index|documentation]] for Cloudflare release setup.

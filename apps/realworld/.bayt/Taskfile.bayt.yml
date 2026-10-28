@@ -40,20 +40,20 @@ includes:
     taskfile: ./Taskfile.ci.yaml
     dir: ../
     optional: true
-  launch-action:
-    taskfile: ./Taskfile.launch-action.yaml
-    dir: ../
-    optional: true
-  integrate-action:
-    taskfile: ./Taskfile.integrate-action.yaml
-    dir: ../
-    optional: true
   check-favorites:
     taskfile: ./Taskfile.check-favorites.yaml
     dir: ../
     optional: true
   ci-favorites:
     taskfile: ./Taskfile.ci-favorites.yaml
+    dir: ../
+    optional: true
+  launch-action:
+    taskfile: ./Taskfile.launch-action.yaml
+    dir: ../
+    optional: true
+  integrate-action:
+    taskfile: ./Taskfile.integrate-action.yaml
     dir: ../
     optional: true
 version: "3"

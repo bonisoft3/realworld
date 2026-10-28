@@ -140,9 +140,6 @@ services:
         path: ../pipelines/favorite-recount.js
         target: /srv/pipelines/favorite-recount.js
       - action: rebuild
-        path: ../shell/validations/own-article.js
-        target: /srv/shell/validations/own-article.js
-      - action: rebuild
         path: ../messages/en.json
         target: /srv/messages/en.json
       - action: rebuild

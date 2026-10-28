@@ -392,7 +392,7 @@
       },
       "name": "Article",
       "ir": "Article",
-      "read": "eager",
+      "read": "lazy",
       "table": "article",
       "id": "0x899a3c66fba1e59d",
       "fields": [
@@ -994,43 +994,7 @@
           ]
         }
       ],
-      "validations": {
-        "own-article": {
-          "machine": "FavoriteRules",
-          "name": "own-article",
-          "on": [
-            "insert",
-            "update"
-          ],
-          "order": {
-            "insert": [
-              0,
-              0
-            ],
-            "update": [
-              0,
-              0
-            ]
-          },
-          "ir": "own-article",
-          "src": "shell/validations/own-article.js",
-          "via": [
-            "article_id"
-          ],
-          "note": "a reader cannot favorite what they wrote",
-          "edges": [
-            {
-              "table": "article",
-              "key": "id",
-              "from": "article_id"
-            }
-          ],
-          "module": {
-            "statements": "// A reader may not favorite what they wrote. `state.rows.article` is the one\n// referenced article, or empty where the reference dangles and the FK will\n// refuse after this does.\n",
-            "completion": "(state, event) => state.rows.article.every((a) => a.author_id !== event.row.user_id)"
-          }
-        }
-      }
+      "validations": {}
     },
     "Bookmark": {
       "access": {
@@ -1628,6 +1592,18 @@
     {
       "name": "015_default_privileges.sql",
       "src": "services/database/sql/015_default_privileges.sql"
+    },
+    {
+      "name": "016_edge_projections.sql",
+      "src": "services/database/sql/016_edge_projections.sql"
+    },
+    {
+      "name": "017_demo_content.sql",
+      "src": "services/database/sql/017_demo_content.sql"
+    },
+    {
+      "name": "018_favorite_guard.sql",
+      "src": "services/database/sql/018_favorite_guard.sql"
     }
   ],
   "duckstreams": {}

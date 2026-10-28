@@ -70,6 +70,20 @@ services:
     profiles:
     - ci
     scale: 1
+  check-favorites:
+    extends:
+      file: ./compose.check-favorites.yaml
+      service: realworld-check-favorites
+    profiles:
+    - check-favorites
+    scale: 1
+  ci-favorites:
+    extends:
+      file: ./compose.ci-favorites.yaml
+      service: realworld-ci-favorites
+    profiles:
+    - ci-favorites
+    scale: 1
   served:
     extends:
       file: ./compose.served.yaml
@@ -104,20 +118,6 @@ services:
       service: realworld-conduit
     profiles:
     - conduit
-    scale: 1
-  check-favorites:
-    extends:
-      file: ./compose.check-favorites.yaml
-      service: realworld-check-favorites
-    profiles:
-    - check-favorites
-    scale: 1
-  ci-favorites:
-    extends:
-      file: ./compose.ci-favorites.yaml
-      service: realworld-ci-favorites
-    profiles:
-    - ci-favorites
     scale: 1
   caddy:
     extends:

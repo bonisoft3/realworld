@@ -1,3 +1,5 @@
+Status: archived — Cloudflare releases use guest and passkey authentication.
+
 # Google sign-in testbed
 
 RealWorld declares Google alongside the terminal's passkey and guest options. Every screen remains gated. Mecha handles the authorization-code redirect and token exchange; Omnishell adopts the resulting session. No Google credential belongs in `program.cue`, browser assets or source control.

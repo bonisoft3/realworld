@@ -42,12 +42,6 @@ services:
         path: ../services/database/migrations/008_publication.sql
         target: /docker-entrypoint-initdb.d
       - action: rebuild
-        path: ../services/database/migrations/009_validations.sql
-        target: /docker-entrypoint-initdb.d
-      - action: rebuild
-        path: ../services/database/migrations/010_machines.sql
-        target: /docker-entrypoint-initdb.d
-      - action: rebuild
         path: ../services/database/migrations/011_owner_writes.sql
         target: /docker-entrypoint-initdb.d
       - action: rebuild
@@ -61,6 +55,15 @@ services:
         target: /docker-entrypoint-initdb.d
       - action: rebuild
         path: ../services/database/migrations/015_default_privileges.sql
+        target: /docker-entrypoint-initdb.d
+      - action: rebuild
+        path: ../services/database/migrations/016_edge_projections.sql
+        target: /docker-entrypoint-initdb.d
+      - action: rebuild
+        path: ../services/database/migrations/017_demo_content.sql
+        target: /docker-entrypoint-initdb.d
+      - action: rebuild
+        path: ../services/database/migrations/018_favorite_guard.sql
         target: /docker-entrypoint-initdb.d
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}

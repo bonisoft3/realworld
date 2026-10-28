@@ -20,7 +20,7 @@ Captured from the actual running `https://localhost:17995/` login in fresh Chrom
 
 ## Checks
 
-The nine login smoke tests pass, including provider return URLs, guest entry, session adoption, sign-out, localization and inline failure handling. Navigation's forty existing checks passed with the new markup. RealWorld's generation, lint and test gates passed after the design change. Screenshot inspection confirmed the hierarchy, typography, mobile fit and dark appearance. Real Google authentication still requires the credentials described in [[google-sign-in]]; these screenshots establish the login surface, not a provider callback.
+The nine login smoke tests pass, including provider return URLs, guest entry, session adoption, sign-out, localization and inline failure handling. Navigation's forty existing checks passed with the new markup. RealWorld's generation, lint and test gates passed after the design change. Screenshot inspection confirmed the hierarchy, typography, mobile fit and dark appearance. Real Google authentication still requires the credentials described in [[archive/google-sign-in]]; these screenshots establish the login surface, not a provider callback.
 
 ## Theme and provider-free regression check
 

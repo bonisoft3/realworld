@@ -9,5 +9,15 @@
     "app_user",
     "service"
   ],
-  "drains": []
+  "drains": [
+    {
+      "name": "edge-projections",
+      "on": [
+        "favorite",
+        "article_tag"
+      ],
+      "call": "refresh_edge_projections",
+      "body": {}
+    }
+  ]
 }

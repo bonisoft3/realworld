@@ -4,6 +4,6 @@ SET statement_timeout = '60s';
 
 BEGIN;
 
-CREATE EXTENSION IF NOT EXISTS plv8;
+-- no extensions required
 
 COMMIT;
