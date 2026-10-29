@@ -20,10 +20,6 @@ include:
   required: false
 - path: ./compose.ci.yaml
   required: false
-- path: ./compose.check-favorites.yaml
-  required: false
-- path: ./compose.ci-favorites.yaml
-  required: false
 - path: ./compose.served.yaml
   required: false
 - path: ./compose.database.yaml
@@ -33,6 +29,10 @@ include:
 - path: ./compose.mesh-events.yaml
   required: false
 - path: ./compose.conduit.yaml
+  required: false
+- path: ./compose.check-favorites.yaml
+  required: false
+- path: ./compose.ci-favorites.yaml
   required: false
 - path: ./compose.caddy.yaml
   required: false
