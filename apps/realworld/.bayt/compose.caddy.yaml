@@ -185,8 +185,8 @@ services:
         path: ../messages/tr.json
         target: /srv/messages/tr.json
       - action: rebuild
-        path: ../brief.html
-        target: /srv/docs/brief.html
+        path: ../journal.html
+        target: /srv/docs/journal.html
       - action: rebuild
         path: ../ir.html
         target: /srv/docs/ir.html
@@ -199,6 +199,33 @@ services:
       - action: rebuild
         path: ../DESIGN.md
         target: /srv/docs/DESIGN.md
+      - action: rebuild
+        path: ../journal/2026-10-18-login-after-dark.png
+        target: /srv/docs/journal/2026-10-18-login-after-dark.png
+      - action: rebuild
+        path: ../journal/2026-10-18-login-after-desktop.png
+        target: /srv/docs/journal/2026-10-18-login-after-desktop.png
+      - action: rebuild
+        path: ../journal/2026-10-18-login-after-mobile.png
+        target: /srv/docs/journal/2026-10-18-login-after-mobile.png
+      - action: rebuild
+        path: ../journal/2026-10-18-login-before-dark.png
+        target: /srv/docs/journal/2026-10-18-login-before-dark.png
+      - action: rebuild
+        path: ../journal/2026-10-18-login-before-desktop.png
+        target: /srv/docs/journal/2026-10-18-login-before-desktop.png
+      - action: rebuild
+        path: ../journal/2026-10-18-login-before-mobile.png
+        target: /srv/docs/journal/2026-10-18-login-before-mobile.png
+      - action: rebuild
+        path: ../journal/2026-10-28-cloudflare-article.png
+        target: /srv/docs/journal/2026-10-28-cloudflare-article.png
+      - action: rebuild
+        path: ../journal/2026-10-28-cloudflare-feed.png
+        target: /srv/docs/journal/2026-10-28-cloudflare-feed.png
+      - action: rebuild
+        path: ../journal/2026-10-28-cloudflare-mobile.png
+        target: /srv/docs/journal/2026-10-28-cloudflare-mobile.png
       - action: rebuild
         path: ../robots.txt
         target: /srv/robots.txt

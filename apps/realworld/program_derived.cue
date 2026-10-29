@@ -358,3 +358,5 @@ _irAccepts: {
 if !_deriving {
 	code: meta: tests: [Id=string]: accepts: _irAccepts[Id]
 }
+
+code: meta: ladder: ["journal/2026-10-18-login-after-dark.png","journal/2026-10-18-login-after-desktop.png","journal/2026-10-18-login-after-mobile.png","journal/2026-10-18-login-before-dark.png","journal/2026-10-18-login-before-desktop.png","journal/2026-10-18-login-before-mobile.png","journal/2026-10-28-cloudflare-article.png","journal/2026-10-28-cloudflare-feed.png","journal/2026-10-28-cloudflare-mobile.png"]

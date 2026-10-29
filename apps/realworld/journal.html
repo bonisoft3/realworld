@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conduit (RealWorld) — Journal</title>
+<style>
+  body { margin:0; background:#faf9f6; color:#202422; font:17px/1.6 system-ui, sans-serif; }
+  main { max-width:1100px; margin:auto; padding:48px 24px; display:grid; gap:36px; }
+  h1, h2 { font-family:Georgia, serif; line-height:1.15; margin:8px 0; }
+  h1 { font-size:46px; }
+  h2 { font-size:28px; }
+  h3 { font-size:19px; margin:16px 0 6px; }
+  p, ul { max-width:760px; }
+  article { border-top:1px solid #dedbd2; padding-top:24px; }
+  time, .eyebrow { color:#1d6a50; font-size:12px; text-transform:uppercase; letter-spacing:.14em; font-weight:700; display:block; }
+  figure { margin:24px 0; }
+  img { max-width:100%; height:auto; border:1px solid #dedbd2; border-radius:12px; }
+  figcaption { font-size:14px; color:#565e59; margin-top:6px; }
+  a { color:#1d6a50; }
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start; }
+  @media(max-width:700px) { .pair { display:block; } h1 { font-size:34px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <span class="eyebrow">Conduit · Project journal</span>
+    <h1>Conduit — Public Social Publishing &amp; Blogging Community</h1>
+    <p>The RealWorld social blogging platform built on Pronto: read global and personalized article feeds, filter by popular tags, publish Markdown stories, follow authors, favorite posts, and discuss articles in threads. <a href="#initial-brief">Latest product brief ↓</a></p>
+  </header>
+
+  <article id="turn-2026-10-28">
+    <time datetime="2026-10-28">2026-10-28 · Cloudflare Release</time>
+    <h2>A community ready to read</h2>
+    <p>Before this turn, RealWorld had no declared release target and fresh databases had no starter articles. The Cloudflare release now carries six illustrated stories, fictional author profiles, and a working tag index. The existing editorial design remains the visual contract.</p>
+    <figure><img src="journal/2026-10-28-cloudflare-feed.png" alt="The community feed with six illustrated articles and popular tags"><figcaption>Local Cloudflare Worker, populated from the migration. All six articles and their tags are visible.</figcaption></figure>
+    <h3>Space for a story</h3>
+    <p>Cover photography, readable Markdown, a pull quote, and author context use the app's existing reading layout. The 390-pixel mobile viewport has no horizontal overflow; the cover image loads at both widths.</p>
+    <div class="pair">
+      <figure><img src="journal/2026-10-28-cloudflare-article.png" alt="Desktop article with forest cover photography and formatted prose"><figcaption>Desktop · 1440 pixels.</figcaption></figure>
+      <figure><img src="journal/2026-10-28-cloudflare-mobile.png" alt="The same article in a narrow mobile layout"><figcaption>Mobile · 390 pixels.</figcaption></figure>
+    </div>
+    <h3>Release checks</h3>
+    <p>The Cloudflare snapshot build, application lint and tests, and the container replay, visual, and favorite integration checks passed. Browser inspection recorded no page errors. Guest authentication loaded the seeded feed and article in the local Worker.</p>
+  </article>
+
+  <article id="turn-2026-10-18">
+    <time datetime="2026-10-18">2026-10-18 · Login Design</time>
+    <h2>Editorial masthead and action hierarchy at the door</h2>
+    <p>The previous terminal gate centered a small generic card in a large empty page. Its Google action was an unstyled browser link, and “Continue” did not distinguish the passkey ceremony. The accepted Press identity supplied the direction: warm paper, ink, pine, editorial type and quiet rules.</p>
+    <p>The shared terminal now separates the app introduction from the action panel. A large serif masthead and app-initial monogram provide identity; Google has the strongest full-width control, passkey is outlined and explicitly named, and guest access remains visible but quiet. Dark mode resolves the same tokens.</p>
+    <div class="pair">
+      <figure><img src="journal/2026-10-18-login-before-desktop.png" alt="Previous desktop login"><figcaption>Before · Desktop</figcaption></figure>
+      <figure><img src="journal/2026-10-18-login-after-desktop.png" alt="Editorial desktop login"><figcaption>After · Desktop</figcaption></figure>
+      <figure><img src="journal/2026-10-18-login-before-mobile.png" alt="Previous mobile login"><figcaption>Before · Mobile</figcaption></figure>
+      <figure><img src="journal/2026-10-18-login-after-mobile.png" alt="Stacked mobile login"><figcaption>After · Mobile</figcaption></figure>
+      <figure><img src="journal/2026-10-18-login-before-dark.png" alt="Previous dark login"><figcaption>Before · Dark</figcaption></figure>
+      <figure><img src="journal/2026-10-18-login-after-dark.png" alt="Dark editorial login"><figcaption>After · Dark</figcaption></figure>
+    </div>
+  </article>
+
+  <article id="initial-brief">
+    <time datetime="2026-10-01">2026-10-01 · Initial Brief</time>
+    <h2>Conduit</h2>
+    <p>A place to read and write, in public. Someone comes in, reads what the community has posted, follows the writers worth following, and — when they have something to say — writes it themselves. Everything written here is public to everyone in it, and everything done about it — writing, following, favoriting, commenting — belongs to a person.</p>
+    <h3>People</h3>
+    <ul>
+      <li>A person signs in with a <strong>passkey</strong>, as a <strong>guest</strong>, or through <strong>Google</strong>; Conduit gives them a friendly <strong>handle</strong>, and no two people share one.</li>
+      <li>What belongs to a person is what they did: their articles, their comments, their follows, their favorites, their own profile. Only the author of an article may change or remove it, only a comment's writer may remove it, and only a person may edit their own profile.</li>
+      <li>Every person has a <strong>public page</strong>: their handle, a <strong>display name</strong> they may set, a line <strong>about</strong> themselves, and a <strong>picture</strong>.</li>
+    </ul>
+    <h3>Data</h3>
+    <ul>
+      <li><a href="ir.html#Article">Article</a> — title, one-line description, markdown body, tags, readable address, author, and timestamps.</li>
+      <li><a href="ir.html#TagCount">TagCount</a> &amp; <a href="ir.html#ArticleStats">ArticleStats</a> — derived live counts of popular tags and article favorites.</li>
+      <li><a href="ir.html#Favorite">Favorite</a>, <a href="ir.html#Follow">Follow</a>, <a href="ir.html#Comment">Comment</a> — per-person actions over community articles and writers.</li>
+    </ul>
+    <h3>Screens</h3>
+    <ul>
+      <li><strong>Home</strong> (<code>/</code>) — masthead, community feed, personal feed of followed writers, popular tags, and search.</li>
+      <li><strong>Article</strong>, <strong>Editor</strong>, <strong>Profile</strong>, <strong>Settings</strong>, <strong>Tag</strong>, <strong>Search</strong>, and <strong>Reading List</strong>.</li>
+    </ul>
+  </article>
+</main>
+</body>
+</html>
