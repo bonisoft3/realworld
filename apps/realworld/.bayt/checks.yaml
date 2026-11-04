@@ -91,8 +91,7 @@ say:
             if ($env.SAY_RELEASE_ARGS_FROM? | is-empty) { use tools.nu [run-mise]; let
             pronto = (run-mise where github:bonisoft3/pronto | str trim); run-mise exec -- deno
             run -A --config ($pronto | path join bundle deno.json) ($pronto | path join bundle
-            derived.ts) . --tables article_stats,favorite_count,favorite_index,me,tag_count
-            --streams
+            derived.ts) . --tables article_stats,favorite_index,tag_count --streams
             realworld-favorite-count,realworld-favorite-index,realworld-favorite-recount,realworld-tag-recount --out dist/derived.sql }
         - do: >-
             use tools.nu [run-mise]; let pronto = (run-mise where github:bonisoft3/pronto |
@@ -116,7 +115,7 @@ say:
             ['--temporary'] }) }
         platform: cloudflare
   self:
-    version: v0.45.2
+    version: v0.45.3
   doctor:
     do: >-
       use tools.nu [run-mise]; run-mise exec -- cue version; run-mise exec -- deno

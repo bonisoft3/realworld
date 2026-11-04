@@ -141,7 +141,7 @@
             "cloudflare": {
               "cmds": [
                 {
-                  "do": "if ($env.SAY_RELEASE_ARGS_FROM? | is-empty) { use tools.nu [run-mise]; let pronto = (run-mise where github:bonisoft3/pronto | str trim); run-mise exec -- deno run -A --config ($pronto | path join bundle deno.json) ($pronto | path join bundle derived.ts) . --tables article_stats,favorite_count,favorite_index,me,tag_count --streams realworld-favorite-count,realworld-favorite-index,realworld-favorite-recount,realworld-tag-recount --out dist/derived.sql }"
+                  "do": "if ($env.SAY_RELEASE_ARGS_FROM? | is-empty) { use tools.nu [run-mise]; let pronto = (run-mise where github:bonisoft3/pronto | str trim); run-mise exec -- deno run -A --config ($pronto | path join bundle deno.json) ($pronto | path join bundle derived.ts) . --tables article_stats,favorite_index,tag_count --streams realworld-favorite-count,realworld-favorite-index,realworld-favorite-recount,realworld-tag-recount --out dist/derived.sql }"
                 },
                 {
                   "do": "use tools.nu [run-mise]; let pronto = (run-mise where github:bonisoft3/pronto | str trim); let data = if ($env.SAY_RELEASE_ARGS_FROM? | is-not-empty) { ['--from' $env.SAY_RELEASE_ARGS_FROM] } else { ['--derived' 'dist/derived.sql'] }; run-mise exec -- deno run -A --config ($pronto | path join bundle deno.json) ($pronto | path join bundle edge.ts) . --omnishell (run-mise where github:bonisoft3/omnishell | str trim) --mecha (run-mise where github:bonisoft3/mecha | str trim) --out dist/cloudflare ...$data --ice-servers '[{\"urls\":\"stun:stun.cloudflare.com:3478\"}]'"
@@ -159,7 +159,7 @@
           }
         },
         "self": {
-          "version": "v0.45.2"
+          "version": "v0.45.3"
         },
         "doctor": {
           "do": "use tools.nu [run-mise]; run-mise exec -- cue version; run-mise exec -- deno --version; run-mise where github:bonisoft3/pronto"
@@ -1527,7 +1527,7 @@
         "manual": true,
         "build": {
           "additional_contexts": {
-            "plugins_omnishell-runtime-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/omnishell:0.21.3@sha256:7ef00827641a0198cca0094402f16933541913c5f915f151bf306e3177abf1c2}${MONOREPO_COMPOSE_MODE:+:plugins_omnishell-runtime-image}"
+            "plugins_omnishell-runtime-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/omnishell:0.21.7@sha256:300583571c8a5434d59c7ada9a3b5c2f6319d5768b3950a9f06504d96237d1a8}${MONOREPO_COMPOSE_MODE:+:plugins_omnishell-runtime-image}"
           },
           "secrets": [],
           "args": {}
@@ -3255,11 +3255,27 @@
           "messages/ja.json",
           "messages/sw.json",
           "messages/tr.json",
+          "brief.md",
+          "brief.html",
           "journal.html",
           "ir.html",
           "ir/card.css",
           "acceptance.md",
           "DESIGN.md",
+          "ir/neighbourhood-app.svg",
+          "ir/neighbourhood-article.svg",
+          "ir/neighbourhood-edit-article.svg",
+          "ir/neighbourhood-editor.svg",
+          "ir/neighbourhood-feed-older.svg",
+          "ir/neighbourhood-feed.svg",
+          "ir/neighbourhood-home.svg",
+          "ir/neighbourhood-older.svg",
+          "ir/neighbourhood-profile-favorites.svg",
+          "ir/neighbourhood-profile.svg",
+          "ir/neighbourhood-reading-list.svg",
+          "ir/neighbourhood-search.svg",
+          "ir/neighbourhood-settings.svg",
+          "ir/neighbourhood-tag.svg",
           "journal/2026-10-18-login-after-dark.png",
           "journal/2026-10-18-login-after-desktop.png",
           "journal/2026-10-18-login-after-mobile.png",
@@ -3316,7 +3332,7 @@
           }
         ],
         "epilogue": [
-          "RUN set -e; install -D -m 644 '/omnishell/interpreter/shell.js' '/served/omnishell/interpreter/shell.js'; install -D -m 644 '/omnishell/interpreter/chrome.js' '/served/omnishell/interpreter/chrome.js'; install -D -m 644 '/omnishell/interpreter/screen.js' '/served/omnishell/interpreter/screen.js'; install -D -m 644 '/omnishell/interpreter/fragment.js' '/served/omnishell/interpreter/fragment.js'; install -D -m 644 '/omnishell/interpreter/data-sync.js' '/served/omnishell/interpreter/data-sync.js'; install -D -m 644 '/omnishell/interpreter/validate.js' '/served/omnishell/interpreter/validate.js'; install -D -m 644 '/omnishell/interpreter/render.js' '/served/omnishell/interpreter/render.js'; install -D -m 644 '/omnishell/interpreter/release-plan.js' '/served/omnishell/interpreter/release-plan.js'; install -D -m 644 '/omnishell/interpreter/preloads.js' '/served/omnishell/interpreter/preloads.js'; install -D -m 644 '/omnishell/interpreter/link-prefetch.js' '/served/omnishell/interpreter/link-prefetch.js'; install -D -m 644 '/omnishell/interpreter/markup.js' '/served/omnishell/interpreter/markup.js'; install -D -m 644 '/omnishell/interpreter/script-url.js' '/served/omnishell/interpreter/script-url.js'; install -D -m 644 '/omnishell/interpreter/deferred-boot.js' '/served/omnishell/interpreter/deferred-boot.js'; install -D -m 644 '/omnishell/interpreter/host-dom.js' '/served/omnishell/interpreter/host-dom.js'; install -D -m 644 '/omnishell/interpreter/hatch.js' '/served/omnishell/interpreter/hatch.js'; install -D -m 644 '/omnishell/interpreter/hatch-worker.js' '/served/omnishell/interpreter/hatch-worker.js'; install -D -m 644 '/omnishell/interpreter/hatch-presenter.js' '/served/omnishell/interpreter/hatch-presenter.js'; install -D -m 644 '/omnishell/interpreter/presenter-realm.js' '/served/omnishell/interpreter/presenter-realm.js'; install -D -m 644 '/omnishell/interpreter/presenter.js' '/served/omnishell/interpreter/presenter.js'; install -D -m 644 '/omnishell/interpreter/storybook.js' '/served/omnishell/interpreter/storybook.js'; install -D -m 644 '/omnishell/interpreter/jessie.js' '/served/omnishell/interpreter/jessie.js'; install -D -m 644 '/omnishell/interpreter/kinetic.js' '/served/omnishell/interpreter/kinetic.js'; install -D -m 644 '/omnishell/interpreter/kinetic-milestones.js' '/served/omnishell/interpreter/kinetic-milestones.js'; install -D -m 644 '/omnishell/interpreter/kinetic-session.js' '/served/omnishell/interpreter/kinetic-session.js'; install -D -m 644 '/omnishell/interpreter/kinetic-sound.js' '/served/omnishell/interpreter/kinetic-sound.js'; install -D -m 644 '/omnishell/interpreter/kinetic-mount.js' '/served/omnishell/interpreter/kinetic-mount.js'; install -D -m 644 '/omnishell/interpreter/rtc-channel.js' '/served/omnishell/interpreter/rtc-channel.js'; install -D -m 644 '/omnishell/interpreter/prng.js' '/served/omnishell/interpreter/prng.js'; install -D -m 644 '/omnishell/interpreter/vendor/mecha-client.js' '/served/omnishell/interpreter/vendor/mecha-client.js'; install -D -m 644 '/omnishell/interpreter/vendor/js-yaml.js' '/served/omnishell/interpreter/vendor/js-yaml.js'; install -D -m 644 '/omnishell/interpreter/vendor/ses.umd.min.js' '/served/omnishell/interpreter/vendor/ses.umd.min.js'; install -D -m 644 '/omnishell/interpreter/vendor/morphlex.js' '/served/omnishell/interpreter/vendor/morphlex.js'; install -D -m 644 '/omnishell/interpreter/vendor/messages.js' '/served/omnishell/interpreter/vendor/messages.js'; install -D -m 644 '/omnishell/interpreter/vendor/game-inputs.js' '/served/omnishell/interpreter/vendor/game-inputs.js'; install -D -m 644 '/omnishell/interpreter/vendor/ggrs/ggrs_wasm.js' '/served/omnishell/interpreter/vendor/ggrs/ggrs_wasm.js'; install -D -m 644 '/omnishell/interpreter/vendor/ggrs/ggrs_wasm_bg.wasm' '/served/omnishell/interpreter/vendor/ggrs/ggrs_wasm_bg.wasm'; install -D -m 644 '/omnishell/components/wallclock.js' '/served/omnishell/components/wallclock.js'; install -D -m 644 '/app/shell/index.html' '/served/shell/index.html'; install -D -m 644 '/app/shell/shell.css' '/served/shell/shell.css'; install -D -m 644 '/app/shell/boot.js' '/served/shell/boot.js'; install -D -m 644 '/app/offline-first-sw.js' '/served/offline-first-sw.js'; install -D -m 644 '/app/shell/shell.yaml' '/served/shell/shell.yaml'; install -D -m 644 '/app/shell/shell.json' '/served/shell/shell.json'; install -D -m 644 '/app/shell/design.css' '/served/shell/design.css'; install -D -m 644 '/app/shell/screens/home.html' '/served/shell/screens/home.html'; install -D -m 644 '/app/shell/screens/home.css' '/served/shell/screens/home.css'; install -D -m 644 '/app/shell/screens/feed.html' '/served/shell/screens/feed.html'; install -D -m 644 '/app/shell/screens/feed.css' '/served/shell/screens/feed.css'; install -D -m 644 '/app/shell/screens/reading-list.html' '/served/shell/screens/reading-list.html'; install -D -m 644 '/app/shell/screens/reading-list.css' '/served/shell/screens/reading-list.css'; install -D -m 644 '/app/shell/screens/editor.html' '/served/shell/screens/editor.html'; install -D -m 644 '/app/shell/screens/editor.css' '/served/shell/screens/editor.css'; install -D -m 644 '/app/shell/screens/settings.html' '/served/shell/screens/settings.html'; install -D -m 644 '/app/shell/screens/settings.css' '/served/shell/screens/settings.css'; install -D -m 644 '/app/shell/screens/older.html' '/served/shell/screens/older.html'; install -D -m 644 '/app/shell/screens/older.css' '/served/shell/screens/older.css'; install -D -m 644 '/app/shell/screens/feed-older.html' '/served/shell/screens/feed-older.html'; install -D -m 644 '/app/shell/screens/feed-older.css' '/served/shell/screens/feed-older.css'; install -D -m 644 '/app/shell/screens/article.html' '/served/shell/screens/article.html'; install -D -m 644 '/app/shell/screens/article.css' '/served/shell/screens/article.css'; install -D -m 644 '/app/shell/screens/edit-article.html' '/served/shell/screens/edit-article.html'; install -D -m 644 '/app/shell/screens/edit-article.css' '/served/shell/screens/edit-article.css'; install -D -m 644 '/app/shell/screens/profile.html' '/served/shell/screens/profile.html'; install -D -m 644 '/app/shell/screens/profile.css' '/served/shell/screens/profile.css'; install -D -m 644 '/app/shell/screens/profile-favorites.html' '/served/shell/screens/profile-favorites.html'; install -D -m 644 '/app/shell/screens/profile-favorites.css' '/served/shell/screens/profile-favorites.css'; install -D -m 644 '/app/shell/screens/tag.html' '/served/shell/screens/tag.html'; install -D -m 644 '/app/shell/screens/tag.css' '/served/shell/screens/tag.css'; install -D -m 644 '/app/shell/screens/search.html' '/served/shell/screens/search.html'; install -D -m 644 '/app/shell/screens/search.css' '/served/shell/screens/search.css'; install -D -m 644 '/app/shell/renderers/markdown.js' '/served/shell/renderers/markdown.js'; install -D -m 644 '/app/shell/shared/chrome.css' '/served/shell/shared/chrome.css'; install -D -m 644 '/app/shell/shared/system.css' '/served/shell/shared/system.css'; install -D -m 644 '/app/pipelines/favorite-recount.js' '/served/pipelines/favorite-recount.js'; install -D -m 644 '/app/messages/en.json' '/served/messages/en.json'; install -D -m 644 '/app/messages/zh.json' '/served/messages/zh.json'; install -D -m 644 '/app/messages/hi.json' '/served/messages/hi.json'; install -D -m 644 '/app/messages/es.json' '/served/messages/es.json'; install -D -m 644 '/app/messages/fr.json' '/served/messages/fr.json'; install -D -m 644 '/app/messages/ar.json' '/served/messages/ar.json'; install -D -m 644 '/app/messages/bn.json' '/served/messages/bn.json'; install -D -m 644 '/app/messages/pt.json' '/served/messages/pt.json'; install -D -m 644 '/app/messages/ru.json' '/served/messages/ru.json'; install -D -m 644 '/app/messages/ur.json' '/served/messages/ur.json'; install -D -m 644 '/app/messages/id.json' '/served/messages/id.json'; install -D -m 644 '/app/messages/de.json' '/served/messages/de.json'; install -D -m 644 '/app/messages/ja.json' '/served/messages/ja.json'; install -D -m 644 '/app/messages/sw.json' '/served/messages/sw.json'; install -D -m 644 '/app/messages/tr.json' '/served/messages/tr.json'; install -D -m 644 '/app/journal.html' '/served/docs/journal.html'; install -D -m 644 '/app/ir.html' '/served/docs/ir.html'; install -D -m 644 '/app/ir/card.css' '/served/docs/ir/card.css'; install -D -m 644 '/app/acceptance.md' '/served/docs/acceptance.md'; install -D -m 644 '/app/DESIGN.md' '/served/docs/DESIGN.md'; install -D -m 644 '/app/journal/2026-10-18-login-after-dark.png' '/served/docs/journal/2026-10-18-login-after-dark.png'; install -D -m 644 '/app/journal/2026-10-18-login-after-desktop.png' '/served/docs/journal/2026-10-18-login-after-desktop.png'; install -D -m 644 '/app/journal/2026-10-18-login-after-mobile.png' '/served/docs/journal/2026-10-18-login-after-mobile.png'; install -D -m 644 '/app/journal/2026-10-18-login-before-dark.png' '/served/docs/journal/2026-10-18-login-before-dark.png'; install -D -m 644 '/app/journal/2026-10-18-login-before-desktop.png' '/served/docs/journal/2026-10-18-login-before-desktop.png'; install -D -m 644 '/app/journal/2026-10-18-login-before-mobile.png' '/served/docs/journal/2026-10-18-login-before-mobile.png'; install -D -m 644 '/app/journal/2026-10-28-cloudflare-article.png' '/served/docs/journal/2026-10-28-cloudflare-article.png'; install -D -m 644 '/app/journal/2026-10-28-cloudflare-feed.png' '/served/docs/journal/2026-10-28-cloudflare-feed.png'; install -D -m 644 '/app/journal/2026-10-28-cloudflare-mobile.png' '/served/docs/journal/2026-10-28-cloudflare-mobile.png'; install -D -m 644 '/app/robots.txt' '/served/robots.txt'; install -D -m 644 '/app/sitemap.xml' '/served/sitemap.xml'; deno cache --frozen --config /omnishell/server/deno.json /omnishell/server/address.ts && deno run --frozen --cached-only --config /omnishell/server/deno.json --allow-read=/served --allow-write=/served,/served.scripts /omnishell/server/address.ts /served /served.scripts"
+          "RUN set -e; install -D -m 644 '/omnishell/interpreter/shell.js' '/served/omnishell/interpreter/shell.js'; install -D -m 644 '/omnishell/interpreter/chrome.js' '/served/omnishell/interpreter/chrome.js'; install -D -m 644 '/omnishell/interpreter/screen.js' '/served/omnishell/interpreter/screen.js'; install -D -m 644 '/omnishell/interpreter/fragment.js' '/served/omnishell/interpreter/fragment.js'; install -D -m 644 '/omnishell/interpreter/data-sync.js' '/served/omnishell/interpreter/data-sync.js'; install -D -m 644 '/omnishell/interpreter/validate.js' '/served/omnishell/interpreter/validate.js'; install -D -m 644 '/omnishell/interpreter/render.js' '/served/omnishell/interpreter/render.js'; install -D -m 644 '/omnishell/interpreter/release-plan.js' '/served/omnishell/interpreter/release-plan.js'; install -D -m 644 '/omnishell/interpreter/early-gestures.js' '/served/omnishell/interpreter/early-gestures.js'; install -D -m 644 '/omnishell/interpreter/early-replay.js' '/served/omnishell/interpreter/early-replay.js'; install -D -m 644 '/omnishell/interpreter/nav-feedback.js' '/served/omnishell/interpreter/nav-feedback.js'; install -D -m 644 '/omnishell/interpreter/preloads.js' '/served/omnishell/interpreter/preloads.js'; install -D -m 644 '/omnishell/interpreter/link-prefetch.js' '/served/omnishell/interpreter/link-prefetch.js'; install -D -m 644 '/omnishell/interpreter/markup.js' '/served/omnishell/interpreter/markup.js'; install -D -m 644 '/omnishell/interpreter/script-url.js' '/served/omnishell/interpreter/script-url.js'; install -D -m 644 '/omnishell/interpreter/deferred-boot.js' '/served/omnishell/interpreter/deferred-boot.js'; install -D -m 644 '/omnishell/interpreter/host-dom.js' '/served/omnishell/interpreter/host-dom.js'; install -D -m 644 '/omnishell/interpreter/hatch.js' '/served/omnishell/interpreter/hatch.js'; install -D -m 644 '/omnishell/interpreter/hatch-worker.js' '/served/omnishell/interpreter/hatch-worker.js'; install -D -m 644 '/omnishell/interpreter/hatch-presenter.js' '/served/omnishell/interpreter/hatch-presenter.js'; install -D -m 644 '/omnishell/interpreter/presenter-realm.js' '/served/omnishell/interpreter/presenter-realm.js'; install -D -m 644 '/omnishell/interpreter/presenter.js' '/served/omnishell/interpreter/presenter.js'; install -D -m 644 '/omnishell/interpreter/storybook.js' '/served/omnishell/interpreter/storybook.js'; install -D -m 644 '/omnishell/interpreter/jessie.js' '/served/omnishell/interpreter/jessie.js'; install -D -m 644 '/omnishell/interpreter/kinetic.js' '/served/omnishell/interpreter/kinetic.js'; install -D -m 644 '/omnishell/interpreter/kinetic-milestones.js' '/served/omnishell/interpreter/kinetic-milestones.js'; install -D -m 644 '/omnishell/interpreter/kinetic-session.js' '/served/omnishell/interpreter/kinetic-session.js'; install -D -m 644 '/omnishell/interpreter/kinetic-sound.js' '/served/omnishell/interpreter/kinetic-sound.js'; install -D -m 644 '/omnishell/interpreter/kinetic-mount.js' '/served/omnishell/interpreter/kinetic-mount.js'; install -D -m 644 '/omnishell/interpreter/rtc-channel.js' '/served/omnishell/interpreter/rtc-channel.js'; install -D -m 644 '/omnishell/interpreter/prng.js' '/served/omnishell/interpreter/prng.js'; install -D -m 644 '/omnishell/interpreter/vendor/mecha-client.js' '/served/omnishell/interpreter/vendor/mecha-client.js'; install -D -m 644 '/omnishell/interpreter/vendor/js-yaml.js' '/served/omnishell/interpreter/vendor/js-yaml.js'; install -D -m 644 '/omnishell/interpreter/vendor/ses.umd.min.js' '/served/omnishell/interpreter/vendor/ses.umd.min.js'; install -D -m 644 '/omnishell/interpreter/vendor/morphlex.js' '/served/omnishell/interpreter/vendor/morphlex.js'; install -D -m 644 '/omnishell/interpreter/vendor/messages.js' '/served/omnishell/interpreter/vendor/messages.js'; install -D -m 644 '/omnishell/interpreter/vendor/game-inputs.js' '/served/omnishell/interpreter/vendor/game-inputs.js'; install -D -m 644 '/omnishell/interpreter/vendor/ggrs/ggrs_wasm.js' '/served/omnishell/interpreter/vendor/ggrs/ggrs_wasm.js'; install -D -m 644 '/omnishell/interpreter/vendor/ggrs/ggrs_wasm_bg.wasm' '/served/omnishell/interpreter/vendor/ggrs/ggrs_wasm_bg.wasm'; install -D -m 644 '/omnishell/components/wallclock.js' '/served/omnishell/components/wallclock.js'; install -D -m 644 '/app/shell/index.html' '/served/shell/index.html'; install -D -m 644 '/app/shell/shell.css' '/served/shell/shell.css'; install -D -m 644 '/app/shell/boot.js' '/served/shell/boot.js'; install -D -m 644 '/app/offline-first-sw.js' '/served/offline-first-sw.js'; install -D -m 644 '/app/shell/shell.yaml' '/served/shell/shell.yaml'; install -D -m 644 '/app/shell/shell.json' '/served/shell/shell.json'; install -D -m 644 '/app/shell/design.css' '/served/shell/design.css'; install -D -m 644 '/app/shell/screens/home.html' '/served/shell/screens/home.html'; install -D -m 644 '/app/shell/screens/home.css' '/served/shell/screens/home.css'; install -D -m 644 '/app/shell/screens/feed.html' '/served/shell/screens/feed.html'; install -D -m 644 '/app/shell/screens/feed.css' '/served/shell/screens/feed.css'; install -D -m 644 '/app/shell/screens/reading-list.html' '/served/shell/screens/reading-list.html'; install -D -m 644 '/app/shell/screens/reading-list.css' '/served/shell/screens/reading-list.css'; install -D -m 644 '/app/shell/screens/editor.html' '/served/shell/screens/editor.html'; install -D -m 644 '/app/shell/screens/editor.css' '/served/shell/screens/editor.css'; install -D -m 644 '/app/shell/screens/settings.html' '/served/shell/screens/settings.html'; install -D -m 644 '/app/shell/screens/settings.css' '/served/shell/screens/settings.css'; install -D -m 644 '/app/shell/screens/older.html' '/served/shell/screens/older.html'; install -D -m 644 '/app/shell/screens/older.css' '/served/shell/screens/older.css'; install -D -m 644 '/app/shell/screens/feed-older.html' '/served/shell/screens/feed-older.html'; install -D -m 644 '/app/shell/screens/feed-older.css' '/served/shell/screens/feed-older.css'; install -D -m 644 '/app/shell/screens/article.html' '/served/shell/screens/article.html'; install -D -m 644 '/app/shell/screens/article.css' '/served/shell/screens/article.css'; install -D -m 644 '/app/shell/screens/edit-article.html' '/served/shell/screens/edit-article.html'; install -D -m 644 '/app/shell/screens/edit-article.css' '/served/shell/screens/edit-article.css'; install -D -m 644 '/app/shell/screens/profile.html' '/served/shell/screens/profile.html'; install -D -m 644 '/app/shell/screens/profile.css' '/served/shell/screens/profile.css'; install -D -m 644 '/app/shell/screens/profile-favorites.html' '/served/shell/screens/profile-favorites.html'; install -D -m 644 '/app/shell/screens/profile-favorites.css' '/served/shell/screens/profile-favorites.css'; install -D -m 644 '/app/shell/screens/tag.html' '/served/shell/screens/tag.html'; install -D -m 644 '/app/shell/screens/tag.css' '/served/shell/screens/tag.css'; install -D -m 644 '/app/shell/screens/search.html' '/served/shell/screens/search.html'; install -D -m 644 '/app/shell/screens/search.css' '/served/shell/screens/search.css'; install -D -m 644 '/app/shell/renderers/markdown.js' '/served/shell/renderers/markdown.js'; install -D -m 644 '/app/shell/shared/chrome.css' '/served/shell/shared/chrome.css'; install -D -m 644 '/app/shell/shared/system.css' '/served/shell/shared/system.css'; install -D -m 644 '/app/pipelines/favorite-recount.js' '/served/pipelines/favorite-recount.js'; install -D -m 644 '/app/messages/en.json' '/served/messages/en.json'; install -D -m 644 '/app/messages/zh.json' '/served/messages/zh.json'; install -D -m 644 '/app/messages/hi.json' '/served/messages/hi.json'; install -D -m 644 '/app/messages/es.json' '/served/messages/es.json'; install -D -m 644 '/app/messages/fr.json' '/served/messages/fr.json'; install -D -m 644 '/app/messages/ar.json' '/served/messages/ar.json'; install -D -m 644 '/app/messages/bn.json' '/served/messages/bn.json'; install -D -m 644 '/app/messages/pt.json' '/served/messages/pt.json'; install -D -m 644 '/app/messages/ru.json' '/served/messages/ru.json'; install -D -m 644 '/app/messages/ur.json' '/served/messages/ur.json'; install -D -m 644 '/app/messages/id.json' '/served/messages/id.json'; install -D -m 644 '/app/messages/de.json' '/served/messages/de.json'; install -D -m 644 '/app/messages/ja.json' '/served/messages/ja.json'; install -D -m 644 '/app/messages/sw.json' '/served/messages/sw.json'; install -D -m 644 '/app/messages/tr.json' '/served/messages/tr.json'; install -D -m 644 '/app/brief.md' '/served/docs/brief.md'; install -D -m 644 '/app/brief.html' '/served/docs/brief.html'; install -D -m 644 '/app/journal.html' '/served/docs/journal.html'; install -D -m 644 '/app/ir.html' '/served/docs/ir.html'; install -D -m 644 '/app/ir/card.css' '/served/docs/ir/card.css'; install -D -m 644 '/app/acceptance.md' '/served/docs/acceptance.md'; install -D -m 644 '/app/DESIGN.md' '/served/docs/DESIGN.md'; install -D -m 644 '/app/ir/neighbourhood-app.svg' '/served/docs/ir/neighbourhood-app.svg'; install -D -m 644 '/app/ir/neighbourhood-article.svg' '/served/docs/ir/neighbourhood-article.svg'; install -D -m 644 '/app/ir/neighbourhood-edit-article.svg' '/served/docs/ir/neighbourhood-edit-article.svg'; install -D -m 644 '/app/ir/neighbourhood-editor.svg' '/served/docs/ir/neighbourhood-editor.svg'; install -D -m 644 '/app/ir/neighbourhood-feed-older.svg' '/served/docs/ir/neighbourhood-feed-older.svg'; install -D -m 644 '/app/ir/neighbourhood-feed.svg' '/served/docs/ir/neighbourhood-feed.svg'; install -D -m 644 '/app/ir/neighbourhood-home.svg' '/served/docs/ir/neighbourhood-home.svg'; install -D -m 644 '/app/ir/neighbourhood-older.svg' '/served/docs/ir/neighbourhood-older.svg'; install -D -m 644 '/app/ir/neighbourhood-profile-favorites.svg' '/served/docs/ir/neighbourhood-profile-favorites.svg'; install -D -m 644 '/app/ir/neighbourhood-profile.svg' '/served/docs/ir/neighbourhood-profile.svg'; install -D -m 644 '/app/ir/neighbourhood-reading-list.svg' '/served/docs/ir/neighbourhood-reading-list.svg'; install -D -m 644 '/app/ir/neighbourhood-search.svg' '/served/docs/ir/neighbourhood-search.svg'; install -D -m 644 '/app/ir/neighbourhood-settings.svg' '/served/docs/ir/neighbourhood-settings.svg'; install -D -m 644 '/app/ir/neighbourhood-tag.svg' '/served/docs/ir/neighbourhood-tag.svg'; install -D -m 644 '/app/journal/2026-10-18-login-after-dark.png' '/served/docs/journal/2026-10-18-login-after-dark.png'; install -D -m 644 '/app/journal/2026-10-18-login-after-desktop.png' '/served/docs/journal/2026-10-18-login-after-desktop.png'; install -D -m 644 '/app/journal/2026-10-18-login-after-mobile.png' '/served/docs/journal/2026-10-18-login-after-mobile.png'; install -D -m 644 '/app/journal/2026-10-18-login-before-dark.png' '/served/docs/journal/2026-10-18-login-before-dark.png'; install -D -m 644 '/app/journal/2026-10-18-login-before-desktop.png' '/served/docs/journal/2026-10-18-login-before-desktop.png'; install -D -m 644 '/app/journal/2026-10-18-login-before-mobile.png' '/served/docs/journal/2026-10-18-login-before-mobile.png'; install -D -m 644 '/app/journal/2026-10-28-cloudflare-article.png' '/served/docs/journal/2026-10-28-cloudflare-article.png'; install -D -m 644 '/app/journal/2026-10-28-cloudflare-feed.png' '/served/docs/journal/2026-10-28-cloudflare-feed.png'; install -D -m 644 '/app/journal/2026-10-28-cloudflare-mobile.png' '/served/docs/journal/2026-10-28-cloudflare-mobile.png'; install -D -m 644 '/app/robots.txt' '/served/robots.txt'; install -D -m 644 '/app/sitemap.xml' '/served/sitemap.xml'; deno cache --frozen --config /omnishell/server/deno.json /omnishell/server/address.ts && deno run --frozen --cached-only --config /omnishell/server/deno.json --allow-read=/served --allow-write=/served,/served.scripts /omnishell/server/address.ts /served /served.scripts"
         ],
         "finalCopy": [
           "/served",
@@ -3334,7 +3350,7 @@
         "manual": false,
         "build": {
           "additional_contexts": {
-            "plugins_omnishell-runtime-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/omnishell:0.21.3@sha256:7ef00827641a0198cca0094402f16933541913c5f915f151bf306e3177abf1c2}${MONOREPO_COMPOSE_MODE:+:plugins_omnishell-runtime-image}"
+            "plugins_omnishell-runtime-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/omnishell:0.21.7@sha256:300583571c8a5434d59c7ada9a3b5c2f6319d5768b3950a9f06504d96237d1a8}${MONOREPO_COMPOSE_MODE:+:plugins_omnishell-runtime-image}"
           },
           "secrets": [],
           "args": {}
@@ -3477,7 +3493,7 @@
         "manual": false,
         "build": {
           "additional_contexts": {
-            "libraries_mecha-database-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-database:0.20.2@sha256:3abbb618a351692cd38272f1b2b0e61da4d40440c861ec85c99f20d0f98d2e10}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-database-image}"
+            "libraries_mecha-database-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-database:0.20.6@sha256:d3eb729237d5bcdead34c500e4f482b86f4cfce00994b98a7c5a27745880b624}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-database-image}"
           },
           "secrets": [],
           "args": {}
@@ -3705,7 +3721,7 @@
         "manual": false,
         "build": {
           "additional_contexts": {
-            "libraries_mecha-auth-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-auth:0.20.2@sha256:d58a74b1f726c815f9a39a99ca8c198d16157ff7053c486a4602a1b49644ddff}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-auth-image}"
+            "libraries_mecha-auth-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-auth:0.20.6@sha256:ef5ff16a08574ef492e82d30ac6d046761cb2482a06fcf754f7f5fe715f936ff}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-auth-image}"
           },
           "secrets": [],
           "args": {}
@@ -3846,7 +3862,7 @@
         "manual": false,
         "build": {
           "additional_contexts": {
-            "libraries_mecha-mesh-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-mesh:0.20.2@sha256:04ad88869e10f421813db7af7f32102ec233095205f37ae5f2103587e669aeb3}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-mesh-image}"
+            "libraries_mecha-mesh-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-mesh:0.20.6@sha256:04ad88869e10f421813db7af7f32102ec233095205f37ae5f2103587e669aeb3}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-mesh-image}"
           },
           "secrets": [],
           "args": {}
@@ -3993,7 +4009,7 @@
         "manual": false,
         "build": {
           "additional_contexts": {
-            "libraries_mecha-conduit-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-conduit:0.20.2@sha256:a946dec4b1ae777c86e6fbd16243458c52398352b011bddf0203058d1f0ae775}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-conduit-image}"
+            "libraries_mecha-conduit-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-conduit:0.20.6@sha256:c18a81780ff1c066c2dc2f7ed1115ac0333b28b2f6c9fe4c9390708c8f7810a1}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-conduit-image}"
           },
           "secrets": [],
           "args": {}
@@ -4246,7 +4262,7 @@
         "manual": true,
         "build": {
           "additional_contexts": {
-            "plugins_omnishell-runtime-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/omnishell:0.21.3@sha256:7ef00827641a0198cca0094402f16933541913c5f915f151bf306e3177abf1c2}${MONOREPO_COMPOSE_MODE:+:plugins_omnishell-runtime-image}"
+            "plugins_omnishell-runtime-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/omnishell:0.21.7@sha256:300583571c8a5434d59c7ada9a3b5c2f6319d5768b3950a9f06504d96237d1a8}${MONOREPO_COMPOSE_MODE:+:plugins_omnishell-runtime-image}"
           },
           "secrets": [],
           "args": {}
@@ -5538,6 +5554,16 @@
             },
             {
               "action": "rebuild",
+              "path": "../brief.md",
+              "target": "/srv/docs/brief.md"
+            },
+            {
+              "action": "rebuild",
+              "path": "../brief.html",
+              "target": "/srv/docs/brief.html"
+            },
+            {
+              "action": "rebuild",
               "path": "../journal.html",
               "target": "/srv/docs/journal.html"
             },
@@ -5560,6 +5586,76 @@
               "action": "rebuild",
               "path": "../DESIGN.md",
               "target": "/srv/docs/DESIGN.md"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-app.svg",
+              "target": "/srv/docs/ir/neighbourhood-app.svg"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-article.svg",
+              "target": "/srv/docs/ir/neighbourhood-article.svg"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-edit-article.svg",
+              "target": "/srv/docs/ir/neighbourhood-edit-article.svg"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-editor.svg",
+              "target": "/srv/docs/ir/neighbourhood-editor.svg"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-feed-older.svg",
+              "target": "/srv/docs/ir/neighbourhood-feed-older.svg"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-feed.svg",
+              "target": "/srv/docs/ir/neighbourhood-feed.svg"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-home.svg",
+              "target": "/srv/docs/ir/neighbourhood-home.svg"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-older.svg",
+              "target": "/srv/docs/ir/neighbourhood-older.svg"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-profile-favorites.svg",
+              "target": "/srv/docs/ir/neighbourhood-profile-favorites.svg"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-profile.svg",
+              "target": "/srv/docs/ir/neighbourhood-profile.svg"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-reading-list.svg",
+              "target": "/srv/docs/ir/neighbourhood-reading-list.svg"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-search.svg",
+              "target": "/srv/docs/ir/neighbourhood-search.svg"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-settings.svg",
+              "target": "/srv/docs/ir/neighbourhood-settings.svg"
+            },
+            {
+              "action": "rebuild",
+              "path": "../ir/neighbourhood-tag.svg",
+              "target": "/srv/docs/ir/neighbourhood-tag.svg"
             },
             {
               "action": "rebuild",

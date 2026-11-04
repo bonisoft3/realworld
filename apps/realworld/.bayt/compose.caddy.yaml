@@ -185,6 +185,12 @@ services:
         path: ../messages/tr.json
         target: /srv/messages/tr.json
       - action: rebuild
+        path: ../brief.md
+        target: /srv/docs/brief.md
+      - action: rebuild
+        path: ../brief.html
+        target: /srv/docs/brief.html
+      - action: rebuild
         path: ../journal.html
         target: /srv/docs/journal.html
       - action: rebuild
@@ -199,6 +205,48 @@ services:
       - action: rebuild
         path: ../DESIGN.md
         target: /srv/docs/DESIGN.md
+      - action: rebuild
+        path: ../ir/neighbourhood-app.svg
+        target: /srv/docs/ir/neighbourhood-app.svg
+      - action: rebuild
+        path: ../ir/neighbourhood-article.svg
+        target: /srv/docs/ir/neighbourhood-article.svg
+      - action: rebuild
+        path: ../ir/neighbourhood-edit-article.svg
+        target: /srv/docs/ir/neighbourhood-edit-article.svg
+      - action: rebuild
+        path: ../ir/neighbourhood-editor.svg
+        target: /srv/docs/ir/neighbourhood-editor.svg
+      - action: rebuild
+        path: ../ir/neighbourhood-feed-older.svg
+        target: /srv/docs/ir/neighbourhood-feed-older.svg
+      - action: rebuild
+        path: ../ir/neighbourhood-feed.svg
+        target: /srv/docs/ir/neighbourhood-feed.svg
+      - action: rebuild
+        path: ../ir/neighbourhood-home.svg
+        target: /srv/docs/ir/neighbourhood-home.svg
+      - action: rebuild
+        path: ../ir/neighbourhood-older.svg
+        target: /srv/docs/ir/neighbourhood-older.svg
+      - action: rebuild
+        path: ../ir/neighbourhood-profile-favorites.svg
+        target: /srv/docs/ir/neighbourhood-profile-favorites.svg
+      - action: rebuild
+        path: ../ir/neighbourhood-profile.svg
+        target: /srv/docs/ir/neighbourhood-profile.svg
+      - action: rebuild
+        path: ../ir/neighbourhood-reading-list.svg
+        target: /srv/docs/ir/neighbourhood-reading-list.svg
+      - action: rebuild
+        path: ../ir/neighbourhood-search.svg
+        target: /srv/docs/ir/neighbourhood-search.svg
+      - action: rebuild
+        path: ../ir/neighbourhood-settings.svg
+        target: /srv/docs/ir/neighbourhood-settings.svg
+      - action: rebuild
+        path: ../ir/neighbourhood-tag.svg
+        target: /srv/docs/ir/neighbourhood-tag.svg
       - action: rebuild
         path: ../journal/2026-10-18-login-after-dark.png
         target: /srv/docs/journal/2026-10-18-login-after-dark.png
