@@ -24,6 +24,7 @@ _catalogues: _ @embed(glob="messages/*.json")
 
 code: pronto.#App & {
 	meta: name:        "realworld"
+	meta: domain:      "realworld.bonisoft3.com"
 	meta: description: "A community writing space — read pieces, follow their authors, and keep the ones that matter."
 	meta: ir: sha256: "a1d0f3d05c317304ea3d2e120ba49e33b106c33c4c160e39779992d9f8e29d1f"
 	meta: targets: ["cloudflare"]
