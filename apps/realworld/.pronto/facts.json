@@ -564,7 +564,7 @@
     {"path":"shell/screens/settings.css","token":"--link-gutter"}
   ],
   "artifact": [
-    {"path":"program.cue","sha256":"ff13f0cba70a8df535efaf7e6e407706be88f259f794220cde003e9eff304df8","derived":false},
+    {"path":"program.cue","sha256":"4ba48862b46d4b3d3f95a0bdca2deb279f66ef4b6434fbf752e3b7a17db0d2dd","derived":false},
     {"path":"DESIGN.md","sha256":"2a7f91c620848c4427ef9a8641ed4b33b1c59eeeb46e3b5d9a844c4e0054142e","derived":false},
     {"path":"ir.html","sha256":"6e04ea74396deb9b9f34f6a90962856cb2720d3b9e66665b535419dc8c404597","derived":false},
     {"path":"acceptance.md","sha256":"a06ae05fa8b4680819d7c6b54fba688f89d00b52780da6d672856cd76ad22d3d","derived":false},

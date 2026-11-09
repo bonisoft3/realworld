@@ -1576,6 +1576,10 @@
   "hatches": {},
   "rawMigrations": [
     {
+      "name": "003_rls.sql",
+      "src": "services/database/sql/003_rls.txt"
+    },
+    {
       "name": "011_owner_writes.sql",
       "src": "services/database/sql/011_owner_writes.sql"
     },

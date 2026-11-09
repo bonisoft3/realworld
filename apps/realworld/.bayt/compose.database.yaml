@@ -42,6 +42,9 @@ services:
         path: ../services/database/migrations/008_publication.sql
         target: /docker-entrypoint-initdb.d
       - action: rebuild
+        path: ../services/database/migrations/003_rls.sql
+        target: /docker-entrypoint-initdb.d
+      - action: rebuild
         path: ../services/database/migrations/011_owner_writes.sql
         target: /docker-entrypoint-initdb.d
       - action: rebuild
