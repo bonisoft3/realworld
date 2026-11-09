@@ -512,11 +512,11 @@
   font-size: .6875rem; letter-spacing: .08em; text-transform: uppercase;
   padding: var(--sp-sm) var(--sp-md); }
 [data-screen="article"] .earlier-piece { display: flex; align-items: baseline;
-  justify-content: space-between; gap: var(--sp-md);
+  justify-content: space-between; gap: var(--sp-md); min-width: 0;
   background: var(--surface); color: var(--primary); text-decoration: none;
   padding: 11px var(--sp-md); }
 [data-screen="article"] .earlier-piece:hover { background: var(--surface-muted); }
-[data-screen="article"] .earlier-title { min-width: 0; }
+[data-screen="article"] .earlier-title { min-width: 0; overflow-wrap: anywhere; }
 [data-screen="article"] .earlier-meta { flex: none; color: var(--secondary);
   white-space: nowrap; }
 

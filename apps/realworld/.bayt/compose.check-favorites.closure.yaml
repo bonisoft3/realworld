@@ -38,6 +38,8 @@ include:
   required: false
 - path: .././.bayt/compose.check-favorites.yaml
   required: false
+- path: .././.bayt/compose.ci-android.yaml
+  required: false
 - path: ../monorepo/${MONOREPO_COMPOSE_MODE:-docker-image}.yaml
   required: false
 services:

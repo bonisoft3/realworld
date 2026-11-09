@@ -25,6 +25,3 @@ _baytData: _ @embed(file="bayt.json")
 
 project: _realworld
 _realworld: bayt.#project & _baytData
-
-depManifestsIn: {[string]: _}
-_render: (bayt.#render & {project: _realworld, depManifests: depManifestsIn})

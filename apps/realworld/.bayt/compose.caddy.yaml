@@ -281,8 +281,12 @@ services:
         path: ../sitemap.xml
         target: /srv/sitemap.xml
     environment:
-      ELECTRIC_SECRET: ${ELECTRIC_SECRET:-dev-electric-secret}
+      PORT: "8080"
       ORIGIN: ${ORIGIN:-https://localhost:${CADDY_TLS_HOST_PORT:-17995}}
+      ELECTRIC_SECRET: ${ELECTRIC_SECRET:-dev-electric-secret}
+      PRONTO_UPSTREAM_CRUD: crud:3000
+      PRONTO_UPSTREAM_ELECTRIC: electric:3000
+      PRONTO_UPSTREAM_AUTH: auth:9999
     healthcheck:
       test:
       - CMD

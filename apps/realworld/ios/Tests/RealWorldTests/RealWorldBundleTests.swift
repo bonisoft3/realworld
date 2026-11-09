@@ -152,6 +152,9 @@ struct RealWorldBundleTests {
             try await Task.sleep(nanoseconds: 50_000_000)
         }
         #expect(editorLoaded == true)
+        for field in ["title", "description", "body", "cover_url", "cover_credit", "tags"] {
+            #expect(app.uiAst.contains("\"id\":\"\(field)\""))
+        }
 
         let publishUrl = "pronto://event/PUBLISH_ARTICLE?title=My+First+SDUI+Article&description=Testing+article+creation&body=This+is+a+new+article+created+natively.&tags=sdui+native"
         _ = app.actionHandler.handleAction(publishUrl)

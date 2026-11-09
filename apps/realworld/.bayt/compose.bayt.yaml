@@ -22,27 +22,29 @@ include:
   required: false
 - path: ./compose.served.yaml
   required: false
-- path: ./compose.database.yaml
-  required: false
-- path: ./compose.auth.yaml
-  required: false
-- path: ./compose.mesh-events.yaml
-  required: false
-- path: ./compose.conduit.yaml
-  required: false
-- path: ./compose.check-favorites.yaml
-  required: false
-- path: ./compose.ci-favorites.yaml
-  required: false
 - path: ./compose.caddy.yaml
   required: false
+- path: ./compose.database.yaml
+  required: false
 - path: ./compose.crud.yaml
+  required: false
+- path: ./compose.auth.yaml
   required: false
 - path: ./compose.electric.yaml
   required: false
 - path: ./compose.redis.yaml
   required: false
+- path: ./compose.mesh-events.yaml
+  required: false
+- path: ./compose.conduit.yaml
+  required: false
 - path: ./compose.transform.yaml
+  required: false
+- path: ./compose.check-favorites.yaml
+  required: false
+- path: ./compose.ci-favorites.yaml
+  required: false
+- path: ./compose.ci-android.yaml
   required: false
 - path: ../monorepo/${MONOREPO_COMPOSE_MODE:-docker-image}.yaml
   required: false

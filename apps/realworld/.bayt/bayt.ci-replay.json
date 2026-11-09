@@ -2,9 +2,10 @@
   "_generated_from": "bayt.cue (do not edit)",
   "dockerfile": {
     "preamble": [
-      "ENV PATH=/root/.local/bin:/root/.local/share/lazybox/bin:$PATH",
+      "ENV PATH=/root/.local/bin:/root/.local/share/mise/shims:/root/.local/share/lazybox/bin:$PATH",
       "ENV MISE_TRUSTED_CONFIG_PATHS=/monorepo",
-      "ENV CADDY_TLS_HOST_PORT=8443"
+      "ENV CADDY_TLS_HOST_PORT=8443",
+      "RUN printf '#!/bin/sh\\nexit 0\\n' > /usr/local/bin/task && chmod 755 /usr/local/bin/task"
     ],
     "preambleCopyContexts": [],
     "from": {

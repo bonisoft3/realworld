@@ -201,4 +201,20 @@ class RealWorldBundleTest {
 
         composeApp.onActionTriggered("pronto://event/TOGGLE_FAVORITE?slug=how-to-build-local-first-pronto-divkit")
     }
+
+    @Test
+    fun testEditorProjectsAllMarkupInputsWithZeroOmissions() = runBlocking {
+        app.dispatchAction("pronto://event/NAVIGATE?screen=editor")
+
+        var retries = 0
+        while (!app.uiAst.value.contains("Writing as @jessie") && retries < 25) {
+            delay(50)
+            retries++
+        }
+
+        val ast = app.uiAst.value
+        for (field in listOf("title", "description", "body", "cover_url", "cover_credit", "tags")) {
+            assertTrue(ast.contains("\"id\":\"$field\""), "Missing editor input field: $field")
+        }
+    }
 }

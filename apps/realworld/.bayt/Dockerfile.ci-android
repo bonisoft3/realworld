@@ -1,0 +1,38 @@
+# generated from bayt.cue — do not edit
+FROM eclipse-temurin:21.0.13_9-jdk-noble@sha256:114cabb73033ca4ce7ceec3deb62396bc1b716282bae051ed3c1d82e38fcab2d AS ci-android
+ARG BAYT_DIR
+WORKDIR /monorepo/${BAYT_DIR}
+COPY --from=workspaceroot-pronto-sources_srcs /monorep[o] /monorepo/
+COPY --parents src/test/**/*.java src/test/**/*.kt src/test/resources/**/* src/test/**/*.sql android/build.gradle.kts android/settings.gradle.kts android/gradlew android/gradle/**/* android/src/**/* android/app/**/* android/bundle/**/* ./
+RUN --mount=type=cache,target=/root/.gradle,id=realworld:/root/.gradle,sharing=locked --mount=type=cache,target=.gradle/configuration-cache,id=realworld-ci-android:.gradle/configuration-cache,sharing=locked cd android && ./gradlew :android:test :test --build-cache --no-daemon
+COPY .bayt/Taskfile.yml .bayt/Taskfile.bayt.yml .bayt/Taskfile.ci-android.yaml .bayt/bayt.ci-android.json ./.bayt/
+
+FROM busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223 AS ci-android_ctxs
+ARG BAYT_DIR
+WORKDIR /monorepo/${BAYT_DIR}
+COPY --parents src/test/**/*.java src/test/**/*.kt src/test/resources/**/* src/test/**/*.sql android/build.gradle.kts android/settings.gradle.kts android/gradlew android/gradle/**/* android/src/**/* android/app/**/* android/bundle/**/* ./
+ARG SOURCE_DATE_EPOCH
+ARG BAYT_CLAMP=1
+RUN if [ "${BAYT_CLAMP:-1}" != 0 ]; then find /monorepo/${BAYT_DIR} -exec touch -hd @${SOURCE_DATE_EPOCH:-0} {} + && { d=$(dirname /monorepo/${BAYT_DIR}); while [ "$d" != / ]; do touch -hd @${SOURCE_DATE_EPOCH:-0} "$d" || exit; d=$(dirname "$d"); done; }; fi
+FROM scratch AS ci-android_srcs
+COPY --from=ci-android_ctxs /monorepo /monorepo
+
+FROM busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223 AS ci-android_outs_ctxs
+ARG BAYT_DIR
+WORKDIR /monorepo/${BAYT_DIR}
+COPY --from=realworld-ci-android --parents /monorepo/${BAYT_DIR:+${BAYT_DIR}/}build/test-results/test/**/*.xml /monorepo/${BAYT_DIR:+${BAYT_DIR}/}build/reports/tests/test/**/* /
+ARG SOURCE_DATE_EPOCH
+ARG BAYT_CLAMP=1
+RUN if [ "${BAYT_CLAMP:-1}" != 0 ]; then find /monorepo/${BAYT_DIR} -exec touch -hd @${SOURCE_DATE_EPOCH:-0} {} + && { d=$(dirname /monorepo/${BAYT_DIR}); while [ "$d" != / ]; do touch -hd @${SOURCE_DATE_EPOCH:-0} "$d" || exit; d=$(dirname "$d"); done; }; fi
+FROM scratch AS ci-android_outs
+COPY --from=ci-android_outs_ctxs /monorepo /monorepo
+
+FROM busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223 AS ci-android_bayt_ctxs
+ARG BAYT_DIR
+WORKDIR /monorepo/${BAYT_DIR}
+COPY --parents .bayt/compose.ci-android.yaml .bayt/Dockerfile.ci-android .bayt/bayt.ci-android.json .bayt/Taskfile.yml .bayt/Taskfile.bayt.yml .bayt/Taskfile.ci-android.yaml .bayt/process-compose.yaml ./
+ARG SOURCE_DATE_EPOCH
+ARG BAYT_CLAMP=1
+RUN if [ "${BAYT_CLAMP:-1}" != 0 ]; then find /monorepo/${BAYT_DIR} -exec touch -hd @${SOURCE_DATE_EPOCH:-0} {} + && { d=$(dirname /monorepo/${BAYT_DIR}); while [ "$d" != / ]; do touch -hd @${SOURCE_DATE_EPOCH:-0} "$d" || exit; d=$(dirname "$d"); done; }; fi
+FROM scratch AS ci-android_bayt
+COPY --from=ci-android_bayt_ctxs /monorepo /monorepo

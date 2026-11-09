@@ -93,13 +93,13 @@ routes:
       key: nav_home
       label: Community
     files:
-      html: shell/screens/home.html
-      css: shell/screens/home.css
-      handlers: []
       adapters: []
+      handlers: []
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
+      html: shell/screens/home.html
+      css: shell/screens/home.css
     ssr: spa
     states:
       - loading
@@ -115,13 +115,13 @@ routes:
       key: nav_feed
       label: Your Feed
     files:
-      html: shell/screens/feed.html
-      css: shell/screens/feed.css
-      handlers: []
       adapters: []
+      handlers: []
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
+      html: shell/screens/feed.html
+      css: shell/screens/feed.css
     ssr: spa
     states:
       - loading
@@ -134,13 +134,13 @@ routes:
       key: nav_reading_list
       label: Saved
     files:
-      html: shell/screens/reading-list.html
-      css: shell/screens/reading-list.css
-      handlers: []
       adapters: []
+      handlers: []
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
+      html: shell/screens/reading-list.html
+      css: shell/screens/reading-list.css
     ssr: spa
     states:
       - loading
@@ -154,13 +154,13 @@ routes:
       key: nav_editor
       label: New Article
     files:
-      html: shell/screens/editor.html
-      css: shell/screens/editor.css
-      handlers: []
       adapters: []
+      handlers: []
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
+      html: shell/screens/editor.html
+      css: shell/screens/editor.css
     ssr: spa
     states:
       - loading
@@ -174,13 +174,13 @@ routes:
       label: Settings
       strip: false
     files:
-      html: shell/screens/settings.html
-      css: shell/screens/settings.css
-      handlers: []
       adapters: []
+      handlers: []
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
+      html: shell/screens/settings.html
+      css: shell/screens/settings.css
     ssr: spa
     states:
       - loading
@@ -193,13 +193,13 @@ routes:
     nav:
       label: Older writing
     files:
-      html: shell/screens/older.html
-      css: shell/screens/older.css
-      handlers: []
       adapters: []
+      handlers: []
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
+      html: shell/screens/older.html
+      css: shell/screens/older.css
     ssr: spa
     states:
       - loading
@@ -212,13 +212,13 @@ routes:
     nav:
       label: Older in your feed
     files:
-      html: shell/screens/feed-older.html
-      css: shell/screens/feed-older.css
-      handlers: []
       adapters: []
+      handlers: []
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
+      html: shell/screens/feed-older.html
+      css: shell/screens/feed-older.css
     ssr: spa
     states:
       - loading
@@ -230,15 +230,15 @@ routes:
     nav:
       label: Article
     files:
-      html: shell/screens/article.html
-      css: shell/screens/article.css
-      handlers: []
       adapters: []
+      handlers: []
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
       renderers:
         - shell/renderers/markdown.js
+      html: shell/screens/article.html
+      css: shell/screens/article.css
     ssr: spa
     states:
       - loading
@@ -255,13 +255,13 @@ routes:
     nav:
       label: Edit Article
     files:
-      html: shell/screens/edit-article.html
-      css: shell/screens/edit-article.css
-      handlers: []
       adapters: []
+      handlers: []
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
+      html: shell/screens/edit-article.html
+      css: shell/screens/edit-article.css
     ssr: spa
     states:
       - loading
@@ -276,13 +276,13 @@ routes:
     nav:
       label: Profile
     files:
-      html: shell/screens/profile.html
-      css: shell/screens/profile.css
-      handlers: []
       adapters: []
+      handlers: []
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
+      html: shell/screens/profile.html
+      css: shell/screens/profile.css
     ssr: spa
     states:
       - loading
@@ -296,13 +296,13 @@ routes:
     nav:
       label: Favorited
     files:
-      html: shell/screens/profile-favorites.html
-      css: shell/screens/profile-favorites.css
-      handlers: []
       adapters: []
+      handlers: []
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
+      html: shell/screens/profile-favorites.html
+      css: shell/screens/profile-favorites.css
     ssr: spa
     states:
       - loading
@@ -315,13 +315,13 @@ routes:
     nav:
       label: Tag
     files:
-      html: shell/screens/tag.html
-      css: shell/screens/tag.css
-      handlers: []
       adapters: []
+      handlers: []
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
+      html: shell/screens/tag.html
+      css: shell/screens/tag.css
     ssr: spa
     states:
       - loading
@@ -333,13 +333,13 @@ routes:
     nav:
       label: Search
     files:
-      html: shell/screens/search.html
-      css: shell/screens/search.css
-      handlers: []
       adapters: []
+      handlers: []
       shared:
         - shell/shared/chrome.css
         - shell/shared/system.css
+      html: shell/screens/search.html
+      css: shell/screens/search.css
     ssr: spa
     states:
       - loading

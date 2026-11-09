@@ -6,21 +6,25 @@
     "build": {
       "additional_contexts": {
         "workspaceroot-pronto-sources_srcs": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:workspaceroot-pronto-sources_srcs}",
-        "libraries_mecha-airlock-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-airlock-image_bayt}",
+        "libraries_mecha-database-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-database-image_bayt}",
+        "libraries_mecha-extensions-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-extensions-image_bayt}",
+        "libraries_mecha-mesh-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-mesh-image_bayt}",
+        "libraries_mecha-conduit-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-conduit-image_bayt}",
         "libraries_mecha-auth-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-auth-image_bayt}",
+        "libraries_mecha-ticker-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-ticker-image_bayt}",
         "libraries_mecha-clock-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-clock-image_bayt}",
         "libraries_mecha-compute-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-compute-image_bayt}",
-        "libraries_mecha-conduit-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-conduit-image_bayt}",
-        "libraries_mecha-database-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-database-image_bayt}",
-        "libraries_mecha-mesh-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-mesh-image_bayt}",
-        "libraries_mecha-ticker-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-ticker-image_bayt}",
+        "libraries_mecha-airlock-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-airlock-image_bayt}",
+        "libraries_mecha-activepieces-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-activepieces-image_bayt}",
         "libraries_mecha-database-image_srcs": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-database-image_srcs}",
+        "libraries_mecha-extensions-image_srcs": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-extensions-image_srcs}",
         "libraries_mecha-mesh-image_srcs": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-mesh-image_srcs}",
         "libraries_mecha-auth-image_srcs": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-auth-image_srcs}",
         "libraries_mecha-ticker-image_srcs": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-ticker-image_srcs}",
         "libraries_mecha-clock-image_srcs": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-clock-image_srcs}",
         "libraries_mecha-compute-image_srcs": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-compute-image_srcs}",
         "libraries_mecha-airlock-image_srcs": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-airlock-image_srcs}",
+        "libraries_mecha-activepieces-image_srcs": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-activepieces-image_srcs}",
         "plugins_omnishell-runtime-image_srcs": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:plugins_omnishell-runtime-image_srcs}",
         "plugins_omnishell-runtime-image_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:plugins_omnishell-runtime-image_bayt}",
         "workspaceroot-pronto-sources_bayt": "${MONOREPO_COMPOSE_MODE:-docker-image://busybox:musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223}${MONOREPO_COMPOSE_MODE:+:workspaceroot-pronto-sources_bayt}"
@@ -49,12 +53,13 @@
       "ARG MONOREPO_COMPOSE_MODE",
       "ENV MONOREPO_COMPOSE_MODE=$MONOREPO_COMPOSE_MODE",
       "ARG BAYT_RUNTIME",
-      "ENV BAYT_RUNTIME=$BAYT_RUNTIME"
+      "ENV BAYT_RUNTIME=$BAYT_RUNTIME",
+      "ENV FELDERA_COMPILATION_PROFILE=unoptimized"
     ],
     "preambleCopyContexts": [
       {
         "name": "bayt",
-        "image": "bonitao/bayt-runtime:1.2.2@sha256:a2e08b0fd123349e30e28843665ab2a2fde9fe25fddf82919fe499f3f01f1b8f"
+        "image": "bonitao/bayt-runtime:1.3.0@sha256:c33b9187787fcbd5fa80f1f2f52c661d6e7c38a4822c269b8daff83e70dce22e"
       },
       {
         "name": "alpine/socat:1.8.0.0@sha256:a6be4c0262b339c53ddad723cdd178a1a13271e1137c65e27f90a08c16de02b8"
@@ -133,6 +138,30 @@
     "extra_hosts": [],
     "epilogue": [],
     "copy": [
+      {
+        "from": {
+          "name": "libraries_mecha-activepieces-image_bayt"
+        },
+        "srcs": [
+          "/monorep[o]"
+        ],
+        "dst": "/monorepo/",
+        "link": true,
+        "parents": false,
+        "exclude": []
+      },
+      {
+        "from": {
+          "name": "libraries_mecha-activepieces-image_srcs"
+        },
+        "srcs": [
+          "/monorep[o]"
+        ],
+        "dst": "/monorepo/",
+        "link": true,
+        "parents": false,
+        "exclude": []
+      },
       {
         "from": {
           "name": "libraries_mecha-airlock-image_bayt"
@@ -256,6 +285,30 @@
       {
         "from": {
           "name": "libraries_mecha-database-image_srcs"
+        },
+        "srcs": [
+          "/monorep[o]"
+        ],
+        "dst": "/monorepo/",
+        "link": true,
+        "parents": false,
+        "exclude": []
+      },
+      {
+        "from": {
+          "name": "libraries_mecha-extensions-image_bayt"
+        },
+        "srcs": [
+          "/monorep[o]"
+        ],
+        "dst": "/monorepo/",
+        "link": true,
+        "parents": false,
+        "exclude": []
+      },
+      {
+        "from": {
+          "name": "libraries_mecha-extensions-image_srcs"
         },
         "srcs": [
           "/monorep[o]"
@@ -434,9 +487,13 @@
       },
       "upClosure": [
         "./.bayt/compose.ci.yaml",
+        "./.bayt/compose.ci-android.yaml",
         "./.bayt/compose.ci-visual.yaml",
         "./.bayt/compose.integrate.yaml",
         "./.bayt/compose.launch.yaml",
+        "./.bayt/compose.build.yaml",
+        "./.bayt/compose.generate.yaml",
+        "./.bayt/compose.setup.yaml",
         "./.bayt/compose.caddy.yaml",
         "./.bayt/compose.crud.yaml",
         "./.bayt/compose.database.yaml",
@@ -448,7 +505,6 @@
         "./.bayt/compose.transform.yaml",
         "./.bayt/compose.auth.yaml",
         "./.bayt/compose.ci-replay.yaml",
-        "./.bayt/compose.setup.yaml",
         "./.bayt/compose.ci-favorites.yaml",
         "./.bayt/compose.check-favorites.yaml"
       ]
@@ -479,9 +535,13 @@
       },
       "upClosure": [
         "./.bayt/compose.ci.yaml",
+        "./.bayt/compose.ci-android.yaml",
         "./.bayt/compose.ci-visual.yaml",
         "./.bayt/compose.integrate.yaml",
         "./.bayt/compose.launch.yaml",
+        "./.bayt/compose.build.yaml",
+        "./.bayt/compose.generate.yaml",
+        "./.bayt/compose.setup.yaml",
         "./.bayt/compose.caddy.yaml",
         "./.bayt/compose.crud.yaml",
         "./.bayt/compose.database.yaml",
@@ -493,7 +553,6 @@
         "./.bayt/compose.transform.yaml",
         "./.bayt/compose.auth.yaml",
         "./.bayt/compose.ci-replay.yaml",
-        "./.bayt/compose.setup.yaml",
         "./.bayt/compose.ci-favorites.yaml",
         "./.bayt/compose.check-favorites.yaml"
       ]
@@ -517,32 +576,276 @@
       "visibility": "internal",
       "deps": [],
       "transitiveDeps": [
-        "ci-visual_srcs_srcs",
-        "ci-visual_bayt_srcs",
-        "ci-replay_srcs_srcs",
-        "ci-replay_bayt_srcs",
-        "ci-favorites_srcs_srcs",
-        "ci-favorites_bayt_srcs",
-        "integrate_srcs_srcs_srcs",
-        "integrate_bayt_srcs_srcs",
-        "database_srcs_srcs_srcs",
-        "caddy_srcs_srcs_srcs",
-        "conduit_srcs_srcs_srcs",
-        "transform_srcs_srcs_srcs",
-        "served_srcs_srcs_srcs",
-        "launch_outs_srcs_srcs_srcs",
-        "crud_outs_srcs_srcs_srcs",
-        "served_outs_srcs_srcs_srcs",
-        "database_outs_srcs_srcs_srcs",
-        "mesh-events_outs_srcs_srcs_srcs",
-        "redis_outs_srcs_srcs_srcs",
-        "database_srcs_srcs",
-        "setup_srcs_srcs",
-        "check-favorites_srcs_srcs_srcs",
-        "check-favorites_bayt_srcs_srcs",
-        "setup_srcs_srcs_srcs"
+        "ci-android_srcs",
+        "ci-visual_srcs",
+        "ci-replay_srcs",
+        "ci-favorites_srcs",
+        "integrate_srcs",
+        "database_srcs",
+        "caddy_srcs",
+        "conduit_srcs",
+        "transform_srcs",
+        "served_srcs",
+        "setup_srcs",
+        "check-favorites_srcs"
       ],
-      "transitiveCrossDeps": [],
+      "transitiveCrossDeps": [
+        {
+          "project": "realworld",
+          "name": "ci-android_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "src/test/**/*.java",
+              "src/test/**/*.kt",
+              "src/test/resources/**/*",
+              "src/test/**/*.sql",
+              "android/build.gradle.kts",
+              "android/settings.gradle.kts",
+              "android/gradlew",
+              "android/gradle/**/*",
+              "android/src/**/*",
+              "android/app/**/*",
+              "android/bundle/**/*"
+            ],
+            "exclude": []
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "ci-replay_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              ".bayt/process-compose.yaml",
+              ".pronto/cluster.json",
+              "services/database/migrations/**",
+              "tests/[r]eplay.json",
+              "tests/[r]eplay/**"
+            ],
+            "exclude": []
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "integrate_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "tests/visual-fixture.ts",
+              "shell/shell.yaml",
+              "shell/screens/home.html",
+              "shell/screens/home.css",
+              "shell/screens/feed.html",
+              "shell/screens/feed.css",
+              "shell/screens/reading-list.html",
+              "shell/screens/reading-list.css",
+              "shell/screens/editor.html",
+              "shell/screens/editor.css",
+              "shell/screens/settings.html",
+              "shell/screens/settings.css",
+              "shell/screens/older.html",
+              "shell/screens/older.css",
+              "shell/screens/feed-older.html",
+              "shell/screens/feed-older.css",
+              "shell/screens/article.html",
+              "shell/screens/article.css",
+              "shell/screens/edit-article.html",
+              "shell/screens/edit-article.css",
+              "shell/screens/profile.html",
+              "shell/screens/profile.css",
+              "shell/screens/profile-favorites.html",
+              "shell/screens/profile-favorites.css",
+              "shell/screens/tag.html",
+              "shell/screens/tag.css",
+              "shell/screens/search.html",
+              "shell/screens/search.css"
+            ],
+            "exclude": []
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "database_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "services/database/migrations/000_extensions.sql",
+              "services/database/migrations/001_roles.sql",
+              "services/database/migrations/002_grants.sql",
+              "services/database/migrations/004_types.sql",
+              "services/database/migrations/005_create_tables.sql",
+              "services/database/migrations/006_policies.sql",
+              "services/database/migrations/007_txid.sql",
+              "services/database/migrations/008_publication.sql",
+              "services/database/migrations/011_owner_writes.sql",
+              "services/database/migrations/012_me_readonly.sql",
+              "services/database/migrations/013_article_tag_sync.sql",
+              "services/database/migrations/014_me_provision.sql",
+              "services/database/migrations/015_default_privileges.sql",
+              "services/database/migrations/016_edge_projections.sql",
+              "services/database/migrations/017_demo_content.sql",
+              "services/database/migrations/018_favorite_guard.sql"
+            ],
+            "exclude": []
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "caddy_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "docker/Caddyfile"
+            ],
+            "exclude": []
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "conduit_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "docker/conduit-pipeline.yaml"
+            ],
+            "exclude": []
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "transform_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "docker/realworld-favorite-recount.yaml",
+              "docker/realworld-favorite-count.yaml",
+              "docker/realworld-favorite-index.yaml",
+              "docker/realworld-tag-recount.yaml"
+            ],
+            "exclude": []
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "served_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "shell/index.html",
+              "shell/shell.css",
+              "shell/boot.js",
+              "offline-first-sw.js",
+              "shell/shell.yaml",
+              "shell/shell.json",
+              "shell/design.css",
+              "shell/screens/home.html",
+              "shell/screens/home.css",
+              "shell/screens/feed.html",
+              "shell/screens/feed.css",
+              "shell/screens/reading-list.html",
+              "shell/screens/reading-list.css",
+              "shell/screens/editor.html",
+              "shell/screens/editor.css",
+              "shell/screens/settings.html",
+              "shell/screens/settings.css",
+              "shell/screens/older.html",
+              "shell/screens/older.css",
+              "shell/screens/feed-older.html",
+              "shell/screens/feed-older.css",
+              "shell/screens/article.html",
+              "shell/screens/article.css",
+              "shell/screens/edit-article.html",
+              "shell/screens/edit-article.css",
+              "shell/screens/profile.html",
+              "shell/screens/profile.css",
+              "shell/screens/profile-favorites.html",
+              "shell/screens/profile-favorites.css",
+              "shell/screens/tag.html",
+              "shell/screens/tag.css",
+              "shell/screens/search.html",
+              "shell/screens/search.css",
+              "shell/renderers/markdown.js",
+              "shell/shared/chrome.css",
+              "shell/shared/system.css",
+              "pipelines/favorite-recount.js",
+              "messages/en.json",
+              "messages/zh.json",
+              "messages/hi.json",
+              "messages/es.json",
+              "messages/fr.json",
+              "messages/ar.json",
+              "messages/bn.json",
+              "messages/pt.json",
+              "messages/ru.json",
+              "messages/ur.json",
+              "messages/id.json",
+              "messages/de.json",
+              "messages/ja.json",
+              "messages/sw.json",
+              "messages/tr.json",
+              "brief.md",
+              "brief.html",
+              "journal.html",
+              "ir.html",
+              "ir/card.css",
+              "acceptance.md",
+              "DESIGN.md",
+              "ir/neighbourhood-app.svg",
+              "ir/neighbourhood-article.svg",
+              "ir/neighbourhood-edit-article.svg",
+              "ir/neighbourhood-editor.svg",
+              "ir/neighbourhood-feed-older.svg",
+              "ir/neighbourhood-feed.svg",
+              "ir/neighbourhood-home.svg",
+              "ir/neighbourhood-older.svg",
+              "ir/neighbourhood-profile-favorites.svg",
+              "ir/neighbourhood-profile.svg",
+              "ir/neighbourhood-reading-list.svg",
+              "ir/neighbourhood-search.svg",
+              "ir/neighbourhood-settings.svg",
+              "ir/neighbourhood-tag.svg",
+              "journal/2026-10-18-login-after-dark.png",
+              "journal/2026-10-18-login-after-desktop.png",
+              "journal/2026-10-18-login-after-mobile.png",
+              "journal/2026-10-18-login-before-dark.png",
+              "journal/2026-10-18-login-before-desktop.png",
+              "journal/2026-10-18-login-before-mobile.png",
+              "journal/2026-10-28-cloudflare-article.png",
+              "journal/2026-10-28-cloudflare-feed.png",
+              "journal/2026-10-28-cloudflare-mobile.png",
+              "robots.txt",
+              "sitemap.xml"
+            ],
+            "exclude": []
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "setup_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "[m]ise.toml",
+              "[.]mise.toml",
+              "[m]ise.lock",
+              "[.]tool-versions"
+            ],
+            "exclude": []
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "check-favorites_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "tests/**"
+            ],
+            "exclude": []
+          }
+        }
+      ],
       "chainedDeps": [],
       "cmds": [],
       "cache": {
@@ -551,9 +854,13 @@
       },
       "upClosure": [
         "./.bayt/compose.ci.yaml",
+        "./.bayt/compose.ci-android.yaml",
         "./.bayt/compose.ci-visual.yaml",
         "./.bayt/compose.integrate.yaml",
         "./.bayt/compose.launch.yaml",
+        "./.bayt/compose.build.yaml",
+        "./.bayt/compose.generate.yaml",
+        "./.bayt/compose.setup.yaml",
         "./.bayt/compose.caddy.yaml",
         "./.bayt/compose.crud.yaml",
         "./.bayt/compose.database.yaml",
@@ -565,7 +872,6 @@
         "./.bayt/compose.transform.yaml",
         "./.bayt/compose.auth.yaml",
         "./.bayt/compose.ci-replay.yaml",
-        "./.bayt/compose.setup.yaml",
         "./.bayt/compose.ci-favorites.yaml",
         "./.bayt/compose.check-favorites.yaml"
       ]
@@ -579,6 +885,8 @@
   "visibility": "internal",
   "emitsSrcs": true,
   "deps": [
+    "ci-android_srcs",
+    "ci-android_bayt",
     "ci-visual_srcs",
     "ci-visual_bayt",
     "ci-replay_srcs",
@@ -587,6 +895,8 @@
     "ci-favorites_bayt"
   ],
   "sameProjectDeps": [
+    "ci-android_srcs",
+    "ci-android_bayt",
     "ci-visual_srcs",
     "ci-visual_bayt",
     "ci-replay_srcs",
@@ -595,37 +905,33 @@
     "ci-favorites_bayt"
   ],
   "transitiveDeps": [
+    "ci-android_srcs",
+    "ci-android_bayt",
     "ci-visual_srcs",
     "ci-visual_bayt",
     "ci-replay_srcs",
     "ci-replay_bayt",
     "ci-favorites_srcs",
     "ci-favorites_bayt",
-    "integrate_srcs_srcs",
-    "integrate_bayt_srcs",
-    "database_srcs_srcs",
-    "caddy_srcs_srcs",
-    "conduit_srcs_srcs",
-    "transform_srcs_srcs",
-    "served_srcs_srcs",
-    "launch_outs_srcs_srcs",
-    "crud_outs_srcs_srcs",
-    "served_outs_srcs_srcs",
-    "database_outs_srcs_srcs",
-    "mesh-events_outs_srcs_srcs",
-    "redis_outs_srcs_srcs",
+    "integrate_srcs",
     "database_srcs",
+    "caddy_srcs",
+    "conduit_srcs",
+    "transform_srcs",
+    "served_srcs",
     "setup_srcs",
-    "check-favorites_srcs_srcs",
-    "check-favorites_bayt_srcs",
-    "setup_srcs_srcs"
+    "check-favorites_srcs"
   ],
   "transitiveCrossDeps": [],
   "upClosure": [
     "./.bayt/compose.ci.yaml",
+    "./.bayt/compose.ci-android.yaml",
     "./.bayt/compose.ci-visual.yaml",
     "./.bayt/compose.integrate.yaml",
     "./.bayt/compose.launch.yaml",
+    "./.bayt/compose.build.yaml",
+    "./.bayt/compose.generate.yaml",
+    "./.bayt/compose.setup.yaml",
     "./.bayt/compose.caddy.yaml",
     "./.bayt/compose.crud.yaml",
     "./.bayt/compose.database.yaml",
@@ -637,11 +943,48 @@
     "./.bayt/compose.transform.yaml",
     "./.bayt/compose.auth.yaml",
     "./.bayt/compose.ci-replay.yaml",
-    "./.bayt/compose.setup.yaml",
     "./.bayt/compose.ci-favorites.yaml",
     "./.bayt/compose.check-favorites.yaml"
   ],
   "chainedDeps": [
+    {
+      "name": "ci-android_srcs",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [
+          "src/test/**/*.java",
+          "src/test/**/*.kt",
+          "src/test/resources/**/*",
+          "src/test/**/*.sql",
+          "android/build.gradle.kts",
+          "android/settings.gradle.kts",
+          "android/gradlew",
+          "android/gradle/**/*",
+          "android/src/**/*",
+          "android/app/**/*",
+          "android/bundle/**/*"
+        ],
+        "exclude": []
+      }
+    },
+    {
+      "name": "ci-android_bayt",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [
+          ".bayt/compose.ci-android.yaml",
+          ".bayt/Dockerfile.ci-android",
+          ".bayt/bayt.ci-android.json",
+          ".bayt/Taskfile.yml",
+          ".bayt/Taskfile.bayt.yml",
+          ".bayt/Taskfile.ci-android.yaml",
+          ".bayt/process-compose.yaml"
+        ],
+        "exclude": []
+      }
+    },
     {
       "name": "ci-visual_srcs",
       "project": "realworld",
@@ -727,6 +1070,44 @@
       }
     },
     {
+      "name": "integrate_srcs",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [
+          "tests/visual-fixture.ts",
+          "shell/shell.yaml",
+          "shell/screens/home.html",
+          "shell/screens/home.css",
+          "shell/screens/feed.html",
+          "shell/screens/feed.css",
+          "shell/screens/reading-list.html",
+          "shell/screens/reading-list.css",
+          "shell/screens/editor.html",
+          "shell/screens/editor.css",
+          "shell/screens/settings.html",
+          "shell/screens/settings.css",
+          "shell/screens/older.html",
+          "shell/screens/older.css",
+          "shell/screens/feed-older.html",
+          "shell/screens/feed-older.css",
+          "shell/screens/article.html",
+          "shell/screens/article.css",
+          "shell/screens/edit-article.html",
+          "shell/screens/edit-article.css",
+          "shell/screens/profile.html",
+          "shell/screens/profile.css",
+          "shell/screens/profile-favorites.html",
+          "shell/screens/profile-favorites.css",
+          "shell/screens/tag.html",
+          "shell/screens/tag.css",
+          "shell/screens/search.html",
+          "shell/screens/search.css"
+        ],
+        "exclude": []
+      }
+    },
+    {
       "name": "database_srcs",
       "project": "realworld",
       "dir": ".",
@@ -753,6 +1134,136 @@
       }
     },
     {
+      "name": "caddy_srcs",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [
+          "docker/Caddyfile"
+        ],
+        "exclude": []
+      }
+    },
+    {
+      "name": "conduit_srcs",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [
+          "docker/conduit-pipeline.yaml"
+        ],
+        "exclude": []
+      }
+    },
+    {
+      "name": "transform_srcs",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [
+          "docker/realworld-favorite-recount.yaml",
+          "docker/realworld-favorite-count.yaml",
+          "docker/realworld-favorite-index.yaml",
+          "docker/realworld-tag-recount.yaml"
+        ],
+        "exclude": []
+      }
+    },
+    {
+      "name": "served_srcs",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [
+          "shell/index.html",
+          "shell/shell.css",
+          "shell/boot.js",
+          "offline-first-sw.js",
+          "shell/shell.yaml",
+          "shell/shell.json",
+          "shell/design.css",
+          "shell/screens/home.html",
+          "shell/screens/home.css",
+          "shell/screens/feed.html",
+          "shell/screens/feed.css",
+          "shell/screens/reading-list.html",
+          "shell/screens/reading-list.css",
+          "shell/screens/editor.html",
+          "shell/screens/editor.css",
+          "shell/screens/settings.html",
+          "shell/screens/settings.css",
+          "shell/screens/older.html",
+          "shell/screens/older.css",
+          "shell/screens/feed-older.html",
+          "shell/screens/feed-older.css",
+          "shell/screens/article.html",
+          "shell/screens/article.css",
+          "shell/screens/edit-article.html",
+          "shell/screens/edit-article.css",
+          "shell/screens/profile.html",
+          "shell/screens/profile.css",
+          "shell/screens/profile-favorites.html",
+          "shell/screens/profile-favorites.css",
+          "shell/screens/tag.html",
+          "shell/screens/tag.css",
+          "shell/screens/search.html",
+          "shell/screens/search.css",
+          "shell/renderers/markdown.js",
+          "shell/shared/chrome.css",
+          "shell/shared/system.css",
+          "pipelines/favorite-recount.js",
+          "messages/en.json",
+          "messages/zh.json",
+          "messages/hi.json",
+          "messages/es.json",
+          "messages/fr.json",
+          "messages/ar.json",
+          "messages/bn.json",
+          "messages/pt.json",
+          "messages/ru.json",
+          "messages/ur.json",
+          "messages/id.json",
+          "messages/de.json",
+          "messages/ja.json",
+          "messages/sw.json",
+          "messages/tr.json",
+          "brief.md",
+          "brief.html",
+          "journal.html",
+          "ir.html",
+          "ir/card.css",
+          "acceptance.md",
+          "DESIGN.md",
+          "ir/neighbourhood-app.svg",
+          "ir/neighbourhood-article.svg",
+          "ir/neighbourhood-edit-article.svg",
+          "ir/neighbourhood-editor.svg",
+          "ir/neighbourhood-feed-older.svg",
+          "ir/neighbourhood-feed.svg",
+          "ir/neighbourhood-home.svg",
+          "ir/neighbourhood-older.svg",
+          "ir/neighbourhood-profile-favorites.svg",
+          "ir/neighbourhood-profile.svg",
+          "ir/neighbourhood-reading-list.svg",
+          "ir/neighbourhood-search.svg",
+          "ir/neighbourhood-settings.svg",
+          "ir/neighbourhood-tag.svg",
+          "journal/2026-10-18-login-after-dark.png",
+          "journal/2026-10-18-login-after-desktop.png",
+          "journal/2026-10-18-login-after-mobile.png",
+          "journal/2026-10-18-login-before-dark.png",
+          "journal/2026-10-18-login-before-desktop.png",
+          "journal/2026-10-18-login-before-mobile.png",
+          "journal/2026-10-28-cloudflare-article.png",
+          "journal/2026-10-28-cloudflare-feed.png",
+          "journal/2026-10-28-cloudflare-mobile.png",
+          "robots.txt",
+          "sitemap.xml"
+        ],
+        "exclude": []
+      }
+    },
+    {
       "name": "setup_srcs",
       "project": "realworld",
       "dir": ".",
@@ -762,6 +1273,17 @@
           "[.]mise.toml",
           "[m]ise.lock",
           "[.]tool-versions"
+        ],
+        "exclude": []
+      }
+    },
+    {
+      "name": "check-favorites_srcs",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [
+          "tests/**"
         ],
         "exclude": []
       }
@@ -777,7 +1299,7 @@
         "defaultGlobs": null,
         "defaultExclude": null
       },
-      "do": "set -eu\nexport DOCKER_HOST_TCP=\"$DOCKER_HOST\"\nexport DEPOT_DISABLE_OTEL=1\ndocker compose --profile '*' config -o /tmp/ci-compose.yaml\ndocker buildx bake --allow=fs.read=/ -f /tmp/ci-compose.yaml --print ci-visual ci-replay ci-favorites > /tmp/ci-bake.json\nfor target in ci-visual ci-replay ci-favorites; do\n docker buildx bake -f /tmp/ci-bake.json --progress plain --set '*.output=type=cacheonly' ${SAYT_NO_CACHE:+--no-cache --set \"*.cache-from=\" --set \"*.cache-to=\"} ${SAYT_NO_CACHE_FROM:+--set \"*.cache-from=\"} ${SAYT_NO_CACHE_TO:+--set \"*.cache-to=\"} \"$target\"\ndone",
+      "do": "set -eu\nexport DOCKER_HOST_TCP=\"$DOCKER_HOST\"\nexport DEPOT_DISABLE_OTEL=1\ndocker compose --profile '*' config -o /tmp/ci-compose.yaml\ndocker buildx bake --allow=fs.read=/ -f /tmp/ci-compose.yaml --print ci-android ci-visual ci-replay ci-favorites > /tmp/ci-bake.json\nfor target in ci-android ci-visual ci-replay ci-favorites; do\n docker buildx bake -f /tmp/ci-bake.json --progress plain --set '*.output=type=cacheonly' ${SAYT_NO_CACHE:+--no-cache --set \"*.cache-from=\" --set \"*.cache-to=\"} ${SAYT_NO_CACHE_FROM:+--set \"*.cache-from=\"} ${SAYT_NO_CACHE_TO:+--set \"*.cache-to=\"} \"$target\"\ndone",
       "shell": "sh",
       "dockerfile": {
         "inject": {

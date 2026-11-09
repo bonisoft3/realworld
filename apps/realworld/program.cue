@@ -10,7 +10,11 @@
 
 package realworld
 
-import "bonisoft.org/plugins/pronto"
+import (
+	bayt "bonisoft.org/plugins/bayt/core:bayt"
+	Gradle "bonisoft.org/plugins/bayt/stacks/gradle"
+	"bonisoft.org/plugins/pronto"
+)
 
 // Both appearances carry the same token names — appearance is a token resolution, never a state
 // (accept-dual-appearance) — which #Design's closed dark twin guarantees
@@ -73,7 +77,7 @@ code: pronto.#App & {
 	capabilities: blobs: false
 
 	// The app is served to a native host as well as a browser, so every route
-	// owes its web affordances a native peer and check-parity holds it to that.
+	// projects deterministically to DivKit (phone) and winio (desktop) via project-native.
 	capabilities: native: true
 
 	// Assembly SQL beyond the schema vocabulary: the three composite uniques
@@ -1592,7 +1596,36 @@ loop: surface: checks: "edge-projections": {
 	note: "edge projections and favorite ownership"
 }
 
+loop: surface: checks: "android": {
+	verb: "integrate"
+	cmds: ["use integrate.nu; integrate --bake --no-up --target ci-android"]
+	note: "RealWorld and Omnishell Android host suites over QuickJS, SQLite, Filament kinetic presenter, and DivKit SDUI projection"
+}
+
 build: (pronto.#DefaultBuild & {"code": code, "loop": loop, "cluster": cluster, "terminal": terminal}).out
+
+build: project: targets: "ci-android": Gradle.test & {
+	activate: ""
+	taskfile: incremental: false
+	srcs: globs: [
+		"android/build.gradle.kts",
+		"android/settings.gradle.kts",
+		"android/gradlew",
+		"android/gradle/**/*",
+		"android/src/**/*",
+		"android/app/**/*",
+		"android/bundle/**/*",
+	]
+	dockerfile: {
+		from: name: "eclipse-temurin:21.0.13_9-jdk-noble@sha256:114cabb73033ca4ce7ceec3deb62396bc1b716282bae051ed3c1d82e38fcab2d"
+		copy: [{from: {name: "workspaceroot-pronto-sources_srcs"}, srcs: ["/monorep[o]"], dst: "/monorepo/"}]
+	}
+	compose: build: additional_contexts: "workspaceroot-pronto-sources_srcs": "${MONOREPO_COMPOSE_MODE:-docker-image://\(bayt.lock.images.busybox)}${MONOREPO_COMPOSE_MODE:+:workspaceroot-pronto-sources_srcs}"
+	cmd: "builtin": {
+		shell: "sh"
+		do:    "cd android && ./gradlew :android:test :test --build-cache --no-daemon"
+	}
+}
 
 // The visual checker resolves route parameters from the same stack it photographs.
 build: project: targets: "integrate": {

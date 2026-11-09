@@ -77,48 +77,6 @@ services:
     profiles:
     - served
     scale: 1
-  database:
-    extends:
-      file: ./compose.database.yaml
-      service: realworld-database
-    profiles:
-    - database
-    scale: 1
-  auth:
-    extends:
-      file: ./compose.auth.yaml
-      service: realworld-auth
-    profiles:
-    - auth
-    scale: 1
-  mesh-events:
-    extends:
-      file: ./compose.mesh-events.yaml
-      service: realworld-mesh-events
-    profiles:
-    - mesh-events
-    scale: 1
-  conduit:
-    extends:
-      file: ./compose.conduit.yaml
-      service: realworld-conduit
-    profiles:
-    - conduit
-    scale: 1
-  check-favorites:
-    extends:
-      file: ./compose.check-favorites.yaml
-      service: realworld-check-favorites
-    profiles:
-    - check-favorites
-    scale: 1
-  ci-favorites:
-    extends:
-      file: ./compose.ci-favorites.yaml
-      service: realworld-ci-favorites
-    profiles:
-    - ci-favorites
-    scale: 1
   caddy:
     extends:
       file: ./compose.caddy.yaml
@@ -126,12 +84,26 @@ services:
     profiles:
     - caddy
     scale: 1
+  database:
+    extends:
+      file: ./compose.database.yaml
+      service: realworld-database
+    profiles:
+    - database
+    scale: 1
   crud:
     extends:
       file: ./compose.crud.yaml
       service: realworld-crud
     profiles:
     - crud
+    scale: 1
+  auth:
+    extends:
+      file: ./compose.auth.yaml
+      service: realworld-auth
+    profiles:
+    - auth
     scale: 1
   electric:
     extends:
@@ -147,10 +119,45 @@ services:
     profiles:
     - redis
     scale: 1
+  mesh-events:
+    extends:
+      file: ./compose.mesh-events.yaml
+      service: realworld-mesh-events
+    profiles:
+    - mesh-events
+    scale: 1
+  conduit:
+    extends:
+      file: ./compose.conduit.yaml
+      service: realworld-conduit
+    profiles:
+    - conduit
+    scale: 1
   transform:
     extends:
       file: ./compose.transform.yaml
       service: realworld-transform
     profiles:
     - transform
+    scale: 1
+  check-favorites:
+    extends:
+      file: ./compose.check-favorites.yaml
+      service: realworld-check-favorites
+    profiles:
+    - check-favorites
+    scale: 1
+  ci-favorites:
+    extends:
+      file: ./compose.ci-favorites.yaml
+      service: realworld-ci-favorites
+    profiles:
+    - ci-favorites
+    scale: 1
+  ci-android:
+    extends:
+      file: ./compose.ci-android.yaml
+      service: realworld-ci-android
+    profiles:
+    - ci-android
     scale: 1

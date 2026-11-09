@@ -64,6 +64,7 @@ services:
   realworld-launch_bayt:
     build:
       additional_contexts:
+        realworld-build_bayt: service:realworld-build_bayt
         realworld-caddy_bayt: service:realworld-caddy_bayt
         realworld-database_bayt: service:realworld-database_bayt
         realworld-crud_bayt: service:realworld-crud_bayt
