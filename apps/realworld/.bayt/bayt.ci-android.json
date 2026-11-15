@@ -221,6 +221,7 @@
         "defaultGlobs": null,
         "defaultExclude": null
       },
+      "name": "builtin",
       "shell": "sh",
       "do": "cd android && ./gradlew :android:test :test --build-cache --no-daemon",
       "windows": {
@@ -243,7 +244,6 @@
           }
         ]
       },
-      "name": "builtin",
       "stop": false
     }
   ],

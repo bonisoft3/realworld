@@ -15,6 +15,22 @@
    "Community", and dressing a destination as a logo would put the brand's
    voice on a word that is not the brand — the masthead on home is where
    "Conduit" is said, once (decision-design-identity). */
+body > nav {
+  --shell-nav-gap: var(--sp-md);
+  --shell-nav-pad: var(--sp-sm) var(--sp-lg);
+  --shell-nav-radius: 0;
+  --shell-nav-hover-bg: transparent;
+  --shell-nav-active-bg: transparent;
+  --shell-nav-active-shadow: none;
+  --shell-nav-link-pad-x: 0;
+  --shell-nav-link-pad-y: 0;
+  --shell-nav-me-pad: 0;
+  --shell-nav-me-rule: 0;
+  --shell-nav-btn-border: 0;
+  --shell-nav-btn-pad-x: 0;
+  --shell-nav-btn-pad-y: 0;
+}
+
 body > nav > a:first-child {
   color: var(--primary); font-weight: 700; margin-inline-end: var(--sp-sm); }
 

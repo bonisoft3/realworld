@@ -5,7 +5,7 @@
     "manual": false,
     "build": {
       "additional_contexts": {
-        "libraries_mecha-conduit-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-conduit:0.22.0@sha256:66ff44e36bbc9e18858a56ee17c17b9a1746960c1817fec38fbf11d4c3d2eef1}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-conduit-image}"
+        "libraries_mecha-conduit-image": "${MONOREPO_COMPOSE_MODE:-docker-image://bonitao/mecha-conduit:0.23.1@sha256:922b908bf57ac1fdd195c414aa352d180956d3636e6ee4168f1cafa9a51a7327}${MONOREPO_COMPOSE_MODE:+:libraries_mecha-conduit-image}"
       },
       "secrets": [],
       "args": {}
@@ -227,8 +227,8 @@
         "./.bayt/compose.mesh-events.yaml",
         "./.bayt/compose.caddy.yaml",
         "./.bayt/compose.crud.yaml",
-        "./.bayt/compose.served.yaml",
-        "./.bayt/compose.redis.yaml"
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.served.yaml"
       ]
     },
     "outs": {
@@ -261,8 +261,8 @@
         "./.bayt/compose.mesh-events.yaml",
         "./.bayt/compose.caddy.yaml",
         "./.bayt/compose.crud.yaml",
-        "./.bayt/compose.served.yaml",
-        "./.bayt/compose.redis.yaml"
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.served.yaml"
       ]
     },
     "srcs": {
@@ -297,8 +297,8 @@
         "./.bayt/compose.mesh-events.yaml",
         "./.bayt/compose.caddy.yaml",
         "./.bayt/compose.crud.yaml",
-        "./.bayt/compose.served.yaml",
-        "./.bayt/compose.redis.yaml"
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.served.yaml"
       ]
     }
   },
@@ -323,8 +323,8 @@
     "./.bayt/compose.mesh-events.yaml",
     "./.bayt/compose.caddy.yaml",
     "./.bayt/compose.crud.yaml",
-    "./.bayt/compose.served.yaml",
-    "./.bayt/compose.redis.yaml"
+    "./.bayt/compose.redis.yaml",
+    "./.bayt/compose.served.yaml"
   ],
   "chainedDeps": [
     {

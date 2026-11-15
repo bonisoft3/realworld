@@ -1,7 +1,6 @@
 # generated from bayt.cue — do not edit
 tasks:
   default:
-    run: once
     cmds:
     - cmd: pwsh -c ".\\gradlew.bat --init-script .bayt/init.gradle.kts test"
       platforms:
@@ -12,4 +11,5 @@ tasks:
     - cmd: sh -c "cd android && ./gradlew :android:test :test --build-cache --no-daemon"
       platforms:
       - darwin
+    run: once
 version: "3"

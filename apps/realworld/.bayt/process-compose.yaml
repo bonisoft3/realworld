@@ -1,8 +1,6 @@
 # generated from bayt.cue — do not edit
 version: "0.5"
 ordered_shutdown: true
-environment:
-- MISE_LOCKED=0
 processes:
   "launch:build":
     entrypoint:
@@ -106,6 +104,26 @@ processes:
     environment:
     - APP_URL=https://localhost:${CADDY_TLS_HOST_PORT:-17995}
     - SETTLE_TIMEOUT_MS=50000
+  check-favorites:
+    depends_on:
+      launch:
+        condition: process_healthy
+    entrypoint:
+    - mise
+    - x
+    - --
+    - nu
+    - -c
+    - >-
+      deno run --config tests/deno.json --no-lock --allow-env --allow-read
+      --allow-net --unsafely-ignore-certificate-errors=caddy,localhost,127.0.0.1
+      tests/favorites.ts .
+    availability:
+      exit_on_skipped: true
+    environment:
+    - APP_URL=https://localhost:${CADDY_TLS_HOST_PORT:-17995}
+    - DOOR=http://127.0.0.1:${CADDY_HTTP_PORT:-27909}
+    - ORIGIN=${ORIGIN:-https://localhost:${CADDY_TLS_HOST_PORT:-17995}}
   caddy:
     depends_on:
       crud:
@@ -118,7 +136,7 @@ processes:
     - --
     - nu
     - -c
-    - "let origin = ($$env.ORIGIN? | default \"\"); let h = ($$origin | str replace -r '^https?://' ''); if ($$h == $$origin) or ($$h | is-empty) or ($$h !~ '^[A-Za-z0-9.:-]+$$') { print -e $$\"ORIGIN '($$origin)' is no origin: set it to the scheme and host readers reach the door at, as https://app.example\"; exit 1 }; let p = (if ($$h | str contains \":\") { $$h | split row \":\" | last } else { \"8443\" }); let tls_port = (if (($$env.CADDY_TLS_HOST_PORT? | default \"\") != \"\") { $$env.CADDY_TLS_HOST_PORT } else { $$p }); let work = ($$env.BAYT_LOCAL_WORK_DIR? | default $$nu.temp-dir); let cdir = ($$work | path join $$\"caddy-($$nu.pid)-(random int 1000..9999)\"); mkdir ($$cdir | path join \"data\") ($$cdir | path join \"config\"); let env_file = ($$cdir | path join \"env\"); let certs = (($$env.CADDY_CERT_DIR? | default \".certs\") | path expand | str replace -a (char -u 5c) '/'); let served_dir = ($$env.BAYT_LOCAL_SERVED_DIR? | default \"\"); let is_local = (($$served_dir != \"\") and (($$served_dir | path join \"srv\") | path exists)); let cfg_src = (if $$is_local { 'docker/Caddyfile' } else { ($$env.CADDY_CONFIG_FILE? | default (if ('docker/Caddyfile' | path exists) { 'docker/Caddyfile' } else { \"/etc/caddy/Caddyfile\" })) }); mut env_lines = [$$\"CADDY_TLS_HOST_PORT=($$tls_port)\"]; mut extra_env = { XDG_DATA_HOME: ($$cdir | path join \"data\"), XDG_CONFIG_HOME: ($$cdir | path join \"config\"), CADDY_TLS_HOST_PORT: $$tls_port }; if $$is_local { let served_fwd = ($$served_dir | path expand | str replace -a (char -u 5c) '/'); let srv_root = $$\"($$served_fwd)/srv\"; let omni_root = $$\"($$served_fwd)/omnishell\"; $$env_lines = ($$env_lines | append [$$\"CADDY_DOOR_PORT=($$tls_port)\" $$\"PRONTO_SRV_ROOT=($$srv_root)\" $$\"PRONTO_OMNISHELL_ROOT=($$omni_root)\"]); $$extra_env = ($$extra_env | merge { CADDY_DOOR_PORT: $$tls_port, PRONTO_SRV_ROOT: $$srv_root, PRONTO_OMNISHELL_ROOT: $$omni_root }) }; if (($$certs | path join \"localhost.pem\") | path exists) { let tv = $$\"($$certs)/localhost.pem ($$certs)/localhost-key.pem\"; $$env_lines = ($$env_lines | append $$\"CADDY_TLS=($$tv)\"); $$extra_env = ($$extra_env | merge { CADDY_TLS: $$tv }) }; let sfile = ($$env.CADDY_SCRIPTS_FILE? | default (if (($$env.BAYT_LOCAL_SERVED_DIR? | default \"\") != \"\") { ($$env.BAYT_LOCAL_SERVED_DIR | path join \"caddy/release-scripts\") } else { \"/etc/caddy/release-scripts\" })); let rel = (if ($$sfile | path exists) { open --raw $$sfile | str trim } else { \"\" }); $$env_lines = ($$env_lines | append $$\"PRONTO_RELEASE_SCRIPTS=($$rel)\"); $$extra_env = ($$extra_env | merge { PRONTO_RELEASE_SCRIPTS: $$rel }); ($$env_lines | str join (char nl)) + (char nl) | save -f $$env_file; with-env $$extra_env { let adapted = (^caddy adapt --envfile $$env_file --config $$cfg_src --adapter caddyfile); let roots = ($$adapted | split row \",\" | parse -r '\"root\":\"(?<r>[^\"]+)\"' | get -o r | default [] | uniq); for r in $$roots { if ($$r | path exists) { glob ($$r | path join \"**/*\" | str replace -a (char -u 5c) '/') | where ($$it | path type) == \"file\" and (not ($$it | str ends-with \".etag\")) | each {|f| let etag = $$\"($$f).etag\"; if (not ($$etag | path exists)) { let d = (open --raw $$f | hash sha256); ((char dquote) + $$d + (char dquote)) | save --raw -f $$etag } } | ignore } }; exec caddy run --envfile $$env_file --config $$cfg_src --adapter caddyfile }"
+    - "let origin = ($$env.ORIGIN? | default \"\"); let h = ($$origin | str replace -r '^https?://' ''); if ($$h == $$origin) or ($$h | is-empty) or ($$h !~ '^[A-Za-z0-9.:-]+$$') { print -e $$\"ORIGIN '($$origin)' is no origin: set it to the scheme and host readers reach the door at, as https://app.example\"; exit 1 }; let p = (if ($$h | str contains \":\") { $$h | split row \":\" | last } else { \"8443\" }); let tls_port = (if (($$env.CADDY_TLS_HOST_PORT? | default \"\") != \"\") { $$env.CADDY_TLS_HOST_PORT } else { $$p }); let work = ($$env.BAYT_LOCAL_WORK_DIR? | default $$nu.temp-dir); let cdir = ($$work | path join $$\"caddy-($$nu.pid)-(random int 1000..9999)\"); mkdir ($$cdir | path join \"data\") ($$cdir | path join \"config\"); let env_file = ($$cdir | path join \"env\"); let certs = (($$env.CADDY_CERT_DIR? | default \".certs\") | path expand | str replace -a (char -u 5c) '/'); let served_dir = ($$env.BAYT_LOCAL_SERVED_DIR? | default \"\"); let is_local = (($$served_dir != \"\") and (($$served_dir | path join \"srv\") | path exists)); let cfg_src = (if $$is_local { 'docker/Caddyfile' } else { ($$env.CADDY_CONFIG_FILE? | default (if ('docker/Caddyfile' | path exists) { 'docker/Caddyfile' } else { \"/etc/caddy/Caddyfile\" })) }); mut env_lines = [$$\"CADDY_TLS_HOST_PORT=($$tls_port)\"]; mut extra_env = { XDG_DATA_HOME: ($$env.CADDY_DATA_HOME? | default ($$cdir | path join \"data\")), XDG_CONFIG_HOME: ($$cdir | path join \"config\"), CADDY_TLS_HOST_PORT: $$tls_port }; if $$is_local { let served_fwd = ($$served_dir | path expand | str replace -a (char -u 5c) '/'); let srv_root = $$\"($$served_fwd)/srv\"; let omni_root = $$\"($$served_fwd)/omnishell\"; $$env_lines = ($$env_lines | append [$$\"CADDY_DOOR_PORT=($$tls_port)\" $$\"PRONTO_SRV_ROOT=($$srv_root)\" $$\"PRONTO_OMNISHELL_ROOT=($$omni_root)\"]); $$extra_env = ($$extra_env | merge { CADDY_DOOR_PORT: $$tls_port, PRONTO_SRV_ROOT: $$srv_root, PRONTO_OMNISHELL_ROOT: $$omni_root }) }; if (($$certs | path join \"localhost.pem\") | path exists) { let tv = $$\"($$certs)/localhost.pem ($$certs)/localhost-key.pem\"; $$env_lines = ($$env_lines | append $$\"CADDY_TLS=($$tv)\"); $$extra_env = ($$extra_env | merge { CADDY_TLS: $$tv }) }; let sfile = ($$env.CADDY_SCRIPTS_FILE? | default (if (($$env.BAYT_LOCAL_SERVED_DIR? | default \"\") != \"\") { ($$env.BAYT_LOCAL_SERVED_DIR | path join \"caddy/release-scripts\") } else { \"/etc/caddy/release-scripts\" })); let rel = (if ($$sfile | path exists) { open --raw $$sfile | str trim } else { \"\" }); $$env_lines = ($$env_lines | append $$\"PRONTO_RELEASE_SCRIPTS=($$rel)\"); $$extra_env = ($$extra_env | merge { PRONTO_RELEASE_SCRIPTS: $$rel }); ($$env_lines | str join (char nl)) + (char nl) | save -f $$env_file; with-env $$extra_env { let adapted = (^caddy adapt --envfile $$env_file --config $$cfg_src --adapter caddyfile); let roots = ($$adapted | split row \",\" | parse -r '\"root\":\"(?<r>[^\"]+)\"' | get -o r | default [] | uniq); for r in $$roots { if ($$r | path exists) { glob ($$r | path join \"**/*\" | str replace -a (char -u 5c) '/') | where ($$it | path type) == \"file\" and (not ($$it | str ends-with \".etag\")) | each {|f| let etag = $$\"($$f).etag\"; if (not ($$etag | path exists)) { let d = (open --raw $$f | hash sha256); ((char dquote) + $$d + (char dquote)) | save --raw -f $$etag } } | ignore } }; exec caddy run --envfile $$env_file --config $$cfg_src --adapter caddyfile }"
     availability:
       exit_on_skipped: true
     environment:
@@ -173,6 +191,77 @@ processes:
     shutdown:
       signal: 2
       timeout_seconds: 5
+  auth:
+    depends_on:
+      database:
+        condition: process_healthy
+    entrypoint:
+    - mise
+    - x
+    - --
+    - nu
+    - -c
+    - >-
+      let app = (if (($$env.AUTH_APP_DIR? | default '') != '') { $$env.AUTH_APP_DIR }
+      else if ('/app/main.ts' | path exists) { '/app' } else if
+      ('services/auth/main.ts' | path exists) { 'services/auth' } else { ((^mise where github:bonisoft3/mecha
+      | str trim) | path join 'services/auth') }); exec deno run --allow-net
+      --allow-env --config ($$app | path join 'deno.json') ($$app | path join 'main.ts')
+    availability:
+      exit_on_skipped: true
+    environment:
+    - AUTH_STATEMENT_TIMEOUT_MS=5000
+    - >-
+      DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@127.0.0.1:${DATABASE_PG_PORT:-19241}/${POSTGRES_DB:-realworld}
+    - OIDC_PROVIDERS=
+    - PGRST_JWT_SECRET=${PGRST_JWT_SECRET:-mecha-dev-secret-please-override-32ch}
+    - PORT=${AUTH_HTTP_PORT:-28423}
+    - WEBAUTHN_ORIGIN=${WEBAUTHN_ORIGIN:-https://localhost:*}
+    - WEBAUTHN_RP_ID=${WEBAUTHN_RP_ID:-localhost}
+  mesh-events:
+    depends_on:
+      caddy:
+        condition: process_started
+      redis:
+        condition: process_started
+      "bayt:portcheck":
+        condition: process_completed_successfully
+    entrypoint:
+    - mise
+    - x
+    - --
+    - nu
+    - -c
+    - >-
+      let base = ($$env.BAYT_LOCAL_WORK_DIR? | default $$nu.temp-dir); let dir =
+      ($$base | path join $$'mesh-events-($$nu.pid)-(random int 1000..9999)'); mkdir $$dir;
+      let mdir = (if (($$env.MECHA_MESH_DIR? | default '') != '') {
+      $$env.MECHA_MESH_DIR } else if ('services/mesh/dapr/components/resiliency.yaml' | path exists) {
+      'services/mesh' } else { ((^mise where github:bonisoft3/mecha | str trim) | path
+      join 'services/mesh') }); cp -f ($$mdir | path join
+      'dapr/components/resiliency.yaml') ($$dir | path join 'resiliency.yaml'); cp -f ($$mdir | path join
+      'dapr/components/redis-streams.yaml') ($$dir | path join 'redis-streams.yaml'); exec daprd
+      --app-id mechaed --dapr-listen-addresses 127.0.0.1
+      --dapr-internal-grpc-listen-address 127.0.0.1 --resources-path $$dir --app-channel-address 127.0.0.1 --app-port
+      $$env.CADDY_PORT --dapr-http-port $$env.DAPR_HTTP_PORT --dapr-grpc-port 0
+      --dapr-internal-grpc-port $$env.DAPR_INTERNAL_GRPC_PORT --metrics-port 0 --profile-port 0
+      --log-level info --enable-api-logging
+    availability:
+      exit_on_skipped: true
+      restart: on_failure
+      backoff_seconds: 1
+      max_restarts: 15
+    environment:
+    - CADDY_PORT=${CADDY_HTTP_PORT:-27909}
+    - DAPR_HTTP_PORT=${MESH_EVENTS_HTTP_PORT:-11857}
+    - DAPR_INTERNAL_GRPC_PORT=${MESH_EVENTS_GRPC_PORT:-22192}
+    - REDIS_HOST=127.0.0.1:${REDIS_REDIS_PORT:-18884}
+    readiness_probe:
+      exec:
+        command: bayt microcheck portcheck --port ${MESH_EVENTS_HTTP_PORT:-11857}
+      period_seconds: 5
+      timeout_seconds: 5
+      failure_threshold: 36
   crud:
     depends_on:
       database:
@@ -204,10 +293,14 @@ processes:
       period_seconds: 5
       timeout_seconds: 5
       failure_threshold: 36
-  auth:
+  conduit:
     depends_on:
       database:
         condition: process_healthy
+      mesh-events:
+        condition: process_started
+      "bayt:httpcheck":
+        condition: process_completed_successfully
     entrypoint:
     - mise
     - x
@@ -215,22 +308,32 @@ processes:
     - nu
     - -c
     - >-
-      let app = (if (($$env.AUTH_APP_DIR? | default '') != '') { $$env.AUTH_APP_DIR }
-      else if ('/app/main.ts' | path exists) { '/app' } else if
-      ('services/auth/main.ts' | path exists) { 'services/auth' } else { ((^mise where github:bonisoft3/mecha
-      | str trim) | path join 'services/auth') }); exec deno run --allow-net
-      --allow-env --config ($$app | path join 'deno.json') ($$app | path join 'main.ts')
+      let base = ($$env.BAYT_LOCAL_WORK_DIR? | default $$nu.temp-dir); let dir =
+      ($$base | path join $$'conduit-($$nu.pid)-(random int 1000..9999)'); mkdir ($$dir |
+      path join 'pipelines') ($$dir | path join 'connectors'); let conn = (which
+      conduit-connector-http | first | get path); cp -f $$conn ($$dir | path join 'connectors'
+      ($$conn | path basename)); open --raw 'docker/conduit-pipeline.yaml' | str
+      replace -a '$${DATABASE_URL}' $$env.DATABASE_URL | str replace -a
+      '$${MESH_EVENTS_URL}' $$env.MESH_EVENTS_URL | save -f ($$dir | path join
+      'pipelines/cdc-to-bus.yaml'); exec conduit run --db.type inmemory --pipelines.path ($$dir | path join
+      'pipelines') --connectors.path ($$dir | path join 'connectors') --api.http.address
+      $$"127.0.0.1:($$env.CONDUIT_API_HTTP_ADDRESS_PORT)" --api.grpc.address '127.0.0.1:0'
     availability:
       exit_on_skipped: true
+      restart: on_failure
+      backoff_seconds: 1
+      max_restarts: 15
     environment:
-    - AUTH_STATEMENT_TIMEOUT_MS=5000
+    - CONDUIT_API_HTTP_ADDRESS_PORT=${CONDUIT_HTTP_PORT:-15878}
     - >-
       DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@127.0.0.1:${DATABASE_PG_PORT:-19241}/${POSTGRES_DB:-realworld}
-    - OIDC_PROVIDERS=
-    - PGRST_JWT_SECRET=${PGRST_JWT_SECRET:-mecha-dev-secret-please-override-32ch}
-    - PORT=${AUTH_HTTP_PORT:-28423}
-    - WEBAUTHN_ORIGIN=${WEBAUTHN_ORIGIN:-https://localhost:*}
-    - WEBAUTHN_RP_ID=${WEBAUTHN_RP_ID:-localhost}
+    - MESH_EVENTS_URL=http://127.0.0.1:${MESH_EVENTS_HTTP_PORT:-11857}
+    readiness_probe:
+      exec:
+        command: bayt microcheck httpcheck http://127.0.0.1:${CONDUIT_HTTP_PORT:-15878}/healthz
+      period_seconds: 5
+      timeout_seconds: 5
+      failure_threshold: 44
   electric:
     depends_on:
       database:
@@ -296,91 +399,6 @@ processes:
       period_seconds: 5
       timeout_seconds: 3
       failure_threshold: 36
-  mesh-events:
-    depends_on:
-      caddy:
-        condition: process_started
-      redis:
-        condition: process_started
-      "bayt:portcheck":
-        condition: process_completed_successfully
-    entrypoint:
-    - mise
-    - x
-    - --
-    - nu
-    - -c
-    - >-
-      let base = ($$env.BAYT_LOCAL_WORK_DIR? | default $$nu.temp-dir); let dir =
-      ($$base | path join $$'mesh-events-($$nu.pid)-(random int 1000..9999)'); mkdir $$dir;
-      let mdir = (if (($$env.MECHA_MESH_DIR? | default '') != '') {
-      $$env.MECHA_MESH_DIR } else if ('services/mesh/dapr/components/resiliency.yaml' | path exists) {
-      'services/mesh' } else { ((^mise where github:bonisoft3/mecha | str trim) | path
-      join 'services/mesh') }); cp -f ($$mdir | path join
-      'dapr/components/resiliency.yaml') ($$dir | path join 'resiliency.yaml'); cp -f ($$mdir | path join
-      'dapr/components/redis-streams.yaml') ($$dir | path join 'redis-streams.yaml'); exec daprd
-      --app-id mechaed --dapr-listen-addresses 127.0.0.1
-      --dapr-internal-grpc-listen-address 127.0.0.1 --resources-path $$dir --app-channel-address 127.0.0.1 --app-port
-      $$env.CADDY_PORT --dapr-http-port $$env.DAPR_HTTP_PORT --dapr-grpc-port 0
-      --dapr-internal-grpc-port $$env.DAPR_INTERNAL_GRPC_PORT --metrics-port 0 --profile-port 0
-      --log-level info --enable-api-logging
-    availability:
-      exit_on_skipped: true
-      restart: on_failure
-      backoff_seconds: 1
-      max_restarts: 15
-    environment:
-    - CADDY_PORT=${CADDY_HTTP_PORT:-27909}
-    - DAPR_HTTP_PORT=${MESH_EVENTS_HTTP_PORT:-11857}
-    - DAPR_INTERNAL_GRPC_PORT=${MESH_EVENTS_GRPC_PORT:-22192}
-    - REDIS_HOST=127.0.0.1:${REDIS_REDIS_PORT:-18884}
-    readiness_probe:
-      exec:
-        command: bayt microcheck portcheck --port ${MESH_EVENTS_HTTP_PORT:-11857}
-      period_seconds: 5
-      timeout_seconds: 5
-      failure_threshold: 36
-  conduit:
-    depends_on:
-      database:
-        condition: process_healthy
-      mesh-events:
-        condition: process_started
-      "bayt:httpcheck":
-        condition: process_completed_successfully
-    entrypoint:
-    - mise
-    - x
-    - --
-    - nu
-    - -c
-    - >-
-      let base = ($$env.BAYT_LOCAL_WORK_DIR? | default $$nu.temp-dir); let dir =
-      ($$base | path join $$'conduit-($$nu.pid)-(random int 1000..9999)'); mkdir ($$dir |
-      path join 'pipelines') ($$dir | path join 'connectors'); let conn = (which
-      conduit-connector-http | first | get path); cp -f $$conn ($$dir | path join 'connectors'
-      ($$conn | path basename)); open --raw 'docker/conduit-pipeline.yaml' | str
-      replace -a '$${DATABASE_URL}' $$env.DATABASE_URL | str replace -a
-      '$${MESH_EVENTS_URL}' $$env.MESH_EVENTS_URL | save -f ($$dir | path join
-      'pipelines/cdc-to-bus.yaml'); exec conduit run --db.type inmemory --pipelines.path ($$dir | path join
-      'pipelines') --connectors.path ($$dir | path join 'connectors') --api.http.address
-      $$"127.0.0.1:($$env.CONDUIT_API_HTTP_ADDRESS_PORT)" --api.grpc.address '127.0.0.1:0'
-    availability:
-      exit_on_skipped: true
-      restart: on_failure
-      backoff_seconds: 1
-      max_restarts: 15
-    environment:
-    - CONDUIT_API_HTTP_ADDRESS_PORT=${CONDUIT_HTTP_PORT:-15878}
-    - >-
-      DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@127.0.0.1:${DATABASE_PG_PORT:-19241}/${POSTGRES_DB:-realworld}
-    - MESH_EVENTS_URL=http://127.0.0.1:${MESH_EVENTS_HTTP_PORT:-11857}
-    readiness_probe:
-      exec:
-        command: bayt microcheck httpcheck http://127.0.0.1:${CONDUIT_HTTP_PORT:-15878}/healthz
-      period_seconds: 5
-      timeout_seconds: 5
-      failure_threshold: 44
   transform:
     depends_on:
       redis:
@@ -413,23 +431,3 @@ processes:
     - REDIS_URL=redis://127.0.0.1:${REDIS_REDIS_PORT:-18884}
     - >-
       SERVICE_JWT=${SERVICE_JWT:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZSIsInN1YiI6IjAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMCIsImV4cCI6MTk4ODE1MDQwMH0.dGYz_sMSnOvZy0eANh7spJbgyr2fEzeynOERIqW7gd4}
-  check-favorites:
-    depends_on:
-      launch:
-        condition: process_healthy
-    entrypoint:
-    - mise
-    - x
-    - --
-    - nu
-    - -c
-    - >-
-      deno run --config tests/deno.json --no-lock --allow-env --allow-read
-      --allow-net --unsafely-ignore-certificate-errors=caddy,localhost,127.0.0.1
-      tests/favorites.ts .
-    availability:
-      exit_on_skipped: true
-    environment:
-    - APP_URL=https://localhost:${CADDY_TLS_HOST_PORT:-17995}
-    - DOOR=http://127.0.0.1:${CADDY_HTTP_PORT:-27909}
-    - ORIGIN=${ORIGIN:-https://localhost:${CADDY_TLS_HOST_PORT:-17995}}

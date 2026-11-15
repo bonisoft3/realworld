@@ -42,7 +42,7 @@
   },
   "dockerfile": {
     "preamble": [
-      "COPY --from=bonitao/lazybox:0.8.5@sha256:091a3b63ba222777000acc3bf8327faebfea4870e23ee07c6eb42431dadb2ac6 /lazybox/ /root/.local/share/lazybox/",
+      "COPY --from=bonitao/lazybox:0.8.6@sha256:0f30c48513fac757f844f02c864802991dec045f9c4189e3db2ae4ac297544df /lazybox/ /root/.local/share/lazybox/",
       "COPY --from=alpine/socat:1.8.0.0@sha256:a6be4c0262b339c53ddad723cdd178a1a13271e1137c65e27f90a08c16de02b8 /usr/bin/socat1 /usr/local/bin/socat",
       "COPY --from=alpine/socat:1.8.0.0@sha256:a6be4c0262b339c53ddad723cdd178a1a13271e1137c65e27f90a08c16de02b8 /usr/lib/libreadline.so.8 /usr/lib/libncursesw.so.6 /usr/lib/",
       "ENV PATH=$PATH:/root/.local/bin:/root/.local/share/lazybox/bin",
@@ -59,7 +59,7 @@
     "preambleCopyContexts": [
       {
         "name": "bayt",
-        "image": "bonitao/bayt-runtime:1.3.0@sha256:c33b9187787fcbd5fa80f1f2f52c661d6e7c38a4822c269b8daff83e70dce22e"
+        "image": "bonitao/bayt-runtime:1.5.1@sha256:21e3851bcc32a4e56460ef51724385b2ba80999ad73accbf6ae2af53975d9547"
       },
       {
         "name": "alpine/socat:1.8.0.0@sha256:a6be4c0262b339c53ddad723cdd178a1a13271e1137c65e27f90a08c16de02b8"
@@ -489,24 +489,24 @@
         "./.bayt/compose.ci.yaml",
         "./.bayt/compose.ci-android.yaml",
         "./.bayt/compose.ci-visual.yaml",
-        "./.bayt/compose.integrate.yaml",
-        "./.bayt/compose.launch.yaml",
-        "./.bayt/compose.build.yaml",
-        "./.bayt/compose.generate.yaml",
-        "./.bayt/compose.setup.yaml",
-        "./.bayt/compose.caddy.yaml",
-        "./.bayt/compose.crud.yaml",
-        "./.bayt/compose.database.yaml",
-        "./.bayt/compose.served.yaml",
-        "./.bayt/compose.electric.yaml",
-        "./.bayt/compose.redis.yaml",
-        "./.bayt/compose.mesh-events.yaml",
-        "./.bayt/compose.conduit.yaml",
-        "./.bayt/compose.transform.yaml",
-        "./.bayt/compose.auth.yaml",
         "./.bayt/compose.ci-replay.yaml",
         "./.bayt/compose.ci-favorites.yaml",
-        "./.bayt/compose.check-favorites.yaml"
+        "./.bayt/compose.auth.yaml",
+        "./.bayt/compose.build.yaml",
+        "./.bayt/compose.caddy.yaml",
+        "./.bayt/compose.check-favorites.yaml",
+        "./.bayt/compose.conduit.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml",
+        "./.bayt/compose.electric.yaml",
+        "./.bayt/compose.generate.yaml",
+        "./.bayt/compose.integrate.yaml",
+        "./.bayt/compose.launch.yaml",
+        "./.bayt/compose.mesh-events.yaml",
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.served.yaml",
+        "./.bayt/compose.setup.yaml",
+        "./.bayt/compose.transform.yaml"
       ]
     },
     "outs": {
@@ -537,24 +537,24 @@
         "./.bayt/compose.ci.yaml",
         "./.bayt/compose.ci-android.yaml",
         "./.bayt/compose.ci-visual.yaml",
-        "./.bayt/compose.integrate.yaml",
-        "./.bayt/compose.launch.yaml",
-        "./.bayt/compose.build.yaml",
-        "./.bayt/compose.generate.yaml",
-        "./.bayt/compose.setup.yaml",
-        "./.bayt/compose.caddy.yaml",
-        "./.bayt/compose.crud.yaml",
-        "./.bayt/compose.database.yaml",
-        "./.bayt/compose.served.yaml",
-        "./.bayt/compose.electric.yaml",
-        "./.bayt/compose.redis.yaml",
-        "./.bayt/compose.mesh-events.yaml",
-        "./.bayt/compose.conduit.yaml",
-        "./.bayt/compose.transform.yaml",
-        "./.bayt/compose.auth.yaml",
         "./.bayt/compose.ci-replay.yaml",
         "./.bayt/compose.ci-favorites.yaml",
-        "./.bayt/compose.check-favorites.yaml"
+        "./.bayt/compose.auth.yaml",
+        "./.bayt/compose.build.yaml",
+        "./.bayt/compose.caddy.yaml",
+        "./.bayt/compose.check-favorites.yaml",
+        "./.bayt/compose.conduit.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml",
+        "./.bayt/compose.electric.yaml",
+        "./.bayt/compose.generate.yaml",
+        "./.bayt/compose.integrate.yaml",
+        "./.bayt/compose.launch.yaml",
+        "./.bayt/compose.mesh-events.yaml",
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.served.yaml",
+        "./.bayt/compose.setup.yaml",
+        "./.bayt/compose.transform.yaml"
       ]
     },
     "srcs": {
@@ -581,11 +581,11 @@
         "ci-replay_srcs",
         "ci-favorites_srcs",
         "integrate_srcs",
-        "database_srcs",
         "caddy_srcs",
+        "served_srcs",
+        "database_srcs",
         "conduit_srcs",
         "transform_srcs",
-        "served_srcs",
         "setup_srcs",
         "check-favorites_srcs"
       ],
@@ -666,63 +666,11 @@
         },
         {
           "project": "realworld",
-          "name": "database_srcs",
-          "dir": ".",
-          "outs": {
-            "globs": [
-              "services/database/migrations/000_extensions.sql",
-              "services/database/migrations/001_roles.sql",
-              "services/database/migrations/002_grants.sql",
-              "services/database/migrations/004_types.sql",
-              "services/database/migrations/005_create_tables.sql",
-              "services/database/migrations/006_policies.sql",
-              "services/database/migrations/007_txid.sql",
-              "services/database/migrations/008_publication.sql",
-              "services/database/migrations/003_rls.sql",
-              "services/database/migrations/011_owner_writes.sql",
-              "services/database/migrations/012_me_readonly.sql",
-              "services/database/migrations/013_article_tag_sync.sql",
-              "services/database/migrations/014_me_provision.sql",
-              "services/database/migrations/015_default_privileges.sql",
-              "services/database/migrations/016_edge_projections.sql",
-              "services/database/migrations/017_demo_content.sql",
-              "services/database/migrations/018_favorite_guard.sql"
-            ],
-            "exclude": []
-          }
-        },
-        {
-          "project": "realworld",
           "name": "caddy_srcs",
           "dir": ".",
           "outs": {
             "globs": [
               "docker/Caddyfile"
-            ],
-            "exclude": []
-          }
-        },
-        {
-          "project": "realworld",
-          "name": "conduit_srcs",
-          "dir": ".",
-          "outs": {
-            "globs": [
-              "docker/conduit-pipeline.yaml"
-            ],
-            "exclude": []
-          }
-        },
-        {
-          "project": "realworld",
-          "name": "transform_srcs",
-          "dir": ".",
-          "outs": {
-            "globs": [
-              "docker/realworld-favorite-recount.yaml",
-              "docker/realworld-favorite-count.yaml",
-              "docker/realworld-favorite-index.yaml",
-              "docker/realworld-tag-recount.yaml"
             ],
             "exclude": []
           }
@@ -823,6 +771,58 @@
         },
         {
           "project": "realworld",
+          "name": "database_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "services/database/migrations/000_extensions.sql",
+              "services/database/migrations/001_roles.sql",
+              "services/database/migrations/002_grants.sql",
+              "services/database/migrations/004_types.sql",
+              "services/database/migrations/005_create_tables.sql",
+              "services/database/migrations/006_policies.sql",
+              "services/database/migrations/007_txid.sql",
+              "services/database/migrations/008_publication.sql",
+              "services/database/migrations/003_rls.sql",
+              "services/database/migrations/011_owner_writes.sql",
+              "services/database/migrations/012_me_readonly.sql",
+              "services/database/migrations/013_article_tag_sync.sql",
+              "services/database/migrations/014_me_provision.sql",
+              "services/database/migrations/015_default_privileges.sql",
+              "services/database/migrations/016_edge_projections.sql",
+              "services/database/migrations/017_demo_content.sql",
+              "services/database/migrations/018_favorite_guard.sql"
+            ],
+            "exclude": []
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "conduit_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "docker/conduit-pipeline.yaml"
+            ],
+            "exclude": []
+          }
+        },
+        {
+          "project": "realworld",
+          "name": "transform_srcs",
+          "dir": ".",
+          "outs": {
+            "globs": [
+              "docker/realworld-favorite-recount.yaml",
+              "docker/realworld-favorite-count.yaml",
+              "docker/realworld-favorite-index.yaml",
+              "docker/realworld-tag-recount.yaml"
+            ],
+            "exclude": []
+          }
+        },
+        {
+          "project": "realworld",
           "name": "setup_srcs",
           "dir": ".",
           "outs": {
@@ -830,7 +830,8 @@
               "[m]ise.toml",
               "[.]mise.toml",
               "[m]ise.lock",
-              "[.]tool-versions"
+              "[.]tool-versions",
+              "[m]ise.local.toml"
             ],
             "exclude": []
           }
@@ -857,24 +858,24 @@
         "./.bayt/compose.ci.yaml",
         "./.bayt/compose.ci-android.yaml",
         "./.bayt/compose.ci-visual.yaml",
-        "./.bayt/compose.integrate.yaml",
-        "./.bayt/compose.launch.yaml",
-        "./.bayt/compose.build.yaml",
-        "./.bayt/compose.generate.yaml",
-        "./.bayt/compose.setup.yaml",
-        "./.bayt/compose.caddy.yaml",
-        "./.bayt/compose.crud.yaml",
-        "./.bayt/compose.database.yaml",
-        "./.bayt/compose.served.yaml",
-        "./.bayt/compose.electric.yaml",
-        "./.bayt/compose.redis.yaml",
-        "./.bayt/compose.mesh-events.yaml",
-        "./.bayt/compose.conduit.yaml",
-        "./.bayt/compose.transform.yaml",
-        "./.bayt/compose.auth.yaml",
         "./.bayt/compose.ci-replay.yaml",
         "./.bayt/compose.ci-favorites.yaml",
-        "./.bayt/compose.check-favorites.yaml"
+        "./.bayt/compose.auth.yaml",
+        "./.bayt/compose.build.yaml",
+        "./.bayt/compose.caddy.yaml",
+        "./.bayt/compose.check-favorites.yaml",
+        "./.bayt/compose.conduit.yaml",
+        "./.bayt/compose.crud.yaml",
+        "./.bayt/compose.database.yaml",
+        "./.bayt/compose.electric.yaml",
+        "./.bayt/compose.generate.yaml",
+        "./.bayt/compose.integrate.yaml",
+        "./.bayt/compose.launch.yaml",
+        "./.bayt/compose.mesh-events.yaml",
+        "./.bayt/compose.redis.yaml",
+        "./.bayt/compose.served.yaml",
+        "./.bayt/compose.setup.yaml",
+        "./.bayt/compose.transform.yaml"
       ]
     }
   },
@@ -915,11 +916,11 @@
     "ci-favorites_srcs",
     "ci-favorites_bayt",
     "integrate_srcs",
-    "database_srcs",
     "caddy_srcs",
+    "served_srcs",
+    "database_srcs",
     "conduit_srcs",
     "transform_srcs",
-    "served_srcs",
     "setup_srcs",
     "check-favorites_srcs"
   ],
@@ -928,24 +929,24 @@
     "./.bayt/compose.ci.yaml",
     "./.bayt/compose.ci-android.yaml",
     "./.bayt/compose.ci-visual.yaml",
-    "./.bayt/compose.integrate.yaml",
-    "./.bayt/compose.launch.yaml",
-    "./.bayt/compose.build.yaml",
-    "./.bayt/compose.generate.yaml",
-    "./.bayt/compose.setup.yaml",
-    "./.bayt/compose.caddy.yaml",
-    "./.bayt/compose.crud.yaml",
-    "./.bayt/compose.database.yaml",
-    "./.bayt/compose.served.yaml",
-    "./.bayt/compose.electric.yaml",
-    "./.bayt/compose.redis.yaml",
-    "./.bayt/compose.mesh-events.yaml",
-    "./.bayt/compose.conduit.yaml",
-    "./.bayt/compose.transform.yaml",
-    "./.bayt/compose.auth.yaml",
     "./.bayt/compose.ci-replay.yaml",
     "./.bayt/compose.ci-favorites.yaml",
-    "./.bayt/compose.check-favorites.yaml"
+    "./.bayt/compose.auth.yaml",
+    "./.bayt/compose.build.yaml",
+    "./.bayt/compose.caddy.yaml",
+    "./.bayt/compose.check-favorites.yaml",
+    "./.bayt/compose.conduit.yaml",
+    "./.bayt/compose.crud.yaml",
+    "./.bayt/compose.database.yaml",
+    "./.bayt/compose.electric.yaml",
+    "./.bayt/compose.generate.yaml",
+    "./.bayt/compose.integrate.yaml",
+    "./.bayt/compose.launch.yaml",
+    "./.bayt/compose.mesh-events.yaml",
+    "./.bayt/compose.redis.yaml",
+    "./.bayt/compose.served.yaml",
+    "./.bayt/compose.setup.yaml",
+    "./.bayt/compose.transform.yaml"
   ],
   "chainedDeps": [
     {
@@ -1109,64 +1110,12 @@
       }
     },
     {
-      "name": "database_srcs",
-      "project": "realworld",
-      "dir": ".",
-      "outs": {
-        "globs": [
-          "services/database/migrations/000_extensions.sql",
-          "services/database/migrations/001_roles.sql",
-          "services/database/migrations/002_grants.sql",
-          "services/database/migrations/004_types.sql",
-          "services/database/migrations/005_create_tables.sql",
-          "services/database/migrations/006_policies.sql",
-          "services/database/migrations/007_txid.sql",
-          "services/database/migrations/008_publication.sql",
-          "services/database/migrations/003_rls.sql",
-          "services/database/migrations/011_owner_writes.sql",
-          "services/database/migrations/012_me_readonly.sql",
-          "services/database/migrations/013_article_tag_sync.sql",
-          "services/database/migrations/014_me_provision.sql",
-          "services/database/migrations/015_default_privileges.sql",
-          "services/database/migrations/016_edge_projections.sql",
-          "services/database/migrations/017_demo_content.sql",
-          "services/database/migrations/018_favorite_guard.sql"
-        ],
-        "exclude": []
-      }
-    },
-    {
       "name": "caddy_srcs",
       "project": "realworld",
       "dir": ".",
       "outs": {
         "globs": [
           "docker/Caddyfile"
-        ],
-        "exclude": []
-      }
-    },
-    {
-      "name": "conduit_srcs",
-      "project": "realworld",
-      "dir": ".",
-      "outs": {
-        "globs": [
-          "docker/conduit-pipeline.yaml"
-        ],
-        "exclude": []
-      }
-    },
-    {
-      "name": "transform_srcs",
-      "project": "realworld",
-      "dir": ".",
-      "outs": {
-        "globs": [
-          "docker/realworld-favorite-recount.yaml",
-          "docker/realworld-favorite-count.yaml",
-          "docker/realworld-favorite-index.yaml",
-          "docker/realworld-tag-recount.yaml"
         ],
         "exclude": []
       }
@@ -1266,6 +1215,58 @@
       }
     },
     {
+      "name": "database_srcs",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [
+          "services/database/migrations/000_extensions.sql",
+          "services/database/migrations/001_roles.sql",
+          "services/database/migrations/002_grants.sql",
+          "services/database/migrations/004_types.sql",
+          "services/database/migrations/005_create_tables.sql",
+          "services/database/migrations/006_policies.sql",
+          "services/database/migrations/007_txid.sql",
+          "services/database/migrations/008_publication.sql",
+          "services/database/migrations/003_rls.sql",
+          "services/database/migrations/011_owner_writes.sql",
+          "services/database/migrations/012_me_readonly.sql",
+          "services/database/migrations/013_article_tag_sync.sql",
+          "services/database/migrations/014_me_provision.sql",
+          "services/database/migrations/015_default_privileges.sql",
+          "services/database/migrations/016_edge_projections.sql",
+          "services/database/migrations/017_demo_content.sql",
+          "services/database/migrations/018_favorite_guard.sql"
+        ],
+        "exclude": []
+      }
+    },
+    {
+      "name": "conduit_srcs",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [
+          "docker/conduit-pipeline.yaml"
+        ],
+        "exclude": []
+      }
+    },
+    {
+      "name": "transform_srcs",
+      "project": "realworld",
+      "dir": ".",
+      "outs": {
+        "globs": [
+          "docker/realworld-favorite-recount.yaml",
+          "docker/realworld-favorite-count.yaml",
+          "docker/realworld-favorite-index.yaml",
+          "docker/realworld-tag-recount.yaml"
+        ],
+        "exclude": []
+      }
+    },
+    {
       "name": "setup_srcs",
       "project": "realworld",
       "dir": ".",
@@ -1274,7 +1275,8 @@
           "[m]ise.toml",
           "[.]mise.toml",
           "[m]ise.lock",
-          "[.]tool-versions"
+          "[.]tool-versions",
+          "[m]ise.local.toml"
         ],
         "exclude": []
       }
@@ -1301,6 +1303,7 @@
         "defaultGlobs": null,
         "defaultExclude": null
       },
+      "name": "builtin",
       "do": "set -eu\nexport DOCKER_HOST_TCP=\"$DOCKER_HOST\"\nexport DEPOT_DISABLE_OTEL=1\ndocker compose --profile '*' config -o /tmp/ci-compose.yaml\ndocker buildx bake --allow=fs.read=/ -f /tmp/ci-compose.yaml --print ci-android ci-visual ci-replay ci-favorites > /tmp/ci-bake.json\nfor target in ci-android ci-visual ci-replay ci-favorites; do\n docker buildx bake -f /tmp/ci-bake.json --progress plain --set '*.output=type=cacheonly' ${SAYT_NO_CACHE:+--no-cache --set \"*.cache-from=\" --set \"*.cache-to=\"} ${SAYT_NO_CACHE_FROM:+--set \"*.cache-from=\"} ${SAYT_NO_CACHE_TO:+--set \"*.cache-to=\"} \"$target\"\ndone",
       "shell": "sh",
       "dockerfile": {
@@ -1444,7 +1447,6 @@
           "steps": []
         }
       },
-      "name": "builtin",
       "stop": false
     }
   ],

@@ -4,7 +4,7 @@ lockfile = true
 experimental = true
 
 [tools]
-"github:cue-lang/cue" = "0.16.1"
+"github:cue-lang/cue" = "0.18.0-rc.4"
 
 # Compares every proto the app does not withhold against its own git history
 # (plugins/pronto/check-proto.ts). Ships windows-x64 and windows-arm64.
@@ -13,6 +13,9 @@ experimental = true
 # its GitHub release, ELK layout, no browser.
 "github:terrastruct/d2" = "v0.9.0"
 "github:denoland/deno" = "v2.9.7"
+# Generated checks run `mise x -- nu`; without this pin `nu` is lazybox's stub,
+# which drops the tools `mise x` put on PATH (apps/platform_pins.nu checks it).
+"github:nushell/nushell" = "0.116.1"
 # Lint + config validators for the emitted pipeline/proxy files. The asset
 # pattern is load-bearing. The release also ships a `-cloud` build that mise
 # picks by default, and it is a slim bundle — no javascript, wasm, subprocess,

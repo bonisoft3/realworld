@@ -20,8 +20,6 @@ include:
   required: false
 - path: .././.bayt/compose.crud.yaml
   required: false
-- path: .././.bayt/compose.served.yaml
-  required: false
 - path: .././.bayt/compose.electric.yaml
   required: false
 - path: .././.bayt/compose.redis.yaml
@@ -33,6 +31,8 @@ include:
 - path: .././.bayt/compose.transform.yaml
   required: false
 - path: .././.bayt/compose.auth.yaml
+  required: false
+- path: .././.bayt/compose.served.yaml
   required: false
 - path: .././.bayt/compose.integrate.yaml
   required: false

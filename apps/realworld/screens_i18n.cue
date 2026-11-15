@@ -64,7 +64,9 @@ _LOCALES: [...#Locale] & [
 	{tag: "ja", key: "lang_ja", name: "日本語"},
 ]
 
-_langPicker: P={
+_langPicker: {
+	let P = self
+
 	// This screen's own route name, so data-route addresses the page the
 	// reader is already on rather than sending them elsewhere.
 	route: string

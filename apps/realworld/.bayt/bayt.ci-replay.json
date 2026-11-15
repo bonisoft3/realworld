@@ -193,7 +193,8 @@
           "[m]ise.toml",
           "[.]mise.toml",
           "[m]ise.lock",
-          "[.]tool-versions"
+          "[.]tool-versions",
+          "[m]ise.local.toml"
         ],
         "exclude": []
       },
@@ -241,7 +242,8 @@
               "[m]ise.toml",
               "[.]mise.toml",
               "[m]ise.lock",
-              "[.]tool-versions"
+              "[.]tool-versions",
+              "[m]ise.local.toml"
             ],
             "exclude": []
           }
@@ -319,9 +321,9 @@
         "defaultGlobs": null,
         "defaultExclude": null
       },
+      "name": "builtin",
       "shell": "sh",
       "do": "process-compose --no-server -f .bayt/process-compose.yaml run replay",
-      "name": "builtin",
       "stop": false
     }
   ],

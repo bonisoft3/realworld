@@ -33,6 +33,7 @@ shell:
   bg: "neutral"
   fg: "secondary"
   rule: "border"
+  nav: "topbar"
 ---
 
 # Press
