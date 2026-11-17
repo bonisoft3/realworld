@@ -587,7 +587,7 @@
   "artifact": [
     {"path":"program.cue","sha256":"e2d0011bb45b9d9d9488fc22ddeb9f598cb0eb633a255413a3c9ee8ce44b30ad","derived":false},
     {"path":"DESIGN.md","sha256":"b0cee66e1f584c56714c84ba05dddaf9836271c9410638ff4ce08cff4ec36f72","derived":false},
-    {"path":"ir.html","sha256":"6e04ea74396deb9b9f34f6a90962856cb2720d3b9e66665b535419dc8c404597","derived":false},
+    {"path":"ir.html","sha256":"de791d917b642dcd6b7b6aa403aa5da5a4c9b3efa4f8910e90232ee97a91264b","derived":false},
     {"path":"acceptance.md","sha256":"a06ae05fa8b4680819d7c6b54fba688f89d00b52780da6d672856cd76ad22d3d","derived":false},
     {"path":".pronto/cel.json","sha256":"1d3f57dc2c651bbead02c4f7d205b9fea272b4083f7aa95042d6c2041b687276","derived":true},
     {"path":"program_cel.cue","sha256":"4b1a7e6fc4ea7e8cfa36135f30080ef1253020d5fbee8818508e959695d3b97e","derived":true},
