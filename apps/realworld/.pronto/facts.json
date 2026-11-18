@@ -585,7 +585,7 @@
     {"path":"shell/shared/chrome.css","token":"--shell-nav-btn-pad-y"}
   ],
   "artifact": [
-    {"path":"program.cue","sha256":"e2d0011bb45b9d9d9488fc22ddeb9f598cb0eb633a255413a3c9ee8ce44b30ad","derived":false},
+    {"path":"program.cue","sha256":"3741b563e09eb3965d55cef4295ba078c0ad7f8990ed83475577631970ec5735","derived":false},
     {"path":"DESIGN.md","sha256":"b0cee66e1f584c56714c84ba05dddaf9836271c9410638ff4ce08cff4ec36f72","derived":false},
     {"path":"ir.html","sha256":"de791d917b642dcd6b7b6aa403aa5da5a4c9b3efa4f8910e90232ee97a91264b","derived":false},
     {"path":"acceptance.md","sha256":"a06ae05fa8b4680819d7c6b54fba688f89d00b52780da6d672856cd76ad22d3d","derived":false},

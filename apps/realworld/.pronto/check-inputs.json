@@ -1580,6 +1580,10 @@
       "src": "services/database/sql/003_rls.txt"
     },
     {
+      "name": "005_create_tables.sql",
+      "src": "services/database/baseline/005_create_tables.sql"
+    },
+    {
       "name": "011_owner_writes.sql",
       "src": "services/database/sql/011_owner_writes.sql"
     },

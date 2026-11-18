@@ -89,6 +89,8 @@ code: pronto.#App & {
 	// decision-article-tag-trigger).
 	state: rawMigrations: [
 		{name: "003_rls.sql", src: "services/database/sql/003_rls.txt"},
+		// As deployed before atomic RLS DDL (#2444); live directories check its digest.
+		{name: "005_create_tables.sql", src: "services/database/baseline/005_create_tables.sql"},
 		{name: "011_owner_writes.sql", src: "services/database/sql/011_owner_writes.sql"},
 		{name: "012_me_readonly.sql", src: "services/database/sql/012_me_readonly.sql"},
 		{name: "013_article_tag_sync.sql", src: "services/database/sql/013_article_tag_sync.sql"},
