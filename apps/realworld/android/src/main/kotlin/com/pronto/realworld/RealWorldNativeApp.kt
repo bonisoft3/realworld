@@ -25,7 +25,8 @@ class RealWorldNativeApp(
     val engine: OmnishellEngine = QuickJsOmnishellEngine(
         networkBridge = networkBridge,
         storageBridge = storageBridge,
-        initialScript = script
+        initialScript = script,
+        origin = "https://realworld.bonisoft3.com"
     )
 
     val actionHandler = RealWorldDivActionHandler(engine)

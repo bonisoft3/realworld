@@ -1320,7 +1320,7 @@ screen, as the masthead, and never twice for two purposes.</p>
         <rect x="160" y="144" width="66" height="13" fill="#EFEDE6" rx="6.5"/>
         <rect x="160" y="161" width="66" height="13" fill="#EFEDE6" rx="6.5"/>
       </svg>
-      <figcaption>loading — skeletons cover region-bound content and nothing else: the nav strip, the reader's own name beside sign out, the masthead and the search box are shell chrome and screen-level static markup, so they are drawn as themselves at first paint (which is what <code>accept-signin-handle</code> asserts). The favorite pills are not drawn at all — the arms are held invisible until the probe sweeps its template. Dark twin: skeletons #24272A on #131414, masthead #E9E7E2, nav and the reader's own name #9AA0A6.</figcaption>
+      <figcaption>loading — skeletons cover region-bound content and nothing else: the nav strip, the reader's own chip, the masthead and the search box are shell chrome and screen-level static markup, so they are drawn as themselves at first paint (which is what <code>accept-signin-handle</code> asserts). The favorite pills are not drawn at all — the arms are held invisible until the probe sweeps its template. Dark twin: skeletons #24272A on #131414, masthead #E9E7E2, nav and the reader's own name #9AA0A6.</figcaption>
     </figure>
 
     <figure id="home-empty" data-kind="state" data-of="home" data-state="empty">
@@ -4709,7 +4709,7 @@ and the <code>014</code> trigger provisions <a href="#Me">Me</a> in the same
 transaction, so <code class="cel">output.me.id == output.user_id</code> holds on
 the first paint rather than after a CDC round trip — which is what lets a guest
 reach <a href="#settings">settings</a> and their own profile immediately. The
-handle stands in the chrome beside sign out on every screen until they sign out
+handle stands in the chrome, on the chip that holds sign out, on every screen until they sign out
 — under the display name once they set one, and linking to their own profile
 either way; the terminal draws it, and no screen redraws it.
 </p>
@@ -5597,8 +5597,8 @@ result rather than an error.
     the identity section spells the ceremony out. Accepted losses, recorded
     rather than smoothed over: a search-engine crawler sees the login chrome and
     nothing else, a shared article link costs one guest click before it reads,
-    and a guest identity lives in <code>sessionStorage</code> — closing the tab
-    ends it; a passkey brings a person back to their own articles
+    and a guest identity lives in the browser's <code>localStorage</code> —
+    clearing site data ends it; a passkey brings a person back to their own articles
     (<code>accept-signout-return</code>). What the app gets in exchange is the
     whole ceremony for free: one tap, no typing, a unique generated handle, the
     <code>name · handle · sign out</code> chrome, the nav, and 401 recovery, none of it

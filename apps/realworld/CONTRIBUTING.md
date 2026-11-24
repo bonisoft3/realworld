@@ -68,8 +68,8 @@ in **both** `ir.html` and `program.cue`, or `check-facts` fails.
 ## Driving it from a browser
 
 Auth is `POST /auth/guest`; the token lives in
-`sessionStorage['pronto-token']`. A `goto` clears it, so the order is: navigate,
-set the token, reload.
+`localStorage['pronto-token']`, one per browser profile, so it outlives a
+`goto`: navigate, set the token, reload.
 
 Anything transient wants a **per-frame trace of the computed value**, never a
 sample at fixed offsets. Both regressions in the counter work were invisible to

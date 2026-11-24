@@ -39,7 +39,6 @@ auth:
       table: app_user
       column: display_name
   mode: passkey
-  promote: false
 floors:
   touch: 24
 i18n:
@@ -77,7 +76,9 @@ i18n:
       path: tr
 keys:
   article_stats: article_id
-native: true
+native:
+  - android
+  - ios
 read:
   article: lazy
   article_tag: lazy

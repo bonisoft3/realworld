@@ -3,7 +3,7 @@
 What "done" looks like, one check per line. Each id below is cited by the
 invariants in [ir.html](ir.html) that realize it; coverage is a lint, not a hope.
 
-- Coming in takes one gesture — a passkey tap, a guest click, or Google sign-in — and leaves the person's handle on screen, next to sign out, until they sign out. {#accept-signin-handle}
+- Coming in takes one gesture — a passkey tap, a guest click, or Google sign-in — and leaves the person's handle on screen, on the chip whose panel holds sign out, until they sign out. {#accept-signin-handle}
 - Signing out returns to the door; signing back in with the same passkey or Google account finds every article, follow and favorite exactly where it was left. {#accept-signout-return}
 - Someone who has just come in and follows nobody still sees the whole community's writing, newest first — never a blank page. {#accept-community-list}
 - Your feed shows the articles of the people you follow and nothing else; with no follows yet it says how to fill it rather than showing an empty list. {#accept-feed-follows-only}

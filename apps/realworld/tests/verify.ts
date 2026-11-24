@@ -35,7 +35,7 @@ const home: JourneyItem = {
     if (!response || response.status() !== 200) throw new Error("home: navigation failed");
     await page.locator(".login-guest").click();
     await ready(page, "home");
-    const session = await page.evaluate(() => JSON.parse(sessionStorage.getItem("pronto-token") ?? "null"));
+    const session = await page.evaluate(() => JSON.parse(localStorage.getItem("pronto-token") ?? "null"));
     if (!session?.token || !session.user?.guest) throw new Error("guest sign-in did not establish a session");
     const articles = await readRows(page, base, "article?select=id,slug,title,created_at,author_id&id=eq.d3b00001-0000-4000-8000-000000000001", session.token);
     const article = articles[0];

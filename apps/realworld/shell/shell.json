@@ -53,8 +53,7 @@
         "column": "display_name"
       }
     },
-    "mode": "passkey",
-    "promote": false
+    "mode": "passkey"
   },
   "floors": {
     "touch": 24
@@ -112,7 +111,10 @@
   "keys": {
     "article_stats": "article_id"
   },
-  "native": true,
+  "native": [
+    "android",
+    "ios"
+  ],
   "read": {
     "article": "lazy",
     "article_tag": "lazy",

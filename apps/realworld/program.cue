@@ -79,7 +79,7 @@ code: pronto.#App & {
 
 	// The app is served to a native host as well as a browser, so every route
 	// projects deterministically to DivKit (phone) and winio (desktop) via project-native.
-	capabilities: native: true
+	capabilities: native: ["android", "ios"]
 
 	// Assembly SQL beyond the schema vocabulary: the three composite uniques
 	// the per-field flag cannot express, the additive owner-write policies and

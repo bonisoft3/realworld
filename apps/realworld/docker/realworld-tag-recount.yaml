@@ -2,6 +2,7 @@
 input:
   processors:
     - mutation: meta cdc_consumer = "realworld-tag-recount"
+    - resource: cdc_stream_trim
     - resource: cdc_trace_join
   redis_streams:
     url: '${REDIS_URL}'

@@ -1,5 +1,5 @@
 /* The terminal's strip, dressed by the app. The terminal owns the markup and
-   its stable classes (nav, .shell-me, .shell-who, .shell-signout) and stamps
+   its stable classes (nav, .shell-me, .shell-person) and stamps
    aria-current on the route you are on; everything below is this app deciding
    what those mean here. Imported by every screen, so it is declared once.
 
@@ -64,48 +64,19 @@ body > nav > a:first-child:last-of-type::before { content: none; }
    column, no upload and no request. The full handle returns as a pill once the
    strip has room for it. */
 /* Pinned to the strip's right edge, not carried along by its scroll. The
-   routes may scroll out of sight; the way out may not — accept-signin-handle
-   asks for the handle beside sign out until the reader takes it, and a control
-   that has scrolled off the end is not on screen. */
+   routes may scroll out of sight; the person's chip may not —
+   accept-signin-handle asks for the handle on screen until the reader signs
+   out, and a control that has scrolled off the end is not on screen. */
 body > nav .shell-me { flex: none;
   background: var(--shell-bg); }
-body > nav .shell-who { text-decoration: none; }
-body > nav .shell-who .name { display: none; }
-body > nav .shell-who .handle {
-  display: block; width: 30px; height: 30px; flex: none;
-  border-radius: var(--r-full);
-  border: 1px solid var(--border);
-  background: var(--surface-muted);
-  color: var(--primary);
-  line-height: 28px; text-align: center; text-transform: uppercase;
-  /* The disc shows one letter: the rest of the handle is sized away rather
-     than truncated, so no ellipsis can appear inside a 30px circle. */
-  font-size: 0;
-}
-body > nav .shell-who .handle::first-letter { font-size: .9375rem; font-weight: 700; }
-body > nav .shell-who:hover .handle { border-color: var(--secondary); }
 
-@media (min-width: 700px) {
-  body > nav .shell-who .handle {
-    width: auto; height: auto; max-width: 16ch; flex: 0 1 auto;
-    border: none; background: none; border-radius: 0;
-    line-height: 1.5; text-transform: none; font-size: .9375rem;
-  }
-  body > nav .shell-who .handle::first-letter { font-size: .9375rem; font-weight: inherit; }
-}
-
-@media (min-width: 960px) {
-  body > nav .shell-who .name { display: block; }
-}
-
-/* A phone's strip is tighter than a desk's. Sign out stays on it at every
-   width: accept-signin-handle asks for the handle beside the way out until
-   the reader takes it, so shrinking it is allowed and hiding it is not. */
+/* A phone's strip is tighter than a desk's. The chip stays on it at every
+   width: accept-signin-handle asks for the handle on screen until the reader
+   signs out, so shrinking it is allowed and hiding it is not. */
 @media (max-width: 699px) {
   /* Four destinations plus the identity fit without wrapping or horizontal
      overflow across standard phone viewports down to 360px. */
   body > nav { gap: 6px; padding: 10px 8px; font-size: .875rem; }
-  body > nav .shell-signout { font-size: .8125rem; flex: none; }
   body > nav > a:first-child { margin-inline-end: 0; }
   body > nav > a:last-of-type { padding: 6px 8px; font-size: 0; margin-inline-start: 0; }
   body > nav > a:last-of-type::before { content: "\270e"; font-size: 1rem; }

@@ -32,7 +32,8 @@ public final class RealWorldNativeApp: @unchecked Sendable {
             let jscEngine = JavaScriptCoreOmnishellEngine(
                 networkBridge: networkBridge,
                 storageBridge: storageBridge,
-                initialScript: script
+                initialScript: script,
+                origin: "https://realworld.bonisoft3.com"
             )
             self.engine = jscEngine
             self.actionHandler = RealWorldDivActionHandler(engine: jscEngine)
