@@ -15,31 +15,24 @@ let event_row = if this.exists("data") && this.data.type() == "string" && this.d
 # `favorite` are column-identical, so a witness column matches both.
 let from_favorite = $event_row.type() == "object" && $event_row.__table == "favorite" && $event_row.exists("article_id")
 
-# A retracted favourite is still a row, so it must be filtered out here or the
-# reader's profile keeps listing a piece they un-favourited.
-let active_rows = $rows.filter(r -> r.deleted_at == null).map_each(r -> {
+# A retracted favourite is still a row, so emit active: false when the
+# triggering pair is no longer active so the profile read (active=is.true) drops
+# it instead of orphaning it. Repeat all five keys on every object because
+# PostgREST rejects a bulk insert whose objects disagree on their key set.
+let event_id = if $from_favorite { $event_row.user_id + ":" + $event_row.article_id } else { "" }
+let active = $rows.filter(r -> r.deleted_at == null && r.user_id == $event_row.user_id && r.article_id == $event_row.article_id).map_each(r -> {
   "id": r.user_id + ":" + r.article_id,
   "user_id": r.user_id,
   "article_id": r.article_id,
   "active": true,
   "favorited_at": r.created_at,
 })
+let retracted = [{
+  "id": $event_id,
+  "user_id": $event_row.user_id,
+  "article_id": $event_row.article_id,
+  "active": false,
+  "favorited_at": $event_row.created_at,
+}]
 
-# An upsert-only sink retracts by value, never by delete: when the triggering
-# pair is no longer among the current favorites — un-favorited, or cascaded
-# away with its article — emit it inactive so the profile read
-# (active=is.true) drops it instead of orphaning it. The row repeats the
-# pair's own columns because PostgREST rejects a bulk insert whose objects
-# disagree on their key set, so all five keys must be present on every object.
-let event_id = if $from_favorite { $event_row.user_id + ":" + $event_row.article_id } else { "" }
-let retractions = if $from_favorite && $active_rows.filter(r -> r.id == $event_id).length() == 0 {
-  [{
-    "id": $event_id,
-    "user_id": $event_row.user_id,
-    "article_id": $event_row.article_id,
-    "active": false,
-    "favorited_at": $event_row.created_at,
-  }]
-} else { [] }
-
-root = if $from_favorite { $active_rows.concat($retractions) } else { deleted() }
+root = if $from_favorite { if $active.length() > 0 { $active } else { $retracted } } else { deleted() }

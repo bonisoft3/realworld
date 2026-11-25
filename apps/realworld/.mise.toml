@@ -4,7 +4,7 @@ lockfile = true
 experimental = true
 
 [tools]
-"github:cue-lang/cue" = "0.18.0-rc.4"
+"github:cue-lang/cue" = "0.18.0"
 
 # Compares every proto the app does not withhold against its own git history
 # (plugins/pronto/check-proto.ts). Ships windows-x64 and windows-arm64.

@@ -15,17 +15,15 @@ let event_row = if this.exists("data") && this.data.type() == "string" && this.d
 # the reason stated in favorite-recount.
 let from_article_tag = $event_row.type() == "object" && $event_row.exists("tag")
 
-# The event's own tag is unioned in so the last piece to shed it drives the
-# count to zero rather than leaving it at one; the panel's article_count=gt.0
-# filter then drops the chip.
-let event_tags = if $from_article_tag { [$event_row.tag] } else { [] }
-let tags = $rows.map_each(r -> r.tag).concat($event_tags).unique()
+# Emit only the triggering event's tag (returning article_count: 0 once the
+# last piece sheds it) so startup sweeps and live events stay linear in tags.
+let tag = if $from_article_tag { $event_row.tag } else { "" }
 
 root = if $from_article_tag {
-  $tags.map_each(t -> {
-    "id": t,
-    "article_count": $rows.filter(r -> r.tag == t).map_each(r -> r.article_id).unique().length(),
-  })
+  [{
+    "id": $tag,
+    "article_count": $rows.filter(r -> r.tag == $tag).map_each(r -> r.article_id).unique().length(),
+  }]
 } else {
   deleted()
 }
