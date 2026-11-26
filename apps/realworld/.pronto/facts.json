@@ -599,7 +599,7 @@
     {"path":"shell/screens/tag.css","sha256":"bdf7bfd82a81b0c7a9e6910577ab1201b426eaf95a56a388d007a9f10e486d29","derived":false},
     {"path":"shell/shared/chrome.css","sha256":"8070f58d464bd23084a3c420739cc30bc70ecae43ed05184fb3ae6f47f91ddca","derived":false},
     {"path":"shell/shared/system.css","sha256":"f09f2869a26bae098597e21a9863fdc1413fdf0878cfc9e8ce8a241dc0b2b767","derived":false},
-    {"path":"shell/design.css","sha256":"4ab7bd2811bacac91cdf66618201c3e69d86f13fbc59a2716f6ee54277408688","derived":true}
+    {"path":"shell/design.css","sha256":"5440d52a8e29baab6832e27811fd262ec794f90fee2bb953c8cc544b0a6a5dc3","derived":true}
   ],
   "cel_ir": [
     {"cel":"this >= 0"},
